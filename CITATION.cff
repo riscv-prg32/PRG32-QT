@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: PRG32-QT
+message: "If you use PRG32-QT in teaching, research, or software, please cite the project repository and the version used."
+type: software
+authors:
+  - family-names: Montella
+    given-names: Raffaele
+license: MIT
+version: 0.3.0
+date-released: 2026-09-21
+repository-code: "https://github.com/riscv-prg32/PRG32-QT"
+keywords:
+  - RISC-V
+  - PRG32
+  - Qt
+  - emulator
+  - education
+  - retro-gaming
