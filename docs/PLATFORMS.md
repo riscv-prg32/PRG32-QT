@@ -69,10 +69,20 @@ The plain-HTTP default Store requires the included App Transport Security allowa
 
 ## Android
 
-Install Android SDK/NDK, JDK 17 and a Qt Android kit:
+Install an Android SDK with platform 34, NDK 26.1.10909125 (r26b), JDK 17 or newer, Ninja, and matching Qt host and Android ARM64 kits. Both Qt kits must include Core, Gui, Quick, QuickControls2, Network and Multimedia. With Qt 6.8.3 in the standard macOS locations, build with:
 
 ```sh
-QT_ROOT=/path/to/Qt/6.8.3/android_arm64_v8a ./scripts/build-android.sh
+./scripts/build-android.sh
 ```
 
-The manifest enables Internet access and cleartext HTTP for the current default Store.
+The helper defaults to `$HOME/Qt/6.8.3/android_arm64_v8a`, `$HOME/Qt/6.8.3/macos`, `$HOME/Library/Android/sdk`, and NDK `26.1.10909125`. Override any nonstandard installation explicitly:
+
+```sh
+QT_ROOT=/path/to/Qt/android_arm64_v8a \
+QT_HOST_PATH=/path/to/Qt/host \
+ANDROID_SDK_ROOT=/path/to/android-sdk \
+ANDROID_NDK_ROOT=/path/to/android-ndk \
+./scripts/build-android.sh
+```
+
+The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The manifest enables Internet access and cleartext HTTP for the current default Store.

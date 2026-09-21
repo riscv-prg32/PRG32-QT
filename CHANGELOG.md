@@ -4,6 +4,8 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Made the Android ARM64 build helper configure the host Qt, Android SDK and NDK explicitly, and documented the reproducible debug APK workflow and artifact.
+
 ## [0.3.0] - 2026-09-21
 
 - Completed feature-parity implementation against the public PRG32 runtime: audio/AUD0, graphics, tiles/playfields, platform helpers, sprites/bitplanes, local scores, RGB LED and metrics.

@@ -29,6 +29,14 @@ ctest --test-dir build-core --output-on-failure
 
 Host helpers are provided in `scripts/` for Windows, Linux, Raspberry Pi OS, macOS, iOS and Android. Platform prerequisites and exact commands are documented in [docs/PLATFORMS.md](docs/PLATFORMS.md).
 
+For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
+
+```sh
+./scripts/build-android.sh
+```
+
+The APK is written to `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`.
+
 To exercise every discoverable Store cartridge after building the headless runner:
 
 ```sh
