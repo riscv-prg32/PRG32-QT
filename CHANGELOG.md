@@ -5,6 +5,7 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 ## [Unreleased]
 
 - Made the Android ARM64 build helper configure the host Qt, Android SDK and NDK explicitly, and documented the reproducible debug APK workflow and artifact.
+- Restored the Qt-required Android activity metadata and file provider, set stable package/version metadata, and verified startup and Store browsing on an ARM64 API 35 emulator.
 
 ## [0.3.0] - 2026-09-21
 

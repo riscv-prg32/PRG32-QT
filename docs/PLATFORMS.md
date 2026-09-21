@@ -85,4 +85,4 @@ ANDROID_NDK_ROOT=/path/to/android-ndk \
 ./scripts/build-android.sh
 ```
 
-The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The manifest enables Internet access and cleartext HTTP for the current default Store.
+The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The manifest enables Internet access and cleartext HTTP for the current default Store and retains Qt's required activity metadata and file provider.

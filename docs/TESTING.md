@@ -24,6 +24,16 @@ To reproduce the Android ARM64 compilation and debug packaging locally after ins
 
 A successful run compiles the native host library, deploys its Qt/QML dependencies, and runs Gradle `assembleDebug`. Verify that `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` exists. This is a build/package check; the physical-device checks below remain required for release qualification.
 
+The Android smoke test was verified on an ARM64 Android API 35 emulator. Install and launch the debug APK with:
+
+```sh
+adb install -r build-android/android-build/build/outputs/apk/debug/android-build-debug.apk
+adb shell monkey -p org.riscvprg32.prg32qt \
+  -c android.intent.category.LAUNCHER 1
+```
+
+Confirm that Setup renders, Browse Store loads the catalog, the application process remains alive, and `adb logcat` contains neither a fatal exception nor a Qt main-library loading failure.
+
 ## Whole-Store certification
 
 ```sh
