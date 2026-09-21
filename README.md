@@ -1,6 +1,6 @@
 # PRG32-QT
 
-PRG32-QT is the portable C++20 / Qt 6 host for the PRG32 cartridge ecosystem. It uses the attached PRG32-iOS implementation as the behavioral parity baseline while sharing one Qt-free runtime across desktop, mobile, Raspberry Pi, headless tests, and Store certification.
+PRG32-QT is the portable C++20 / Qt 6 host for the PRG32 cartridge ecosystem. It uses the public PRG32 cartridge ABI as its compatibility contract while sharing one Qt-free runtime across desktop, mobile, Raspberry Pi, headless tests, and Store certification.
 
 Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, and Android**. The default Cartridge Store is `http://193.205.230.7:5080`.
 
@@ -12,10 +12,10 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
 - Touch handheld controls on mobile; keyboard plus hot-plug game controller support on desktop.
-- RGB LED emulation, local scores, metrics/performance ABI calls and safe unavailable-service stubs matching the iOS host.
+- RGB LED emulation, local scores, metrics/performance ABI calls and safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL settings/test, architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
-- Canonical PRG32 artwork sourced from the attached iOS baseline.
-- Headless regression fixtures copied from the iOS implementation and live whole-Store certification tooling.
+- Canonical PRG32 artwork used by the PRG32 project.
+- Headless regression fixtures included for compatibility testing and live whole-Store certification tooling.
 
 ## Build and test
 

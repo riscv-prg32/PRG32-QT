@@ -2,9 +2,9 @@
 
 ## PRG32 ecosystem
 
-PRG32-QT interoperates with the public PRG32 cartridge format and ABI and uses the attached PRG32-iOS implementation as its behavioral parity baseline. Upstream project: `riscv-prg32/PRG32`.
+PRG32-QT interoperates with the public PRG32 cartridge format and ABI. Upstream project: `riscv-prg32/PRG32`.
 
-No upstream source file is required at runtime. The regression cartridges under `tests/fixtures/` originate from the attached PRG32-iOS baseline and are retained solely to verify compatible cartridge execution.
+No upstream source file is required at runtime. The regression cartridges under `tests/fixtures/` are retained solely to verify compatible cartridge execution.
 
 ## Qt
 

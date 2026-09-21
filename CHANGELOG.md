@@ -6,9 +6,9 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [0.3.0] - 2026-09-21
 
-- Completed feature-parity implementation against the attached PRG32-iOS baseline: audio/AUD0, graphics, tiles/playfields, platform helpers, sprites/bitplanes, local scores, RGB LED and metrics.
+- Completed feature-parity implementation against the public PRG32 runtime: audio/AUD0, graphics, tiles/playfields, platform helpers, sprites/bitplanes, local scores, RGB LED and metrics.
 - Expanded RV32IMAC execution with atomics and counter CSRs used by portable cartridges.
-- Added Store/search/settings/local-import/adaptive-player behavior from the iOS baseline.
+- Added Store/search/settings/local-import/adaptive-player behavior for the Qt host.
 - Added Windows and Linux/Raspberry Pi controller backends and build automation.
 - Added Windows, Linux and ARM64-Linux CI alongside macOS, iOS and Android.
 - Consolidated vision, architecture, licensing and authorship documentation under `docs/`.
@@ -26,3 +26,10 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 ## [0.1.0] - 2026-09-20
 
 Initial public-source preparation.
+
+## Unreleased
+
+- Matched the ESP32-C6 33 ms cartridge frame period and paused cartridge execution from Setup.
+- Added the PRG32 local HTTP API, device IP display, screenshot and four cartridge slots.
+- Implemented the version 1 cartridge performance broker and schema version 2 results.
+- Revised portrait and landscape layouts for compact mobile screens.

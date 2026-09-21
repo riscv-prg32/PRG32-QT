@@ -1,6 +1,6 @@
 # PRG32-QT Architecture
 
-PRG32-QT is deliberately split into a Qt-free portable guest runtime and a thin Qt/platform host. The design follows the same guest-visible behavior as the attached PRG32-iOS baseline while making the host reusable on Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, and Android.
+PRG32-QT is deliberately split into a Qt-free portable guest runtime and a thin Qt/platform host. The design follows the same guest-visible behavior as the public PRG32 runtime while making the host reusable on Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, and Android.
 
 ## Layer 1 — Portable C++ runtime (`src/core`)
 
@@ -18,11 +18,11 @@ Downloaded cartridge bytes are never treated as host-native code.
 
 The runtime installs the PRG32 ABI 1.6 table in guest-visible memory and maps 139 ABI entries to synthetic host-call addresses. Current ABI hash `0x260f6136` and documented compatible hashes `0x006427c2` and `0x6be6e8d0` are accepted.
 
-The provided feature mask intentionally matches the iOS baseline: audio, metrics, extended audio, tile maps, platform helpers, and sprites. Wi-Fi, multiplayer, and keyboard/text-input services keep the same safe unavailable/stub semantics as the iOS implementation and are not falsely advertised.
+The provided feature mask intentionally matches the public PRG32 ABI: audio, metrics, extended audio, tile maps, platform helpers, and sprites. Wi-Fi, multiplayer, and keyboard/text-input services keep the same safe unavailable/stub semantics as the public PRG32 implementation and are not falsely advertised.
 
 ### Graphics
 
-`Framebuffer` keeps the canonical 320×200 indexed framebuffer and 256-entry RGB565 palette. RGB565 drawing is quantized through the palette, matching the iOS baseline. Implemented paths include primitives, 5×7 host text in 8×8 cells, 1-bpp sprites, RGB565 sprites, packed 1/2/4/8-bpp sprites, bitplanes, palette operations, and row snapshots.
+`Framebuffer` keeps the canonical 320×200 indexed framebuffer and 256-entry RGB565 palette. RGB565 drawing is quantized through the palette, matching the public PRG32 ABI. Implemented paths include primitives, 5×7 host text in 8×8 cells, 1-bpp sprites, RGB565 sprites, packed 1/2/4/8-bpp sprites, bitplanes, palette operations, and row snapshots.
 
 ### Tiles and platform helpers
 
@@ -34,7 +34,7 @@ The runtime implements 8×8 tile definitions, 40×25 direct tile screens, two 64
 
 ### Scores and metrics
 
-The iOS baseline's local in-memory score operations and performance-call semantics are implemented. Remote score synchronization remains unavailable, matching the baseline.
+Local scores and the public performance broker are implemented. The host also serves the PRG32 HTTP API on port 8080.
 
 ## Layer 2 — Qt host (`src/qt`)
 
@@ -56,7 +56,7 @@ All adapters produce the same PRG32 bit mask.
 
 ## Layer 4 — Qt Quick UI (`qml`)
 
-The UI mirrors the iOS baseline capabilities: startup splash/tone, setup menu, Store browser, search and tag filtering, Store settings/testing, local `.prg32` import, cartridge icons, adaptive portrait/landscape player, touch controls, RGB LED/bezel feedback, controller status, and About information.
+The UI provides: startup splash/tone, setup menu, Store browser, search and tag filtering, Store settings/testing, local `.prg32` import, cartridge icons, adaptive portrait/landscape player, touch controls, RGB LED/bezel feedback, controller status, and About information.
 
 ## Platform packaging
 
@@ -69,6 +69,14 @@ The UI mirrors the iOS baseline capabilities: startup splash/tone, setup menu, S
 ## Test architecture
 
 1. Portable unit tests verify CRC, framebuffer behavior, input-source merging, CPU execution, and cartridge parsing.
-2. `Asteroids.prg32` and `Bach.prg32` from the attached iOS baseline run headlessly for repeated frames.
+2. `Asteroids.prg32` and `Bach.prg32` run headlessly for repeated frames.
 3. Store certification enumerates and executes every cartridge exposed by the configured PRG32 Store.
 4. GitHub Actions build the native Qt application on desktop/mobile targets where matching SDKs are available.
+
+## Frame pacing, pause, and local API
+
+The Qt host follows the ESP32-C6 firmware frame loop at one update/draw cycle every 33 ms. `QTimer` uses precise timing, and it does not schedule catch-up frames after a delay. Opening Setup from a cartridge stops the frame timer, clears input, and pauses audio. Returning to the player resumes the existing runtime state.
+
+The host listens on TCP port 8080 and publishes the PRG32 device endpoints: `GET /api`, `/api/runtime`, `/api/games`, `/api/screenshot.bmp`, `/api/performance.json`, `/api/scores`, and `/api/memory`, plus `POST /api/games`, `/api/games/select`, and `/api/scores`. Cartridge uploads use the four `cart0` through `cart3` slots. The Setup and player screens show the active local IPv4 address and API URL.
+
+Performance ABI calls 124 through 132 implement the public version 1 broker. A cartridge that declares a `performance_contract` or `performance` metadata value, or uses a `benchmark` or `performance` tag, receives a visible performance action. Results use the PRG32 performance JSON schema version 2.

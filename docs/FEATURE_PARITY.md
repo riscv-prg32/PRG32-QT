@@ -1,8 +1,8 @@
-# PRG32-iOS Feature Parity
+# PRG32 Feature Compatibility
 
-The attached PRG32-iOS source tree is the behavioral baseline for this checklist. A feature is marked implemented only when PRG32-QT has a corresponding code path rather than merely documenting an intention.
+The public PRG32 ABI is the compatibility baseline for this checklist. A feature is marked implemented only when PRG32-QT has a corresponding code path rather than merely documenting an intention.
 
-| PRG32-iOS capability | PRG32-QT implementation |
+| PRG32 capability | PRG32-QT implementation |
 |---|---|
 | PRG2 header, bounds, entry-point and CRC validation | `src/core/Cartridge.*` |
 | ABI-table portability/import validation | `Cartridge`, `Runtime` |
@@ -33,8 +33,8 @@ The attached PRG32-iOS source tree is the behavioral baseline for this checklist
 | Performance ABI calls | `Runtime` |
 | Safe unavailable Wi-Fi/multiplayer semantics | `Runtime` |
 | Band/keyboard/text-input baseline stub semantics | `Runtime` |
-| Canonical PRG32 artwork from attached iOS source | `assets/` |
-| iOS baseline regression cartridges | `tests/fixtures/` + CTest |
+| Canonical PRG32 artwork | `assets/` |
+| PRG32 regression cartridges | `tests/fixtures/` + CTest |
 
 ## Qt-only extensions
 

@@ -8,7 +8,7 @@ ApplicationWindow {
     id: root
     visible: true
     width: 1100; height: 760
-    minimumWidth: 420; minimumHeight: 620
+    minimumWidth: 320; minimumHeight: 260
     title: "PRG32"
     property int page: 0 // 0 setup, 1 store, 2 player
     property string searchText: ""
@@ -39,7 +39,7 @@ ApplicationWindow {
             const hay=(gameTitle(g)+" "+(g.summary||"")+" "+t.join(" ")).toLowerCase(); if(q.length===0||hay.indexOf(q)>=0) out.push(g) }
         out.sort((a,b)=>gameTitle(a).localeCompare(gameTitle(b))); return out
     }
-    function showPlayer() { page=2; requestActivate(); keyboardHandler.forceActiveFocus() }
+    function showPlayer() { appController.resume(); page=2; requestActivate(); keyboardHandler.forceActiveFocus() }
 
     Item {
         id: keyboardHandler
@@ -76,8 +76,9 @@ ApplicationWindow {
                 Item { Layout.preferredHeight:22 }
                 Image { Layout.alignment:Qt.AlignHCenter; source:"qrc:/prg32qt/assets/prg32_logo.png"; Layout.preferredHeight:130; Layout.preferredWidth:500; fillMode:Image.PreserveAspectFit }
                 Label { text:"PRG32 SETUP"; color:"white"; font.family:"monospace"; font.pixelSize:18 }
-                Label { text:"PLATFORM: "+Qt.platform.os.toUpperCase()+"\nRUNTIME: RV32IMAC\nCARTRIDGES: "+storeClient.cartridges.length+"\nDEFAULT: CARTRIDGE STORE"; color:"#43d17b"; font.family:"monospace" }
+                Label { Layout.fillWidth:true; text:"PLATFORM: "+Qt.platform.os.toUpperCase()+"\nRUNTIME: RV32IMAC · 30 FPS\nCARTRIDGES: "+storeClient.cartridges.length+"\nIP: "+(appController.deviceIp||"No local IPv4 address")+"\nWEB API: "+(appController.webApiUrl||"Unavailable"); color:"#43d17b"; font.family:"monospace"; wrapMode:Text.WrapAnywhere }
                 Button { Layout.fillWidth:true; text:"›  RUN CARTRIDGE"; enabled:appController.running; onClicked:root.showPlayer() }
+                Button { Layout.fillWidth:true; visible:appController.performanceAvailable; text:"›  RUN PERFORMANCE TEST"; onClicked:{appController.runPerformanceTest();root.showPlayer()} }
                 Button { Layout.fillWidth:true; text:"›  BROWSE STORE"; onClicked:root.page=1 }
                 Button { Layout.fillWidth:true; text:"›  IMPORT CARTRIDGE"; onClicked:importDialog.open() }
                 Button { Layout.fillWidth:true; text:"›  STORE SETTINGS"; onClicked:settingsDialog.open() }
@@ -88,10 +89,12 @@ ApplicationWindow {
         // Store browser
         Item { ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8
             RowLayout { Layout.fillWidth:true; Button{text:"Setup";onClicked:root.page=0} Label{text:"Cartridge Store";font.pixelSize:20;font.bold:true} Item{Layout.fillWidth:true} Label{text:filteredGames().length+" / "+storeClient.cartridges.length} Button{text:"Refresh";onClicked:storeClient.refresh()} }
-            RowLayout { Layout.fillWidth:true; TextField { Layout.fillWidth:true; placeholderText:"Search cartridges"; text:root.searchText; onTextChanged:root.searchText=text }
-                ComboBox { id:tagBox; model:root.tags(); onCurrentTextChanged:root.selectedTag=currentText }
-                Button { text:"Import .prg32"; onClicked:importDialog.open() }
-                Button { text:"Settings"; onClicked:settingsDialog.open() }
+            ColumnLayout { Layout.fillWidth:true; spacing:4
+                RowLayout { Layout.fillWidth:true; TextField { Layout.fillWidth:true; placeholderText:"Search cartridges"; text:root.searchText; onTextChanged:root.searchText=text }
+                    ComboBox { id:tagBox; Layout.preferredWidth:Math.min(150,root.width*.35); model:root.tags(); onCurrentTextChanged:root.selectedTag=currentText } }
+                RowLayout { Layout.fillWidth:true; Button { text:"Import .prg32"; onClicked:importDialog.open() }
+                    Button { text:"Settings"; onClicked:settingsDialog.open() } Item { Layout.fillWidth:true }
+                    Label { text:appController.deviceIp||"Offline"; font.pixelSize:11; color:"#43d17b" } }
             }
             ProgressBar { Layout.fillWidth:true; indeterminate:true; visible:storeClient.loading }
             Label { Layout.fillWidth:true; visible:storeClient.error.length>0; text:storeClient.error; color:"tomato"; wrapMode:Text.Wrap }
@@ -110,8 +113,12 @@ ApplicationWindow {
         // Player
         Item { id:playerPage
             Rectangle { anchors.fill:parent; color:"#0d1015" }
-            Loader { anchors.fill:parent; sourceComponent:width>height?landscapePlayer:portraitPlayer }
-            Button { anchors.left:parent.left; anchors.top:parent.top; anchors.margins:10; text:"Store"; z:3; onClicked:root.page=1 }
+            Loader { anchors.fill:parent; anchors.topMargin:48; sourceComponent:width>height?landscapePlayer:portraitPlayer }
+            RowLayout { anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:6; height:42; z:3
+                Button { text:"‹ Setup"; onClicked:{appController.pause();root.page=0} }
+                Label { Layout.fillWidth:true; text:appController.cartridgeName; elide:Text.ElideRight; font.bold:true; horizontalAlignment:Text.AlignHCenter }
+                Button { visible:appController.performanceAvailable; text:"Performance"; onClicked:appController.runPerformanceTest() }
+            }
         }
     }
 
@@ -134,18 +141,18 @@ ApplicationWindow {
     }
     Component { id:portraitPlayer
         ColumnLayout { anchors.fill:parent; anchors.margins:18; spacing:12
-            Item{Layout.preferredHeight:12} RowLayout { Layout.fillWidth:true; Image{source:"qrc:/prg32qt/assets/prg32_logo.png";Layout.preferredWidth:180;Layout.preferredHeight:52;fillMode:Image.PreserveAspectFit} Item{Layout.fillWidth:true} Rectangle{width:9;height:9;radius:5;color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.max(.15,appController.ledIntensity))} }
-            Loader { Layout.fillWidth:true; Layout.preferredHeight:Math.min(420,width*200/320+20); sourceComponent:screenComponent }
-            RowLayout { Layout.fillWidth:true; Layout.preferredHeight:150; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:130;height:130;sourceComponent:dpadComponent}} Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:150;height:120;sourceComponent:actionsComponent}} }
+            RowLayout { Layout.fillWidth:true; Image{source:"qrc:/prg32qt/assets/prg32_logo.png";Layout.preferredWidth:150;Layout.preferredHeight:42;fillMode:Image.PreserveAspectFit} Item{Layout.fillWidth:true} Rectangle{width:9;height:9;radius:5;color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.max(.15,appController.ledIntensity))} }
+            Loader { Layout.fillWidth:true; Layout.preferredHeight:Math.min(330,width*200/320+20); Layout.fillHeight:true; sourceComponent:screenComponent }
+            RowLayout { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,Math.max(110,parent.height*.2)); Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(130,parent.width);height:Math.min(130,parent.height);sourceComponent:dpadComponent}} Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(150,parent.width);height:Math.min(120,parent.height);sourceComponent:actionsComponent}} }
             Button { Layout.alignment:Qt.AlignHCenter; text:"SELECT"; onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false) }
-            RowLayout { Layout.fillWidth:true; Label{text:"RV32IMAC"} Item{Layout.fillWidth:true} Label{text:"320 × 200"} }
+            RowLayout { Layout.fillWidth:true; Label{text:"RV32IMAC · 30 FPS"} Item{Layout.fillWidth:true} Label{text:appController.deviceIp||"Offline"} }
             Label { Layout.alignment:Qt.AlignHCenter; visible:appController.controllerConnected; text:"Controller: "+appController.controllerName; opacity:.7 }
         }
     }
     Component { id:landscapePlayer
         RowLayout { anchors.fill:parent; anchors.margins:14; spacing:12
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png";fillMode:Image.PreserveAspectFit} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Button{Layout.alignment:Qt.AlignHCenter;text:"SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Item{Layout.fillHeight:true} }
-            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Loader{Layout.fillWidth:true;Layout.fillHeight:true;sourceComponent:screenComponent} Label{Layout.alignment:Qt.AlignHCenter;text:appController.controllerConnected?"Controller: "+appController.controllerName:"Keyboard: arrows/WASD · SELECT Enter/Space · A Z/J · B X/K";opacity:.7} }
+            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Loader{Layout.fillWidth:true;Layout.fillHeight:true;sourceComponent:screenComponent} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:150;Layout.preferredHeight:130;sourceComponent:actionsComponent} Label{Layout.alignment:Qt.AlignHCenter;text:"PRG32";font.bold:true} Item{Layout.fillHeight:true} }
         }
     }

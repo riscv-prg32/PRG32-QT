@@ -24,13 +24,14 @@ if(PRG32QT_BUILD_TESTS)
   add_test(NAME prg32qt_core COMMAND prg32qt_tests)
   add_test(NAME prg32qt_ios_fixture_asteroids COMMAND prg32qt-headless ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/Asteroids.prg32 300)
   add_test(NAME prg32qt_ios_fixture_bach COMMAND prg32qt-headless ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/Bach.prg32 300)
+  add_test(NAME prg32qt_performance_contract COMMAND prg32qt-headless ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/PerformanceTest.prg32 605 --require-performance)
 endif()
 
 if(PRG32QT_BUILD_APP)
   find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Network Multimedia)
   qt_standard_project_setup(REQUIRES 6.5)
   set(PRG32QT_APP_SOURCES
-      src/qt/main.cpp src/qt/AppController.cpp src/qt/StoreClient.cpp src/qt/FrameItem.cpp
+      src/qt/main.cpp src/qt/AppController.cpp src/qt/StoreClient.cpp src/qt/FrameItem.cpp src/qt/WebApiServer.cpp
       src/qt/QtAudioEngine.cpp src/qt/GamepadBackend.h)
   if(APPLE)
     enable_language(OBJCXX)

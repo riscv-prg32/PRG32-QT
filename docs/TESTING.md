@@ -10,7 +10,7 @@ cmake --build build-core
 ctest --test-dir build-core --output-on-failure
 ```
 
-The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` copied from the attached PRG32-iOS implementation. Each fixture is initialized and executed for 300 frames, covering graphics/runtime behavior and the audio-heavy cartridge path.
+The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` included as compatibility fixtures. Each fixture is initialized and executed for 300 frames, covering graphics/runtime behavior and the audio-heavy cartridge path.
 
 ## Platform compilation
 
@@ -27,3 +27,5 @@ This enumerates the Store, downloads PRG2 cartridges and executes every package 
 ## Physical-device checks
 
 Before signed releases verify startup, Store browsing/download, local import, graphics, audio and input on representative devices. On desktops also verify keyboard and controller connect/disconnect behavior; on mobile verify both portrait and landscape touch layouts.
+
+The `prg32qt_performance_contract` test executes the public reference performance cartridge for 605 frames and requires its broker state to be complete. This covers descriptor validation, case lifecycle, sample recording, aggregate calculation, and performance ABI return values.

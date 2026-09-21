@@ -5,4 +5,5 @@
 <key>CFBundleShortVersionString</key><string>0.3.0</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+<key>NSLocalNetworkUsageDescription</key><string>PRG32 shares cartridges, screenshots, and performance results on your local network.</string>
 </dict></plist>
