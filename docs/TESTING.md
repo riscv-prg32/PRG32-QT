@@ -56,3 +56,25 @@ This enumerates the Store, downloads PRG2 cartridges and executes every package 
 Before signed releases verify startup, Store browsing/download, local import, graphics, audio and input on representative devices. On desktops also verify keyboard and controller connect/disconnect behavior; on mobile verify both portrait and landscape touch layouts.
 
 The `prg32qt_performance_contract` test executes the public reference performance cartridge for 605 frames and requires its broker state to be complete. This covers descriptor validation, case lifecycle, sample recording, aggregate calculation, and performance ABI return values.
+
+## Readability-pass validation (2026-09-22)
+
+- Portable core: Apple Silicon (`arm64`) macOS host, Ninja build in `build-core`; all four CTest targets
+  passed, including both 300-frame cartridges and the 605-frame performance contract.
+- Qt desktop host: Apple Silicon (`arm64`) macOS host with Homebrew Qt, full application build in
+  `build-macos-brew` succeeded. The default `scripts/build-macos.sh` path selected an incompatible locally
+  installed Qt tool whose QML import scanner requires a different processor feature set; the source was
+  therefore validated with the native Homebrew Qt kit.
+- Android recompiled the portable library, headless runner, tests, and generated Qt metadata through the QML
+  type-registration step. Packaging could not finish because the configured host-side Qt tool reports an
+  incompatible processor/NEON requirement.
+- The iOS simulator Xcode build reached target dependency and toolchain evaluation but could not create its
+  module-session cache because this validation environment does not permit writes to Xcode DerivedData.
+- Windows, Linux, and Raspberry Pi OS were not executable in this local macOS validation session. Their build
+  helpers remain the CI entry points, and the workflow records each target as a distinct, visible job rather
+  than silently omitting it.
+- The default Store catalog snapshot contained 22 cartridges. Twenty qemu variants completed 300 headless
+  frames. `it.uniparthenope.space_invaders` 1.0.0 and `it.uniparthenope.terraforge` 1.0.0 were rejected because
+  they are not portable ABI-table cartridges. The repository's existing `store-smoke.py` also cannot consume
+  the current object-valued `variants.qemu` catalog entry; this pre-existing certification-tool defect was not
+  changed in the behavior-preserving readability pass and requires a separate fix.

@@ -4,6 +4,9 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Reformatted the C++ implementation for reviewability and added an enforced formatting, documentation,
+  six-platform build, deterministic-test, and Cartridge Store certification workflow; runtime behavior and
+  public contracts are unchanged.
 - Matched the ESP32-C6 33 ms cartridge frame period and paused cartridge execution from Setup.
 - Added the PRG32 local HTTP API, device IP display, screenshot and four cartridge slots.
 - Implemented the version 1 cartridge performance broker and schema version 2 results.

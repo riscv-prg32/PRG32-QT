@@ -64,3 +64,10 @@ The repository-root `LICENSE` remains intentionally at the conventional GitHub l
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Compatibility changes should include regression coverage and, when Store behavior is affected, a whole-Store certification run.
+
+### How this repository enforces its quality bar
+
+The binding engineering contract is [AGENTS.md](AGENTS.md). GitHub Actions checks the repository's
+authoritative `.clang-format`, documentation/code invariants, portable tests and fixture cartridges, all six
+supported build targets, and the live Cartridge Store catalog. Platform jobs call the scripts in `scripts/`, so
+local and CI builds use the same entry points.
