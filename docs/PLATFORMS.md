@@ -63,7 +63,29 @@ Install Xcode and a Qt iOS kit, then:
 QT_ROOT=/path/to/Qt/6.8.3/ios ./scripts/build-ios.sh
 ```
 
-Set `IOS_TEAM_ID` to your Apple development team ID and `IOS_DESTINATION` to a connected device destination to build a signed installable app. Set `IOS_DESTINATION` to a simulator destination for simulator builds. On Apple Silicon, the Qt iOS kit must contain arm64 simulator libraries and plugins; the tested Qt 6.8.3 kit contains arm64 device and x86_64 simulator objects, so it cannot link an arm64 simulator app.
+Set `IOS_TEAM_ID` to your Apple development team ID and `IOS_DESTINATION` to a connected device destination to build a signed installable app. Set `IOS_DESTINATION` to a simulator destination for simulator builds.
+
+The helper selects an `arm64` device build or an `x86_64` simulator build from `IOS_DESTINATION`. Qt's binary iOS package provides x86_64 simulator libraries, so Apple Silicon hosts run the simulator build with Rosetta installed. `IOS_ARCHS` can override the selected architecture for a custom Qt kit.
+
+Build, install and launch an iPhone simulator app with:
+
+```sh
+IOS_DESTINATION='platform=iOS Simulator,id=<simulator-udid>' ./scripts/build-ios.sh
+xcrun simctl install <simulator-udid> build-ios-sim/Release-iphonesimulator/PRG32.app
+xcrun simctl launch --terminate-running-process <simulator-udid> org.riscv-prg32.prg32qt
+```
+
+Build and deploy to a development-signed physical device with:
+
+```sh
+IOS_TEAM_ID=<team-id> \
+IOS_DESTINATION='platform=iOS,id=<device-udid>' \
+./scripts/build-ios.sh
+xcrun devicectl device install app --device <device-udid> \
+  build-ios-device/Release-iphoneos/PRG32.app
+xcrun devicectl device process launch --device <device-udid> \
+  org.riscv-prg32.prg32qt
+```
 
 The plain-HTTP default Store requires the included App Transport Security allowance. Prefer HTTPS for production distribution.
 

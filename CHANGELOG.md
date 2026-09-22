@@ -4,6 +4,12 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Matched the ESP32-C6 33 ms cartridge frame period and paused cartridge execution from Setup.
+- Added the PRG32 local HTTP API, device IP display, screenshot and four cartridge slots.
+- Implemented the version 1 cartridge performance broker and schema version 2 results.
+- Revised portrait and landscape layouts for compact mobile screens.
+- Fixed the iOS helper to select the Qt-compatible x86_64 simulator architecture while retaining arm64 device builds, and documented simulator and physical-device validation.
+- Added repository instructions requiring Linux, Windows, Raspberry Pi OS, macOS, iOS and Android to remain buildable and working.
 - Made the Android ARM64 build helper configure the host Qt, Android SDK and NDK explicitly, and documented the reproducible debug APK workflow and artifact.
 - Restored the Qt-required Android activity metadata and file provider, set stable package/version metadata, and verified startup and Store browsing on an ARM64 API 35 emulator.
 - Fixed Android raster rendering and compact-screen layouts so PRG32 and cartridge artwork is visible, Setup controls remain within the viewport, Store actions remain legible, and the complete About content fits without scrolling.
@@ -30,10 +36,3 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 ## [0.1.0] - 2026-09-20
 
 Initial public-source preparation.
-
-## Unreleased
-
-- Matched the ESP32-C6 33 ms cartridge frame period and paused cartridge execution from Setup.
-- Added the PRG32 local HTTP API, device IP display, screenshot and four cartridge slots.
-- Implemented the version 1 cartridge performance broker and schema version 2 results.
-- Revised portrait and landscape layouts for compact mobile screens.
