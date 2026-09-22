@@ -2,13 +2,16 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQuick.Window
 import PRG32Qt
 
 ApplicationWindow {
     id: root
     visible: true
-    width: 1100; height: 760
-    minimumWidth: 320; minimumHeight: 260
+    width: desktopPlatform ? 1100 : Screen.width
+    height: desktopPlatform ? 760 : Screen.height
+    minimumWidth: desktopPlatform ? 320 : 0
+    minimumHeight: desktopPlatform ? 260 : 0
     title: "PRG32"
     property int page: 0 // 0 setup, 1 store, 2 player
     property string searchText: ""
@@ -76,6 +79,8 @@ ApplicationWindow {
     }
     onActiveChanged: if (!active) appController.clearKeyboard()
     Component.onCompleted: {
+        if (!desktopPlatform)
+            root.showMaximized()
         storeClient.refresh()
         appController.playStartupTone()
         splashTimer.start()
@@ -204,7 +209,9 @@ ApplicationWindow {
     Component { id:portraitPlayer
         ColumnLayout { anchors.fill:parent; anchors.margins:18; spacing:12
             RowLayout { Layout.fillWidth:true; PRG32Image{source:"qrc:/prg32qt/assets/prg32_logo.png";Layout.preferredWidth:150;Layout.preferredHeight:42} Item{Layout.fillWidth:true} Rectangle{width:9;height:9;radius:5;color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.max(.15,appController.ledIntensity))} }
-            Loader { Layout.fillWidth:true; Layout.preferredHeight:Math.min(330,width*200/320+20); Layout.fillHeight:true; sourceComponent:screenComponent }
+            Item { Layout.fillWidth:true; Layout.preferredHeight:Math.min(330,width*200/320+20); Layout.fillHeight:true
+                Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/200); height:width*200/320; sourceComponent:screenComponent }
+            }
             RowLayout { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,Math.max(110,parent.height*.2)); Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(130,parent.width);height:Math.min(130,parent.height);sourceComponent:dpadComponent}} Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(150,parent.width);height:Math.min(120,parent.height);sourceComponent:actionsComponent}} }
             Button { Layout.alignment:Qt.AlignHCenter; text:"SELECT"; onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false) }
             RowLayout { Layout.fillWidth:true; Label{text:"RV32IMAC · 30 FPS"} Item{Layout.fillWidth:true} Label{text:appController.deviceIp||"Offline"} }
@@ -214,7 +221,7 @@ ApplicationWindow {
     Component { id:landscapePlayer
         RowLayout { anchors.fill:parent; anchors.margins:14; spacing:12
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png"} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Button{Layout.alignment:Qt.AlignHCenter;text:"SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Item{Layout.fillHeight:true} }
-            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Loader{Layout.fillWidth:true;Layout.fillHeight:true;sourceComponent:screenComponent} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
+            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(parent.width,parent.height*320/200);height:width*200/320;sourceComponent:screenComponent}} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:150;Layout.preferredHeight:130;sourceComponent:actionsComponent} Label{Layout.alignment:Qt.AlignHCenter;text:"PRG32";font.bold:true} Item{Layout.fillHeight:true} }
         }
     }

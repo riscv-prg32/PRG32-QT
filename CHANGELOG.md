@@ -4,6 +4,7 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Fixed iOS window sizing across portrait/landscape rotation and preserved the 320:200 game-surface aspect ratio in both touch-player layouts.
 - Added automatic Git-derived application/package versioning with one source-archive fallback and consistent
   runtime, About, Android and Apple bundle metadata.
 - Added Apple TV and Android TV build targets, controller-first input, game-only fullscreen presentation,
