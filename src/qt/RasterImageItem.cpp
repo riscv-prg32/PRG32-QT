@@ -2,11 +2,11 @@
 
 #include <QPainter>
 
-RasterImageItem::RasterImageItem(QQuickItem *parent) : QQuickPaintedItem(parent) {
+RasterImageItem::RasterImageItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
     setAntialiasing(true);
 }
 
-void RasterImageItem::setSource(const QString &source) {
+void RasterImageItem::setSource(const QString& source) {
     if (source_ == source)
         return;
     source_ = source;
@@ -25,12 +25,12 @@ void RasterImageItem::setSource(const QString &source) {
     update();
 }
 
-void RasterImageItem::paint(QPainter *painter) {
+void RasterImageItem::paint(QPainter* painter) {
     if (image_.isNull() || width() <= 0 || height() <= 0)
         return;
     const QSize fitted = image_.size().scaled(qRound(width()), qRound(height()), Qt::KeepAspectRatio);
-    const QRectF target((width() - fitted.width()) / 2, (height() - fitted.height()) / 2,
-                        fitted.width(), fitted.height());
+    const QRectF target(
+        (width() - fitted.width()) / 2, (height() - fitted.height()) / 2, fitted.width(), fitted.height());
     painter->setRenderHint(QPainter::SmoothPixmapTransform);
     painter->drawImage(target, image_);
 }

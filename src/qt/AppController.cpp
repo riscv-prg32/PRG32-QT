@@ -5,41 +5,461 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QStandardPaths>
-#include <QNetworkInterface>
-#include <QJsonDocument>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
-#include <QSysInfo>
+#include <QNetworkInterface>
 #include <QSaveFile>
+#include <QStandardPaths>
+#include <QSysInfo>
 #include <algorithm>
-AppController::AppController(QObject*p):QObject(p),audio_(std::make_unique<QtAudioEngine>()){
- rt_.setAudioSink(audio_.get());rt_.setLEDCallback([this](prg32::RGBState v){led_=v;emit ledChanged();});
- gamepad_=createGamepadBackend(this);connect(gamepad_,&GamepadBackend::inputChanged,this,[this](quint32 mask){input_.replace(InputState::Controller0,mask);});connect(gamepad_,&GamepadBackend::connectedChanged,this,&AppController::controllerChanged);
- timer_.setTimerType(Qt::PreciseTimer);timer_.setInterval(33);connect(&timer_,&QTimer::timeout,this,[this]{std::string e;if(!rt_.frame(input_.merged(),e)){timer_.stop();running_=false;emit runningChanged();setStatus(QString::fromStdString(e));return;}++frameCount_;led_.intensity*=.90;emit ledChanged();updateFrame();emit performanceChanged();});
- ipTimer_.setInterval(5000);connect(&ipTimer_,&QTimer::timeout,this,&AppController::refreshIp);ipTimer_.start();refreshIp();
+AppController::AppController(QObject* p) : QObject(p), audio_(std::make_unique<QtAudioEngine>()) {
+    rt_.setAudioSink(audio_.get());
+    rt_.setLEDCallback([this](prg32::RGBState v) {
+        led_ = v;
+        emit ledChanged();
+    });
+    gamepad_ = createGamepadBackend(this);
+    connect(gamepad_, &GamepadBackend::inputChanged, this, [this](quint32 mask) {
+        input_.replace(InputState::Controller0, mask);
+    });
+    connect(gamepad_, &GamepadBackend::connectedChanged, this, &AppController::controllerChanged);
+    timer_.setTimerType(Qt::PreciseTimer);
+    timer_.setInterval(33);
+    connect(&timer_, &QTimer::timeout, this, [this] {
+        std::string e;
+        if (!rt_.frame(input_.merged(), e)) {
+            timer_.stop();
+            running_ = false;
+            emit runningChanged();
+            setStatus(QString::fromStdString(e));
+            return;
+        }
+        ++frameCount_;
+        led_.intensity *= .90;
+        emit ledChanged();
+        updateFrame();
+        emit performanceChanged();
+    });
+    ipTimer_.setInterval(5000);
+    connect(&ipTimer_, &QTimer::timeout, this, &AppController::refreshIp);
+    ipTimer_.start();
+    refreshIp();
 }
-AppController::~AppController(){rt_.stop();}
-void AppController::setStatus(QString s){if(status_==s)return;status_=std::move(s);emit statusChanged();}bool AppController::controllerConnected()const{return gamepad_&&gamepad_->connected();}QString AppController::controllerName()const{return gamepad_?gamepad_->name():QString();}
-void AppController::updateFrame(){if(frame_)frame_->setFrame(rt_.framebuffer().rgb565Pixels());}
-bool AppController::loadBytes(const QByteArray&d,const QString&suggestedName){std::string e;auto c=prg32::Cartridge::parse(std::span<const uint8_t>((const uint8_t*)d.constData(),size_t(d.size())),e);if(!c){setStatus(QString::fromStdString(e));return false;}timer_.stop();rt_.stop();if(!rt_.load(*c,e)||!rt_.init(e)){setStatus(QString::fromStdString(e));return false;}currentBytes_=d;cartridgeName_=QString::fromStdString(c->name());auto meta=QJsonDocument::fromJson(QByteArray::fromStdString(c->metadataJson())).object();auto tags=meta.value("tags").toArray();performanceAvailable_=meta.contains("performance_contract")||meta.contains("performance")||std::any_of(tags.begin(),tags.end(),[](const QJsonValue&v){return v.toString().compare("benchmark",Qt::CaseInsensitive)==0||v.toString().compare("performance",Qt::CaseInsensitive)==0;});frameCount_=0;emit cartridgeChanged();emit performanceChanged();updateFrame();timer_.start();running_=true;paused_=false;emit runningChanged();emit pausedChanged();QString n=suggestedName.isEmpty()?cartridgeName_:suggestedName;saveCartridge(d,n);setStatus(QString("Running %1").arg(cartridgeName_));return true;}
-bool AppController::loadFile(const QUrl&u){QString path=u.toLocalFile();QFile f(path);if(!f.open(QIODevice::ReadOnly)){setStatus("Cannot open cartridge file");return false;}return loadBytes(f.readAll(),QFileInfo(path).completeBaseName());}
-void AppController::saveCartridge(const QByteArray&d,const QString&name){QString root=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);if(root.isEmpty())return;QDir dir(root);dir.mkpath("PRG32Cartridges");QString safe=name;safe.replace('/','_').replace('\\','_');QFile f(dir.filePath("PRG32Cartridges/"+safe+".prg32"));if(f.open(QIODevice::WriteOnly|QIODevice::Truncate))f.write(d);}
-void AppController::stop(){timer_.stop();rt_.stop();input_=InputState{};paused_=false;emit pausedChanged();if(running_){running_=false;emit runningChanged();}}
-void AppController::pause(){if(!running_||paused_)return;timer_.stop();rt_.pause();input_=InputState{};paused_=true;emit pausedChanged();setStatus(QString("Paused %1").arg(cartridgeName_));}
-void AppController::resume(){if(!running_||!paused_)return;paused_=false;timer_.start();emit pausedChanged();setStatus(QString("Running %1").arg(cartridgeName_));}
-void AppController::setButton(int m,bool down){input_.set(InputState::Ui,uint32_t(m),down);}void AppController::setDirectional(int m){input_.replace(InputState::Ui,(input_.value(InputState::Ui)&~0x0fu)|(uint32_t(m)&0x0f));}
-void AppController::setKeyboardButton(int m,bool d){input_.set(InputState::Keyboard,uint32_t(m),d);}void AppController::clearKeyboard(){input_.clear(InputState::Keyboard);}void AppController::attachFrame(QObject*o){frame_=qobject_cast<FrameItem*>(o);updateFrame();}void AppController::playStartupTone(){audio_->tone(523.25,120,180);QTimer::singleShot(130,this,[this]{audio_->tone(659.25,120,180);});QTimer::singleShot(260,this,[this]{audio_->tone(783.99,660,180);});}
-void AppController::refreshIp(){QString chosen;for(const auto&i:QNetworkInterface::allInterfaces()){if(!(i.flags()&QNetworkInterface::IsUp)||!(i.flags()&QNetworkInterface::IsRunning)||(i.flags()&QNetworkInterface::IsLoopBack))continue;for(const auto&a:i.addressEntries()){auto ip=a.ip();if(ip.protocol()!=QAbstractSocket::IPv4Protocol||ip.isLoopback())continue;QString candidate=ip.toString();if(chosen.isEmpty())chosen=candidate;if(i.humanReadableName().contains("Wi-Fi",Qt::CaseInsensitive)||i.name()=="en0"){chosen=candidate;break;}}}if(deviceIp_!=chosen){deviceIp_=chosen;emit networkChanged();}}
-QString AppController::slotPath(int slot)const{QString root=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);return QDir(root).filePath(QString("PRG32Cartridges/cart%1.prg32").arg(slot));}
-QString AppController::performanceState()const{switch(rt_.performance().state){case 1:return "Running";case 2:return "Complete";case 3:return "Aborted";default:return "Idle";}}
-void AppController::runPerformanceTest(){if(!performanceAvailable_||currentBytes_.isEmpty())return;auto bytes=currentBytes_;auto name=cartridgeName_;if(loadBytes(bytes,name))setStatus("Performance test running — results at /api/performance.json");}
-QJsonObject AppController::runtimeJson()const{auto&h=rt_.cartridge().header();QJsonObject cart{{"name",cartridgeName_},{"loaded",rt_.loaded()},{"stored",!currentBytes_.isEmpty()},{"code_size",int(h.codeSize)},{"mem_size",int(h.memSize)},{"audio_size",rt_.cartridge().audio()?int(rt_.cartridge().audio()->samples.size()):0},{"audio",bool(rt_.cartridge().audio())},{"generation",int(frameCount_?1:0)}};return {{"name","PRG32"},{"firmware_version","qt-0.3.0"},{"cart_magic","PRG2"},{"cart_abi_major",1},{"cart_abi_minor",6},{"cart_abi_hash",double(prg32::Runtime::CurrentAbiHash)},{"cart_abi_features",double(prg32::Runtime::ProvidedFeatures)},{"cart_load_addr",double(h.loadAddr)},{"cart_max_size",double(prg32::Cartridge::MaximumGuestBytes)},{"cart_ram_size",double(h.memSize)},{"cart_loaded",rt_.loaded()},{"qemu",false},{"cart",cart},{"diag",QJsonObject{{"frame_count",double(frameCount_)},{"input_state",double(input_.merged())}}},{"host","qt"}};}
-QJsonArray AppController::gamesJson()const{QJsonArray out;for(int i=0;i<4;++i){QFile f(slotPath(i));QJsonObject g{{"slot",QString("cart%1").arg(i)},{"name",""},{"loaded",false},{"stored",false},{"code_size",0},{"mem_size",0},{"audio_size",0},{"audio",false},{"generation",0}};if(f.open(QIODevice::ReadOnly)){std::string e;auto b=f.readAll();auto c=prg32::Cartridge::parse(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(b.constData()),size_t(b.size())),e);if(c){g["name"]=QString::fromStdString(c->name());g["stored"]=true;g["loaded"]=currentBytes_==b;g["code_size"]=int(c->header().codeSize);g["mem_size"]=int(c->header().memSize);g["audio"]=bool(c->audio());g["audio_size"]=c->audio()?int(c->audio()->samples.size()):0;g["generation"]=currentBytes_==b?1:0;}}out.append(g);}return out;}
-bool AppController::uploadSlot(int slot,const QByteArray&bytes,QString&error){if(slot<0||slot>=4){error="invalid cartridge slot";return false;}std::string e;auto c=prg32::Cartridge::parse(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(bytes.constData()),size_t(bytes.size())),e);if(!c){error=QString::fromStdString(e);return false;}QDir().mkpath(QFileInfo(slotPath(slot)).absolutePath());QSaveFile file(slotPath(slot));if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){error="cannot store cartridge";return false;}return true;}
-bool AppController::selectSlot(int slot,QString&error){if(slot<0||slot>=4){error="invalid cartridge slot";return false;}QFile file(slotPath(slot));if(!file.open(QIODevice::ReadOnly)){error="slot is empty";return false;}if(!loadBytes(file.readAll(),QString("cart%1").arg(slot))){error=status_;return false;}return true;}
-QJsonObject AppController::memoryJson()const{auto m=rt_.loaded()?rt_.cartridge().header().memSize:0;return {{"static_bss_bytes",0},{"static_data_bytes",0},{"heap_total_bytes",double(m)},{"heap_free_bytes",0},{"heap_allocated_bytes",double(m)},{"heap_largest_free_block",0},{"host","qt"}};}
-QJsonArray AppController::scoresJson()const{QJsonArray a;for(const auto&s:rt_.scores())a.append(QJsonObject{{"game",QString::fromStdString(s.game)},{"player",QString::fromStdString(s.player)},{"score",double(s.score)}});return a;}
-bool AppController::submitScore(const QJsonObject&o,QString&error){auto g=o.value("game").toString(),p=o.value("player").toString();double score=o.value("score").toDouble(-1);if(g.isEmpty()||p.isEmpty()||score<0||score>UINT32_MAX){error="expected game, player, score";return false;}rt_.submitScore(g.toStdString(),p.toStdString(),uint32_t(score));return true;}
-QByteArray AppController::screenshotBmp()const{constexpr int w=320,h=200,row=w*3;QByteArray b(54+row*h,0);auto p=reinterpret_cast<unsigned char*>(b.data());auto wr16=[&](int o,uint16_t v){p[o]=uint8_t(v);p[o+1]=uint8_t(v>>8);};auto wr32=[&](int o,uint32_t v){for(int i=0;i<4;++i)p[o+i]=uint8_t(v>>(i*8));};p[0]='B';p[1]='M';wr32(2,uint32_t(b.size()));wr32(10,54);wr32(14,40);wr32(18,w);wr32(22,h);wr16(26,1);wr16(28,24);wr32(34,row*h);const auto&pixels=rt_.framebuffer().rgb565Pixels();for(int y=0;y<h;++y)for(int x=0;x<w;++x){uint16_t c=pixels[size_t(y)*w+x];int o=54+(h-1-y)*row+x*3;p[o]=uint8_t((c&31)*255/31);p[o+1]=uint8_t(((c>>5)&63)*255/63);p[o+2]=uint8_t(((c>>11)&31)*255/31);}return b;}
-QJsonObject AppController::performanceJson()const{const auto&s=rt_.performance();if(s.state==1)return {{"ok",false},{"running",true}};if(s.state!=2)return {{"ok",false},{"error","no performance test results"}};QJsonArray cases;uint64_t total=0,updates=0,draws=0,presents=0;uint32_t frames=0,min=UINT32_MAX,max=0,missed=0,screenCount=0;for(const auto&c:s.cases){cases.append(QJsonObject{{"screen_index",int(c.index)},{"screen_name",QString::fromStdString(c.name)},{"color_mode",c.mode==0?"rgb565":c.mode==1?"indexed":"custom"},{"metric_goal",QString::fromStdString(c.goal)},{"first_frame",int(c.first)},{"last_frame",int(c.first+c.frames-1)},{"frames",int(c.frames)},{"fps_mean",c.mean?1000000.0/double(c.mean):0.0},{"frame_us_min",int(c.min)},{"frame_us_mean",int(c.mean)},{"frame_us_p50",int(c.p50)},{"frame_us_p95",int(c.p95)},{"frame_us_p99",int(c.p99)},{"frame_us_max",int(c.max)},{"missed_deadlines",int(c.missed)},{"update_us_mean",int(c.update)},{"draw_us_mean",int(c.draw)},{"present_us_mean",int(c.present)},{"heap_min",0}});frames+=c.frames;total+=c.frameTotal;updates+=c.updateTotal;draws+=c.drawTotal;presents+=c.presentTotal;min=std::min(min,c.min);max=std::max(max,c.max);missed+=c.missed;screenCount=std::max(screenCount,c.index+1);}double mean=frames?double(total)/frames:0;QJsonObject summary{{"frames",int(frames)},{"fps_mean",mean?1000000.0/mean:0.0},{"frame_us_min",int(min==UINT32_MAX?0:min)},{"frame_us_mean",mean},{"frame_us_max",int(max)},{"missed_deadlines",int(missed)},{"update_us_mean",frames?double(updates)/frames:0.0},{"draw_us_mean",frames?double(draws)/frames:0.0},{"present_us_mean",frames?double(presents)/frames:0.0},{"heap_min",0},{"screen_count",int(screenCount)}};return {{"ok",true},{"schema_version",2},{"run_id",QString("perf-%1-%2").arg(s.started).arg(s.sequence)},{"board_id","qt-host"},{"target","qt"},{"display_backend","qt-quick"},{"game_name",QString::fromStdString(s.name)},{"wifi_mode",deviceIp_.isEmpty()?"off":"infrastructure"},{"sample_period_frames",0},{"screen_count",int(screenCount)},{"result_count",int(s.cases.size())},{"color_modes",QJsonArray{"rgb565","indexed"}},{"started_at_device_us",double(s.started)},{"started_at_server_ts",QJsonValue::Null},{"duration_us",double(s.ended-s.started)},{"samples",QJsonArray{}},{"aggregate_windows",QJsonArray{}},{"screen_summaries",cases},{"comparisons",QJsonArray{}},{"memory",QJsonObject{{"baseline_free_bytes",0},{"baseline_largest_block",0},{"peak_free_bytes",0},{"peak_largest_block",0},{"after_free_bytes",0},{"after_largest_block",0}}},{"summary",summary}};}
+AppController::~AppController() {
+    rt_.stop();
+}
+void AppController::setStatus(QString s) {
+    if (status_ == s)
+        return;
+    status_ = std::move(s);
+    emit statusChanged();
+}
+bool AppController::controllerConnected() const {
+    return gamepad_ && gamepad_->connected();
+}
+QString AppController::controllerName() const {
+    return gamepad_ ? gamepad_->name() : QString();
+}
+void AppController::updateFrame() {
+    if (frame_)
+        frame_->setFrame(rt_.framebuffer().rgb565Pixels());
+}
+bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName) {
+    std::string e;
+    auto c =
+        prg32::Cartridge::parse(std::span<const uint8_t>((const uint8_t*)d.constData(), size_t(d.size())), e);
+    if (!c) {
+        setStatus(QString::fromStdString(e));
+        return false;
+    }
+    timer_.stop();
+    rt_.stop();
+    if (!rt_.load(*c, e) || !rt_.init(e)) {
+        setStatus(QString::fromStdString(e));
+        return false;
+    }
+    currentBytes_ = d;
+    cartridgeName_ = QString::fromStdString(c->name());
+    auto meta = QJsonDocument::fromJson(QByteArray::fromStdString(c->metadataJson())).object();
+    auto tags = meta.value("tags").toArray();
+    performanceAvailable_ = meta.contains("performance_contract") || meta.contains("performance") ||
+                            std::any_of(tags.begin(), tags.end(), [](const QJsonValue& v) {
+                                return v.toString().compare("benchmark", Qt::CaseInsensitive) == 0 ||
+                                       v.toString().compare("performance", Qt::CaseInsensitive) == 0;
+                            });
+    frameCount_ = 0;
+    emit cartridgeChanged();
+    emit performanceChanged();
+    updateFrame();
+    timer_.start();
+    running_ = true;
+    paused_ = false;
+    emit runningChanged();
+    emit pausedChanged();
+    QString n = suggestedName.isEmpty() ? cartridgeName_ : suggestedName;
+    saveCartridge(d, n);
+    setStatus(QString("Running %1").arg(cartridgeName_));
+    return true;
+}
+bool AppController::loadFile(const QUrl& u) {
+    QString path = u.toLocalFile();
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        setStatus("Cannot open cartridge file");
+        return false;
+    }
+    return loadBytes(f.readAll(), QFileInfo(path).completeBaseName());
+}
+void AppController::saveCartridge(const QByteArray& d, const QString& name) {
+    QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (root.isEmpty())
+        return;
+    QDir dir(root);
+    dir.mkpath("PRG32Cartridges");
+    QString safe = name;
+    safe.replace('/', '_').replace('\\', '_');
+    QFile f(dir.filePath("PRG32Cartridges/" + safe + ".prg32"));
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        f.write(d);
+}
+void AppController::stop() {
+    timer_.stop();
+    rt_.stop();
+    input_ = InputState{};
+    paused_ = false;
+    emit pausedChanged();
+    if (running_) {
+        running_ = false;
+        emit runningChanged();
+    }
+}
+void AppController::pause() {
+    if (!running_ || paused_)
+        return;
+    timer_.stop();
+    rt_.pause();
+    input_ = InputState{};
+    paused_ = true;
+    emit pausedChanged();
+    setStatus(QString("Paused %1").arg(cartridgeName_));
+}
+void AppController::resume() {
+    if (!running_ || !paused_)
+        return;
+    paused_ = false;
+    timer_.start();
+    emit pausedChanged();
+    setStatus(QString("Running %1").arg(cartridgeName_));
+}
+void AppController::setButton(int m, bool down) {
+    input_.set(InputState::Ui, uint32_t(m), down);
+}
+void AppController::setDirectional(int m) {
+    input_.replace(InputState::Ui, (input_.value(InputState::Ui) & ~0x0fu) | (uint32_t(m) & 0x0f));
+}
+void AppController::setKeyboardButton(int m, bool d) {
+    input_.set(InputState::Keyboard, uint32_t(m), d);
+}
+void AppController::clearKeyboard() {
+    input_.clear(InputState::Keyboard);
+}
+void AppController::attachFrame(QObject* o) {
+    frame_ = qobject_cast<FrameItem*>(o);
+    updateFrame();
+}
+void AppController::playStartupTone() {
+    audio_->tone(523.25, 120, 180);
+    QTimer::singleShot(130, this, [this] { audio_->tone(659.25, 120, 180); });
+    QTimer::singleShot(260, this, [this] { audio_->tone(783.99, 660, 180); });
+}
+void AppController::refreshIp() {
+    QString chosen;
+    for (const auto& i : QNetworkInterface::allInterfaces()) {
+        if (!(i.flags() & QNetworkInterface::IsUp) || !(i.flags() & QNetworkInterface::IsRunning) ||
+            (i.flags() & QNetworkInterface::IsLoopBack))
+            continue;
+        for (const auto& a : i.addressEntries()) {
+            auto ip = a.ip();
+            if (ip.protocol() != QAbstractSocket::IPv4Protocol || ip.isLoopback())
+                continue;
+            QString candidate = ip.toString();
+            if (chosen.isEmpty())
+                chosen = candidate;
+            if (i.humanReadableName().contains("Wi-Fi", Qt::CaseInsensitive) || i.name() == "en0") {
+                chosen = candidate;
+                break;
+            }
+        }
+    }
+    if (deviceIp_ != chosen) {
+        deviceIp_ = chosen;
+        emit networkChanged();
+    }
+}
+QString AppController::slotPath(int slot) const {
+    QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return QDir(root).filePath(QString("PRG32Cartridges/cart%1.prg32").arg(slot));
+}
+QString AppController::performanceState() const {
+    switch (rt_.performance().state) {
+    case 1:
+        return "Running";
+    case 2:
+        return "Complete";
+    case 3:
+        return "Aborted";
+    default:
+        return "Idle";
+    }
+}
+void AppController::runPerformanceTest() {
+    if (!performanceAvailable_ || currentBytes_.isEmpty())
+        return;
+    auto bytes = currentBytes_;
+    auto name = cartridgeName_;
+    if (loadBytes(bytes, name))
+        setStatus("Performance test running — results at /api/performance.json");
+}
+QJsonObject AppController::runtimeJson() const {
+    auto& h = rt_.cartridge().header();
+    QJsonObject cart{
+        {"name", cartridgeName_},
+        {"loaded", rt_.loaded()},
+        {"stored", !currentBytes_.isEmpty()},
+        {"code_size", int(h.codeSize)},
+        {"mem_size", int(h.memSize)},
+        {"audio_size", rt_.cartridge().audio() ? int(rt_.cartridge().audio()->samples.size()) : 0},
+        {"audio", bool(rt_.cartridge().audio())},
+        {"generation", int(frameCount_ ? 1 : 0)}};
+    return {
+        {"name", "PRG32"},
+        {"firmware_version", "qt-0.3.0"},
+        {"cart_magic", "PRG2"},
+        {"cart_abi_major", 1},
+        {"cart_abi_minor", 6},
+        {"cart_abi_hash", double(prg32::Runtime::CurrentAbiHash)},
+        {"cart_abi_features", double(prg32::Runtime::ProvidedFeatures)},
+        {"cart_load_addr", double(h.loadAddr)},
+        {"cart_max_size", double(prg32::Cartridge::MaximumGuestBytes)},
+        {"cart_ram_size", double(h.memSize)},
+        {"cart_loaded", rt_.loaded()},
+        {"qemu", false},
+        {"cart", cart},
+        {"diag", QJsonObject{{"frame_count", double(frameCount_)}, {"input_state", double(input_.merged())}}},
+        {"host", "qt"}};
+}
+QJsonArray AppController::gamesJson() const {
+    QJsonArray out;
+    for (int i = 0; i < 4; ++i) {
+        QFile f(slotPath(i));
+        QJsonObject g{{"slot", QString("cart%1").arg(i)},
+                      {"name", ""},
+                      {"loaded", false},
+                      {"stored", false},
+                      {"code_size", 0},
+                      {"mem_size", 0},
+                      {"audio_size", 0},
+                      {"audio", false},
+                      {"generation", 0}};
+        if (f.open(QIODevice::ReadOnly)) {
+            std::string e;
+            auto b = f.readAll();
+            auto c = prg32::Cartridge::parse(
+                std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(b.constData()), size_t(b.size())),
+                e);
+            if (c) {
+                g["name"] = QString::fromStdString(c->name());
+                g["stored"] = true;
+                g["loaded"] = currentBytes_ == b;
+                g["code_size"] = int(c->header().codeSize);
+                g["mem_size"] = int(c->header().memSize);
+                g["audio"] = bool(c->audio());
+                g["audio_size"] = c->audio() ? int(c->audio()->samples.size()) : 0;
+                g["generation"] = currentBytes_ == b ? 1 : 0;
+            }
+        }
+        out.append(g);
+    }
+    return out;
+}
+bool AppController::uploadSlot(int slot, const QByteArray& bytes, QString& error) {
+    if (slot < 0 || slot >= 4) {
+        error = "invalid cartridge slot";
+        return false;
+    }
+    std::string e;
+    auto c = prg32::Cartridge::parse(
+        std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(bytes.constData()), size_t(bytes.size())),
+        e);
+    if (!c) {
+        error = QString::fromStdString(e);
+        return false;
+    }
+    QDir().mkpath(QFileInfo(slotPath(slot)).absolutePath());
+    QSaveFile file(slotPath(slot));
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
+        error = "cannot store cartridge";
+        return false;
+    }
+    return true;
+}
+bool AppController::selectSlot(int slot, QString& error) {
+    if (slot < 0 || slot >= 4) {
+        error = "invalid cartridge slot";
+        return false;
+    }
+    QFile file(slotPath(slot));
+    if (!file.open(QIODevice::ReadOnly)) {
+        error = "slot is empty";
+        return false;
+    }
+    if (!loadBytes(file.readAll(), QString("cart%1").arg(slot))) {
+        error = status_;
+        return false;
+    }
+    return true;
+}
+QJsonObject AppController::memoryJson() const {
+    auto m = rt_.loaded() ? rt_.cartridge().header().memSize : 0;
+    return {{"static_bss_bytes", 0},
+            {"static_data_bytes", 0},
+            {"heap_total_bytes", double(m)},
+            {"heap_free_bytes", 0},
+            {"heap_allocated_bytes", double(m)},
+            {"heap_largest_free_block", 0},
+            {"host", "qt"}};
+}
+QJsonArray AppController::scoresJson() const {
+    QJsonArray a;
+    for (const auto& s : rt_.scores())
+        a.append(QJsonObject{{"game", QString::fromStdString(s.game)},
+                             {"player", QString::fromStdString(s.player)},
+                             {"score", double(s.score)}});
+    return a;
+}
+bool AppController::submitScore(const QJsonObject& o, QString& error) {
+    auto g = o.value("game").toString(), p = o.value("player").toString();
+    double score = o.value("score").toDouble(-1);
+    if (g.isEmpty() || p.isEmpty() || score < 0 || score > UINT32_MAX) {
+        error = "expected game, player, score";
+        return false;
+    }
+    rt_.submitScore(g.toStdString(), p.toStdString(), uint32_t(score));
+    return true;
+}
+QByteArray AppController::screenshotBmp() const {
+    constexpr int w = 320, h = 200, row = w * 3;
+    QByteArray b(54 + row * h, 0);
+    auto p = reinterpret_cast<unsigned char*>(b.data());
+    auto wr16 = [&](int o, uint16_t v) {
+        p[o] = uint8_t(v);
+        p[o + 1] = uint8_t(v >> 8);
+    };
+    auto wr32 = [&](int o, uint32_t v) {
+        for (int i = 0; i < 4; ++i)
+            p[o + i] = uint8_t(v >> (i * 8));
+    };
+    p[0] = 'B';
+    p[1] = 'M';
+    wr32(2, uint32_t(b.size()));
+    wr32(10, 54);
+    wr32(14, 40);
+    wr32(18, w);
+    wr32(22, h);
+    wr16(26, 1);
+    wr16(28, 24);
+    wr32(34, row * h);
+    const auto& pixels = rt_.framebuffer().rgb565Pixels();
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            uint16_t c = pixels[size_t(y) * w + x];
+            int o = 54 + (h - 1 - y) * row + x * 3;
+            p[o] = uint8_t((c & 31) * 255 / 31);
+            p[o + 1] = uint8_t(((c >> 5) & 63) * 255 / 63);
+            p[o + 2] = uint8_t(((c >> 11) & 31) * 255 / 31);
+        }
+    return b;
+}
+QJsonObject AppController::performanceJson() const {
+    const auto& s = rt_.performance();
+    if (s.state == 1)
+        return {{"ok", false}, {"running", true}};
+    if (s.state != 2)
+        return {{"ok", false}, {"error", "no performance test results"}};
+    QJsonArray cases;
+    uint64_t total = 0, updates = 0, draws = 0, presents = 0;
+    uint32_t frames = 0, min = UINT32_MAX, max = 0, missed = 0, screenCount = 0;
+    for (const auto& c : s.cases) {
+        cases.append(QJsonObject{{"screen_index", int(c.index)},
+                                 {"screen_name", QString::fromStdString(c.name)},
+                                 {"color_mode",
+                                  c.mode == 0   ? "rgb565"
+                                  : c.mode == 1 ? "indexed"
+                                                : "custom"},
+                                 {"metric_goal", QString::fromStdString(c.goal)},
+                                 {"first_frame", int(c.first)},
+                                 {"last_frame", int(c.first + c.frames - 1)},
+                                 {"frames", int(c.frames)},
+                                 {"fps_mean", c.mean ? 1000000.0 / double(c.mean) : 0.0},
+                                 {"frame_us_min", int(c.min)},
+                                 {"frame_us_mean", int(c.mean)},
+                                 {"frame_us_p50", int(c.p50)},
+                                 {"frame_us_p95", int(c.p95)},
+                                 {"frame_us_p99", int(c.p99)},
+                                 {"frame_us_max", int(c.max)},
+                                 {"missed_deadlines", int(c.missed)},
+                                 {"update_us_mean", int(c.update)},
+                                 {"draw_us_mean", int(c.draw)},
+                                 {"present_us_mean", int(c.present)},
+                                 {"heap_min", 0}});
+        frames += c.frames;
+        total += c.frameTotal;
+        updates += c.updateTotal;
+        draws += c.drawTotal;
+        presents += c.presentTotal;
+        min = std::min(min, c.min);
+        max = std::max(max, c.max);
+        missed += c.missed;
+        screenCount = std::max(screenCount, c.index + 1);
+    }
+    double mean = frames ? double(total) / frames : 0;
+    QJsonObject summary{{"frames", int(frames)},
+                        {"fps_mean", mean ? 1000000.0 / mean : 0.0},
+                        {"frame_us_min", int(min == UINT32_MAX ? 0 : min)},
+                        {"frame_us_mean", mean},
+                        {"frame_us_max", int(max)},
+                        {"missed_deadlines", int(missed)},
+                        {"update_us_mean", frames ? double(updates) / frames : 0.0},
+                        {"draw_us_mean", frames ? double(draws) / frames : 0.0},
+                        {"present_us_mean", frames ? double(presents) / frames : 0.0},
+                        {"heap_min", 0},
+                        {"screen_count", int(screenCount)}};
+    return {{"ok", true},
+            {"schema_version", 2},
+            {"run_id", QString("perf-%1-%2").arg(s.started).arg(s.sequence)},
+            {"board_id", "qt-host"},
+            {"target", "qt"},
+            {"display_backend", "qt-quick"},
+            {"game_name", QString::fromStdString(s.name)},
+            {"wifi_mode", deviceIp_.isEmpty() ? "off" : "infrastructure"},
+            {"sample_period_frames", 0},
+            {"screen_count", int(screenCount)},
+            {"result_count", int(s.cases.size())},
+            {"color_modes", QJsonArray{"rgb565", "indexed"}},
+            {"started_at_device_us", double(s.started)},
+            {"started_at_server_ts", QJsonValue::Null},
+            {"duration_us", double(s.ended - s.started)},
+            {"samples", QJsonArray{}},
+            {"aggregate_windows", QJsonArray{}},
+            {"screen_summaries", cases},
+            {"comparisons", QJsonArray{}},
+            {"memory",
+             QJsonObject{{"baseline_free_bytes", 0},
+                         {"baseline_largest_block", 0},
+                         {"peak_free_bytes", 0},
+                         {"peak_largest_block", 0},
+                         {"after_free_bytes", 0},
+                         {"after_largest_block", 0}}},
+            {"summary", summary}};
+}

@@ -5,27 +5,221 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSettings>
-#include <QUrlQuery>
 #include <QStringList>
+#include <QUrlQuery>
 #include <memory>
 #ifndef PRG32QT_DEFAULT_STORE
 #define PRG32QT_DEFAULT_STORE "http://193.205.230.7:5080"
 #endif
-StoreClient::StoreClient(QObject*p):QObject(p){QSettings s;QString saved=s.value("storeURL").toString();if(saved.isEmpty()||saved=="http://127.0.0.1:5080")saved=QStringLiteral(PRG32QT_DEFAULT_STORE);base_=QUrl(saved);}
-QUrl StoreClient::join(QString p)const{QUrl b=base_;QString x=b.path();if(!x.endsWith('/'))x+='/';while(p.startsWith('/'))p.remove(0,1);b.setPath(x+p);return b;}
-void StoreClient::setBaseUrl(const QString&s){QUrl u(s.trimmed());if(!u.isValid()||(u.scheme()!="http"&&u.scheme()!="https")||u.host().isEmpty()){setError("Enter a valid http:// or https:// Cartridge Store URL");return;}if(u==base_)return;base_=u;icons_.clear();++iconRevision_;QSettings().setValue("storeURL",u.toString());emit baseUrlChanged();emit iconRevisionChanged();}
-void StoreClient::resetDefault(){setBaseUrl(QStringLiteral(PRG32QT_DEFAULT_STORE));}
-void StoreClient::setError(QString e){if(error_==e)return;error_=std::move(e);emit errorChanged();}void StoreClient::setLoading(bool v){if(loading_==v)return;loading_=v;emit loadingChanged();}
-static QJsonArray decodeGames(const QByteArray&data){auto d=QJsonDocument::fromJson(data);if(d.isArray())return d.array();if(d.isObject()){auto o=d.object();for(auto k:{"games","items","cartridges","results"})if(o.value(k).isArray())return o.value(k).toArray();}return{};}
-void StoreClient::refresh(){setError({});setLoading(true);fetchGamesDirect(true);}
-void StoreClient::fetchGamesDirect(bool fallback){auto*r=net_.get(QNetworkRequest(join("api/games")));connect(r,&QNetworkReply::finished,this,[this,r,fallback]{auto data=r->readAll();int status=r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();r->deleteLater();auto a=decodeGames(data);if(status>=200&&status<300){carts_=a;emit cartridgesChanged();fetchIcons();setLoading(false);setError(QString());return;}if(fallback)fetchDiscovery();else{setLoading(false);setError(QString("Cartridge Store HTTP %1").arg(status));}});}
-void StoreClient::fetchDiscovery(){auto*r=net_.get(QNetworkRequest(join(".well-known/prg32-store.json")));connect(r,&QNetworkReply::finished,this,[this,r]{auto data=r->readAll();int status=r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();r->deleteLater();if(status<200||status>=300){setLoading(false);setError(QString("Store discovery failed (HTTP %1)").arg(status));return;}auto o=QJsonDocument::fromJson(data).object();if(o.value("abi").toString()!="prg32-store-discovery-1.0"){setLoading(false);setError("Unsupported PRG32 store discovery ABI");return;}fetchCatalog(o);});}
-void StoreClient::fetchCatalog(const QJsonObject&o){QString path;for(auto k:{"catalog","catalog_url","cartridges","cartridges_url","api"})if(o.value(k).isString()){path=o.value(k).toString();break;}QStringList candidates;if(!path.isEmpty())candidates<<path;candidates<<"api/games"<<"api/cartridges"<<"cartridges.json"<<"catalog.json";auto next=std::make_shared<std::function<void(int)>>();*next=[this,candidates,next](int n){if(n>=candidates.size()){setLoading(false);setError("Store discovery succeeded but no supported catalog endpoint was found");return;}QUrl u(candidates[n]);if(u.isRelative())u=join(candidates[n]);auto*r=net_.get(QNetworkRequest(u));connect(r,&QNetworkReply::finished,this,[this,r,n,next]{auto d=r->readAll();int st=r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();r->deleteLater();auto a=decodeGames(d);if(st>=200&&st<300){carts_=a;emit cartridgesChanged();fetchIcons();setLoading(false);setError({});}else(*next)(n+1);});};(*next)(0);}
-void StoreClient::fetchIcons(){
- for(const auto&value:carts_){QString id=value.toObject().value("id").toString();if(id.isEmpty()||icons_.contains(id))continue;
-  auto*r=net_.get(QNetworkRequest(join("api/games/"+QString::fromUtf8(QUrl::toPercentEncoding(id))+"/icon")));
-  connect(r,&QNetworkReply::finished,this,[this,r,id]{QByteArray data=r->readAll();int status=r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();r->deleteLater();QImage image;if(status>=200&&status<300&&image.loadFromData(data)){QByteArray normalized;QBuffer buffer(&normalized);buffer.open(QIODevice::WriteOnly);image.convertToFormat(QImage::Format_RGBA8888).save(&buffer,"PNG");icons_.insert(id,"data:image/png;base64,"+normalized.toBase64());++iconRevision_;emit iconRevisionChanged();}});
- }
+StoreClient::StoreClient(QObject* p) : QObject(p) {
+    QSettings s;
+    QString saved = s.value("storeURL").toString();
+    if (saved.isEmpty() || saved == "http://127.0.0.1:5080")
+        saved = QStringLiteral(PRG32QT_DEFAULT_STORE);
+    base_ = QUrl(saved);
 }
-void StoreClient::downloadGame(const QJsonObject&g){QString id=g.value("id").toString();if(id.isEmpty()){setError("Store entry has no cartridge id");return;}QStringList offered;for(auto v:g.value("architectures").toArray())offered<<v.toString();QString arch;for(auto c:{"qt","qemu","esp32c6","ios"})if(offered.contains(c)){arch=c;break;}if(arch.isEmpty())arch="qemu";QUrl u=join("api/games/"+QString::fromUtf8(QUrl::toPercentEncoding(id))+"/download");QUrlQuery q;q.addQueryItem("architecture",arch);QString version=g.value("version").toString();if(!version.isEmpty())q.addQueryItem("version",version);u.setQuery(q);setLoading(true);auto*r=net_.get(QNetworkRequest(u));connect(r,&QNetworkReply::finished,this,[this,r,id]{auto d=r->readAll();int st=r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();r->deleteLater();setLoading(false);if(st>=200&&st<300&&d.startsWith("PRG2")){setError({});emit cartridgeDownloaded(id,d);}else setError(QString("Cartridge download failed or is not PRG2 (HTTP %1)").arg(st));});}
-QString StoreClient::iconUrl(const QString&id)const{auto it=icons_.constFind(id);return it==icons_.cend()?QString():QString::fromLatin1(it.value());}
+QUrl StoreClient::join(QString p) const {
+    QUrl b = base_;
+    QString x = b.path();
+    if (!x.endsWith('/'))
+        x += '/';
+    while (p.startsWith('/'))
+        p.remove(0, 1);
+    b.setPath(x + p);
+    return b;
+}
+void StoreClient::setBaseUrl(const QString& s) {
+    QUrl u(s.trimmed());
+    if (!u.isValid() || (u.scheme() != "http" && u.scheme() != "https") || u.host().isEmpty()) {
+        setError("Enter a valid http:// or https:// Cartridge Store URL");
+        return;
+    }
+    if (u == base_)
+        return;
+    base_ = u;
+    icons_.clear();
+    ++iconRevision_;
+    QSettings().setValue("storeURL", u.toString());
+    emit baseUrlChanged();
+    emit iconRevisionChanged();
+}
+void StoreClient::resetDefault() {
+    setBaseUrl(QStringLiteral(PRG32QT_DEFAULT_STORE));
+}
+void StoreClient::setError(QString e) {
+    if (error_ == e)
+        return;
+    error_ = std::move(e);
+    emit errorChanged();
+}
+void StoreClient::setLoading(bool v) {
+    if (loading_ == v)
+        return;
+    loading_ = v;
+    emit loadingChanged();
+}
+static QJsonArray decodeGames(const QByteArray& data) {
+    auto d = QJsonDocument::fromJson(data);
+    if (d.isArray())
+        return d.array();
+    if (d.isObject()) {
+        auto o = d.object();
+        for (auto k : {"games", "items", "cartridges", "results"})
+            if (o.value(k).isArray())
+                return o.value(k).toArray();
+    }
+    return {};
+}
+void StoreClient::refresh() {
+    setError({});
+    setLoading(true);
+    fetchGamesDirect(true);
+}
+void StoreClient::fetchGamesDirect(bool fallback) {
+    auto* r = net_.get(QNetworkRequest(join("api/games")));
+    connect(r, &QNetworkReply::finished, this, [this, r, fallback] {
+        auto data = r->readAll();
+        int status = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        r->deleteLater();
+        auto a = decodeGames(data);
+        if (status >= 200 && status < 300) {
+            carts_ = a;
+            emit cartridgesChanged();
+            fetchIcons();
+            setLoading(false);
+            setError(QString());
+            return;
+        }
+        if (fallback)
+            fetchDiscovery();
+        else {
+            setLoading(false);
+            setError(QString("Cartridge Store HTTP %1").arg(status));
+        }
+    });
+}
+void StoreClient::fetchDiscovery() {
+    auto* r = net_.get(QNetworkRequest(join(".well-known/prg32-store.json")));
+    connect(r, &QNetworkReply::finished, this, [this, r] {
+        auto data = r->readAll();
+        int status = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        r->deleteLater();
+        if (status < 200 || status >= 300) {
+            setLoading(false);
+            setError(QString("Store discovery failed (HTTP %1)").arg(status));
+            return;
+        }
+        auto o = QJsonDocument::fromJson(data).object();
+        if (o.value("abi").toString() != "prg32-store-discovery-1.0") {
+            setLoading(false);
+            setError("Unsupported PRG32 store discovery ABI");
+            return;
+        }
+        fetchCatalog(o);
+    });
+}
+void StoreClient::fetchCatalog(const QJsonObject& o) {
+    QString path;
+    for (auto k : {"catalog", "catalog_url", "cartridges", "cartridges_url", "api"})
+        if (o.value(k).isString()) {
+            path = o.value(k).toString();
+            break;
+        }
+    QStringList candidates;
+    if (!path.isEmpty())
+        candidates << path;
+    candidates << "api/games" << "api/cartridges" << "cartridges.json" << "catalog.json";
+    auto next = std::make_shared<std::function<void(int)>>();
+    *next = [this, candidates, next](int n) {
+        if (n >= candidates.size()) {
+            setLoading(false);
+            setError("Store discovery succeeded but no supported catalog endpoint was found");
+            return;
+        }
+        QUrl u(candidates[n]);
+        if (u.isRelative())
+            u = join(candidates[n]);
+        auto* r = net_.get(QNetworkRequest(u));
+        connect(r, &QNetworkReply::finished, this, [this, r, n, next] {
+            auto d = r->readAll();
+            int st = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            r->deleteLater();
+            auto a = decodeGames(d);
+            if (st >= 200 && st < 300) {
+                carts_ = a;
+                emit cartridgesChanged();
+                fetchIcons();
+                setLoading(false);
+                setError({});
+            } else
+                (*next)(n + 1);
+        });
+    };
+    (*next)(0);
+}
+void StoreClient::fetchIcons() {
+    for (const auto& value : carts_) {
+        QString id = value.toObject().value("id").toString();
+        if (id.isEmpty() || icons_.contains(id))
+            continue;
+        auto* r = net_.get(
+            QNetworkRequest(join("api/games/" + QString::fromUtf8(QUrl::toPercentEncoding(id)) + "/icon")));
+        connect(r, &QNetworkReply::finished, this, [this, r, id] {
+            QByteArray data = r->readAll();
+            int status = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            r->deleteLater();
+            QImage image;
+            if (status >= 200 && status < 300 && image.loadFromData(data)) {
+                QByteArray normalized;
+                QBuffer buffer(&normalized);
+                buffer.open(QIODevice::WriteOnly);
+                image.convertToFormat(QImage::Format_RGBA8888).save(&buffer, "PNG");
+                icons_.insert(id, "data:image/png;base64," + normalized.toBase64());
+                ++iconRevision_;
+                emit iconRevisionChanged();
+            }
+        });
+    }
+}
+void StoreClient::downloadGame(const QJsonObject& g) {
+    QString id = g.value("id").toString();
+    if (id.isEmpty()) {
+        setError("Store entry has no cartridge id");
+        return;
+    }
+    QStringList offered;
+    for (auto v : g.value("architectures").toArray())
+        offered << v.toString();
+    QString arch;
+    for (auto c : {"qt", "qemu", "esp32c6", "ios"})
+        if (offered.contains(c)) {
+            arch = c;
+            break;
+        }
+    if (arch.isEmpty())
+        arch = "qemu";
+    QUrl u = join("api/games/" + QString::fromUtf8(QUrl::toPercentEncoding(id)) + "/download");
+    QUrlQuery q;
+    q.addQueryItem("architecture", arch);
+    QString version = g.value("version").toString();
+    if (!version.isEmpty())
+        q.addQueryItem("version", version);
+    u.setQuery(q);
+    setLoading(true);
+    auto* r = net_.get(QNetworkRequest(u));
+    connect(r, &QNetworkReply::finished, this, [this, r, id] {
+        auto d = r->readAll();
+        int st = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        r->deleteLater();
+        setLoading(false);
+        if (st >= 200 && st < 300 && d.startsWith("PRG2")) {
+            setError({});
+            emit cartridgeDownloaded(id, d);
+        } else
+            setError(QString("Cartridge download failed or is not PRG2 (HTTP %1)").arg(st));
+    });
+}
+QString StoreClient::iconUrl(const QString& id) const {
+    auto it = icons_.constFind(id);
+    return it == icons_.cend() ? QString() : QString::fromLatin1(it.value());
+}

@@ -6,14 +6,183 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-QtAudioEngine::QtAudioEngine(QObject*p):QIODevice(p){channelVolumes_.fill(1.f);channelPans_.fill(0.f);open(QIODevice::ReadOnly);}
-QtAudioEngine::~QtAudioEngine(){shutdown();}
-void QtAudioEngine::ensureStarted(){if(sink_&&sink_->state()!=QAudio::StoppedState)return;auto dev=QMediaDevices::defaultAudioOutput();QAudioFormat f;f.setSampleRate(44100);f.setChannelCount(2);f.setSampleFormat(QAudioFormat::Float);if(!dev.isFormatSupported(f))f=dev.preferredFormat();format_=f;sink_=std::make_unique<QAudioSink>(dev,format_);sink_->setBufferSize(std::max(4096,format_.bytesForFrames(2048)));sink_->start(this);}
-void QtAudioEngine::configure(int){ensureStarted();}void QtAudioEngine::shutdown(){stopAll();if(sink_){sink_->stop();sink_.reset();}}
-void QtAudioEngine::tone(double hz,int ms,uint8_t volume){int rate=44100,count=std::max(1,rate*std::max(1,ms)/1000);std::vector<float>s(count);for(int n=0;n<count;n++){double ph=double(n)*hz/rate;s[n]=float(std::sin(ph*2*3.14159265358979323846));}playPCM(0,s,rate,1,volume,0,-1,-1);}
-void QtAudioEngine::noteOn(int ch,int note,uint8_t vel,int8_t pan){ensureStarted();Voice v;v.kind=Kind::Oscillator;v.channel=ch&7;v.frequency=440.0*std::pow(2.0,double(note-69)/12.0);v.volume=float(vel)/255.f;v.pan=float(pan)/64.f;QMutexLocker l(&mutex_);std::erase_if(voices_,[&](auto&x){return x.channel==v.channel;});voices_.push_back(std::move(v));}
-void QtAudioEngine::noteOff(int ch){stop(ch);}void QtAudioEngine::playPCM(int ch,const std::vector<float>&s,double sourceRate,double pitch,uint8_t vol,int8_t pan,int ls,int le){if(s.empty())return;ensureStarted();Voice v;v.kind=Kind::Pcm;v.channel=ch&7;v.samples=s;v.increment=std::max(.01,sourceRate/double(std::max(1,format_.sampleRate()))*pitch);v.volume=float(vol)/255.f;v.pan=float(pan)/64.f;v.loopStart=ls;v.loopEnd=le;QMutexLocker l(&mutex_);std::erase_if(voices_,[&](auto&x){return x.channel==v.channel;});voices_.push_back(std::move(v));}
-void QtAudioEngine::stop(int ch){QMutexLocker l(&mutex_);int c=ch&7;std::erase_if(voices_,[&](auto&x){return x.channel==c;});}void QtAudioEngine::stopAll(){QMutexLocker l(&mutex_);voices_.clear();}void QtAudioEngine::setMasterVolume(uint8_t v){QMutexLocker l(&mutex_);master_=float(v)/255.f;}void QtAudioEngine::setChannelVolume(int c,uint8_t v){QMutexLocker l(&mutex_);channelVolumes_[c&7]=float(v)/255.f;}void QtAudioEngine::setChannelPan(int c,int8_t p){QMutexLocker l(&mutex_);channelPans_[c&7]=float(p)/64.f;}
-void QtAudioEngine::render(float*l,float*r,int frames){QMutexLocker lock(&mutex_);double rate=std::max(1,format_.sampleRate());for(int f=0;f<frames;f++){float L=0,R=0;for(auto&v:voices_)if(v.active){float s=0;if(v.kind==Kind::Oscillator){double p=std::fmod(v.phase,1.0);s=float(4*std::abs(p-.5)-1)*.45f;v.phase+=v.frequency/rate;}else{int pos=int(v.position);if(pos>=int(v.samples.size())){if(v.loopStart>=0&&v.loopEnd>v.loopStart&&v.loopStart<int(v.samples.size()))v.position=v.loopStart;else{v.active=false;continue;}}pos=std::min(int(v.position),int(v.samples.size())-1);s=v.samples[pos];v.position+=v.increment;if(v.loopStart>=0&&v.loopEnd>v.loopStart&&v.position>=v.loopEnd)v.position=v.loopStart+(v.position-v.loopEnd);}int c=v.channel&7;float vol=v.volume*channelVolumes_[c]*master_,pan=std::clamp(v.pan+channelPans_[c],-1.f,1.f);L+=s*vol*std::sqrt((1-pan)*.5f);R+=s*vol*std::sqrt((1+pan)*.5f);}l[f]=std::tanh(L);r[f]=std::tanh(R);}std::erase_if(voices_,[](auto&v){return!v.active;});}
-void QtAudioEngine::encode(char*dst,int frames,const std::vector<float>&x){int ch=std::max(1,format_.channelCount());auto sf=format_.sampleFormat();if(sf==QAudioFormat::Float){auto*p=reinterpret_cast<float*>(dst);std::copy(x.begin(),x.end(),p);}else if(sf==QAudioFormat::Int16){auto*p=reinterpret_cast<qint16*>(dst);for(size_t i=0;i<x.size();i++)p[i]=qint16(std::clamp(x[i],-1.f,1.f)*32767);}else if(sf==QAudioFormat::Int32){auto*p=reinterpret_cast<qint32*>(dst);for(size_t i=0;i<x.size();i++)p[i]=qint32(std::clamp(x[i],-1.f,1.f)*2147483647.f);}else if(sf==QAudioFormat::UInt8){auto*p=reinterpret_cast<quint8*>(dst);for(size_t i=0;i<x.size();i++)p[i]=quint8(std::clamp(x[i]*127.f+128.f,0.f,255.f));}else std::memset(dst,0,format_.bytesForFrames(frames));(void)ch;}
-qint64 QtAudioEngine::readData(char*data,qint64 maxlen){if(format_.bytesPerFrame()<=0)return 0;int frames=int(maxlen/format_.bytesPerFrame());if(frames<=0)return 0;std::vector<float>L(frames),R(frames);render(L.data(),R.data(),frames);int ch=std::max(1,format_.channelCount());std::vector<float>x(size_t(frames)*ch);for(int f=0;f<frames;f++)for(int c=0;c<ch;c++)x[size_t(f)*ch+c]=(c==0?L[f]:(c==1?R[f]:(L[f]+R[f])*.5f));encode(data,frames,x);return format_.bytesForFrames(frames);}
+QtAudioEngine::QtAudioEngine(QObject* p) : QIODevice(p) {
+    channelVolumes_.fill(1.f);
+    channelPans_.fill(0.f);
+    open(QIODevice::ReadOnly);
+}
+QtAudioEngine::~QtAudioEngine() {
+    shutdown();
+}
+void QtAudioEngine::ensureStarted() {
+    if (sink_ && sink_->state() != QAudio::StoppedState)
+        return;
+    auto dev = QMediaDevices::defaultAudioOutput();
+    QAudioFormat f;
+    f.setSampleRate(44100);
+    f.setChannelCount(2);
+    f.setSampleFormat(QAudioFormat::Float);
+    if (!dev.isFormatSupported(f))
+        f = dev.preferredFormat();
+    format_ = f;
+    sink_ = std::make_unique<QAudioSink>(dev, format_);
+    sink_->setBufferSize(std::max(4096, format_.bytesForFrames(2048)));
+    sink_->start(this);
+}
+void QtAudioEngine::configure(int) {
+    ensureStarted();
+}
+void QtAudioEngine::shutdown() {
+    stopAll();
+    if (sink_) {
+        sink_->stop();
+        sink_.reset();
+    }
+}
+void QtAudioEngine::tone(double hz, int ms, uint8_t volume) {
+    int rate = 44100, count = std::max(1, rate * std::max(1, ms) / 1000);
+    std::vector<float> s(count);
+    for (int n = 0; n < count; n++) {
+        double ph = double(n) * hz / rate;
+        s[n] = float(std::sin(ph * 2 * 3.14159265358979323846));
+    }
+    playPCM(0, s, rate, 1, volume, 0, -1, -1);
+}
+void QtAudioEngine::noteOn(int ch, int note, uint8_t vel, int8_t pan) {
+    ensureStarted();
+    Voice v;
+    v.kind = Kind::Oscillator;
+    v.channel = ch & 7;
+    v.frequency = 440.0 * std::pow(2.0, double(note - 69) / 12.0);
+    v.volume = float(vel) / 255.f;
+    v.pan = float(pan) / 64.f;
+    QMutexLocker l(&mutex_);
+    std::erase_if(voices_, [&](auto& x) { return x.channel == v.channel; });
+    voices_.push_back(std::move(v));
+}
+void QtAudioEngine::noteOff(int ch) {
+    stop(ch);
+}
+void QtAudioEngine::playPCM(int ch,
+                            const std::vector<float>& s,
+                            double sourceRate,
+                            double pitch,
+                            uint8_t vol,
+                            int8_t pan,
+                            int ls,
+                            int le) {
+    if (s.empty())
+        return;
+    ensureStarted();
+    Voice v;
+    v.kind = Kind::Pcm;
+    v.channel = ch & 7;
+    v.samples = s;
+    v.increment = std::max(.01, sourceRate / double(std::max(1, format_.sampleRate())) * pitch);
+    v.volume = float(vol) / 255.f;
+    v.pan = float(pan) / 64.f;
+    v.loopStart = ls;
+    v.loopEnd = le;
+    QMutexLocker l(&mutex_);
+    std::erase_if(voices_, [&](auto& x) { return x.channel == v.channel; });
+    voices_.push_back(std::move(v));
+}
+void QtAudioEngine::stop(int ch) {
+    QMutexLocker l(&mutex_);
+    int c = ch & 7;
+    std::erase_if(voices_, [&](auto& x) { return x.channel == c; });
+}
+void QtAudioEngine::stopAll() {
+    QMutexLocker l(&mutex_);
+    voices_.clear();
+}
+void QtAudioEngine::setMasterVolume(uint8_t v) {
+    QMutexLocker l(&mutex_);
+    master_ = float(v) / 255.f;
+}
+void QtAudioEngine::setChannelVolume(int c, uint8_t v) {
+    QMutexLocker l(&mutex_);
+    channelVolumes_[c & 7] = float(v) / 255.f;
+}
+void QtAudioEngine::setChannelPan(int c, int8_t p) {
+    QMutexLocker l(&mutex_);
+    channelPans_[c & 7] = float(p) / 64.f;
+}
+void QtAudioEngine::render(float* l, float* r, int frames) {
+    QMutexLocker lock(&mutex_);
+    double rate = std::max(1, format_.sampleRate());
+    for (int f = 0; f < frames; f++) {
+        float L = 0, R = 0;
+        for (auto& v : voices_)
+            if (v.active) {
+                float s = 0;
+                if (v.kind == Kind::Oscillator) {
+                    double p = std::fmod(v.phase, 1.0);
+                    s = float(4 * std::abs(p - .5) - 1) * .45f;
+                    v.phase += v.frequency / rate;
+                } else {
+                    int pos = int(v.position);
+                    if (pos >= int(v.samples.size())) {
+                        if (v.loopStart >= 0 && v.loopEnd > v.loopStart &&
+                            v.loopStart < int(v.samples.size()))
+                            v.position = v.loopStart;
+                        else {
+                            v.active = false;
+                            continue;
+                        }
+                    }
+                    pos = std::min(int(v.position), int(v.samples.size()) - 1);
+                    s = v.samples[pos];
+                    v.position += v.increment;
+                    if (v.loopStart >= 0 && v.loopEnd > v.loopStart && v.position >= v.loopEnd)
+                        v.position = v.loopStart + (v.position - v.loopEnd);
+                }
+                int c = v.channel & 7;
+                float vol = v.volume * channelVolumes_[c] * master_,
+                      pan = std::clamp(v.pan + channelPans_[c], -1.f, 1.f);
+                L += s * vol * std::sqrt((1 - pan) * .5f);
+                R += s * vol * std::sqrt((1 + pan) * .5f);
+            }
+        l[f] = std::tanh(L);
+        r[f] = std::tanh(R);
+    }
+    std::erase_if(voices_, [](auto& v) { return !v.active; });
+}
+void QtAudioEngine::encode(char* dst, int frames, const std::vector<float>& x) {
+    int ch = std::max(1, format_.channelCount());
+    auto sf = format_.sampleFormat();
+    if (sf == QAudioFormat::Float) {
+        auto* p = reinterpret_cast<float*>(dst);
+        std::copy(x.begin(), x.end(), p);
+    } else if (sf == QAudioFormat::Int16) {
+        auto* p = reinterpret_cast<qint16*>(dst);
+        for (size_t i = 0; i < x.size(); i++)
+            p[i] = qint16(std::clamp(x[i], -1.f, 1.f) * 32767);
+    } else if (sf == QAudioFormat::Int32) {
+        auto* p = reinterpret_cast<qint32*>(dst);
+        for (size_t i = 0; i < x.size(); i++)
+            p[i] = qint32(std::clamp(x[i], -1.f, 1.f) * 2147483647.f);
+    } else if (sf == QAudioFormat::UInt8) {
+        auto* p = reinterpret_cast<quint8*>(dst);
+        for (size_t i = 0; i < x.size(); i++)
+            p[i] = quint8(std::clamp(x[i] * 127.f + 128.f, 0.f, 255.f));
+    } else
+        std::memset(dst, 0, format_.bytesForFrames(frames));
+    (void)ch;
+}
+qint64 QtAudioEngine::readData(char* data, qint64 maxlen) {
+    if (format_.bytesPerFrame() <= 0)
+        return 0;
+    int frames = int(maxlen / format_.bytesPerFrame());
+    if (frames <= 0)
+        return 0;
+    std::vector<float> L(frames), R(frames);
+    render(L.data(), R.data(), frames);
+    int ch = std::max(1, format_.channelCount());
+    std::vector<float> x(size_t(frames) * ch);
+    for (int f = 0; f < frames; f++)
+        for (int c = 0; c < ch; c++)
+            x[size_t(f) * ch + c] = (c == 0 ? L[f] : (c == 1 ? R[f] : (L[f] + R[f]) * .5f));
+    encode(data, frames, x);
+    return format_.bytesForFrames(frames);
+}
