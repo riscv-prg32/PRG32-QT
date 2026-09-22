@@ -16,6 +16,11 @@ The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` inclu
 
 `.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS and Android. ARM64 Linux is the continuous build proxy for Raspberry Pi OS/Raspbian portability; release qualification should also be performed natively on the target Pi hardware/image.
 
+The same workflow runs a dedicated Qt-free Release build and uploads its Linux headless runner. Successful
+desktop jobs upload their application build as a short-lived Actions artifact. These CI artifacts are diagnostic
+outputs, not signed distributable packages; tag-driven source publication is handled separately by
+`.github/workflows/release.yml`.
+
 To reproduce the Android ARM64 compilation and debug packaging locally after installing the dependencies in [Platform support](PLATFORMS.md):
 
 ```sh

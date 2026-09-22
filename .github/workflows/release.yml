@@ -1,0 +1,81 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-release:
+    name: Validate and publish source release
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Validate tag and project version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must have the form vX.Y.Z: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          project_version="$(sed -nE 's/^project\(PRG32_QT VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)"
+          if [[ "v$project_version" != "$RELEASE_TAG" ]]; then
+            echo "Tag $RELEASE_TAG does not match CMake project version v$project_version" >&2
+            exit 1
+          fi
+          grep -Fq "version: $project_version" CITATION.cff || {
+            echo "CITATION.cff does not declare version $project_version" >&2
+            exit 1
+          }
+
+      - name: Run portable release tests
+        run: |
+          cmake -S . -B build-release -DPRG32QT_BUILD_APP=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-release --parallel
+          ctest --test-dir build-release --output-on-failure
+
+      - name: Create source archives and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          prefix="PRG32-QT-${RELEASE_TAG#v}"
+          git archive --format=tar --prefix="$prefix/" "$RELEASE_TAG" | gzip -9 > "dist/$prefix.tar.gz"
+          git archive --format=zip --prefix="$prefix/" "$RELEASE_TAG" > "dist/$prefix.zip"
+          cd dist
+          sha256sum "$prefix.tar.gz" "$prefix.zip" > SHA256SUMS.txt
+
+      - name: Upload release candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: PRG32-QT-${{ env.RELEASE_TAG }}-source
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/*

@@ -4,6 +4,8 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Added GitHub Actions CI artifacts and tag-driven continuous delivery with version validation, portable
+  release tests, checksummed source archives, and generated GitHub Releases.
 - Reformatted the C++ implementation for reviewability and added an enforced formatting, documentation,
   six-platform build, deterministic-test, and Cartridge Store certification workflow; runtime behavior and
   public contracts are unchanged.

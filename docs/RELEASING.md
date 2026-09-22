@@ -5,6 +5,11 @@
 3. Confirm CI is green for Windows, Linux, ARM64 Linux/Raspberry-Pi-compatible, macOS, iOS and Android.
 4. Run the Store certification workflow against the default Store and review every cartridge result.
 5. Verify the canonical PRG32 artwork and platform packaging metadata.
-6. Tag `vX.Y.Z` and push the tag. The release workflow creates source archives.
+6. Tag `vX.Y.Z` and push the tag. `.github/workflows/release.yml` verifies that the tag agrees with both
+   `CMakeLists.txt` and `CITATION.cff`, reruns the portable release suite, creates `.tar.gz` and `.zip` source
+   archives plus `SHA256SUMS.txt`, and publishes them in a GitHub Release with generated notes.
+
+The release workflow may also be started manually for an existing tag. It never invents or moves a tag: the
+specified tag must already exist and must have the exact `vX.Y.Z` form.
 
 Binary/app-store releases should additionally be installed and launched on representative physical hardware for each target family, with audio, touch/keyboard, controller hot-plug, local import and Store download exercised before signing/publication.
