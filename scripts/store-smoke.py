@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,10 @@ import urllib.request
 DEFAULT_STORE = "http://193.205.230.7:5080"
 PORTABLE_ARCHITECTURES = ("qt", "qemu", "ios")
 NONPORTABLE_ERROR = "PRG32-QT accepts portable ABI-table PRG32 cartridges only"
+MEDIA_PATTERN = re.compile(
+    r"MEDIA graphics_non_black=(\d+) unique_frame_hashes=(\d+) "
+    r"audio_declared=(\d+) audio_events=(\d+) pcm_samples=(\d+)"
+)
 
 
 def fetch(url: str) -> bytes:
@@ -134,7 +139,7 @@ def certify(store: str, runner: str, frames: int) -> int:
                 package_path = pathlib.Path(temporary_directory) / f"cartridge-{index}.prg32"
                 package_path.write_bytes(package)
                 result = subprocess.run(
-                    [runner, str(package_path), str(frames)],
+                    [runner, str(package_path), str(frames), "--verify-media"],
                     capture_output=True,
                     text=True,
                     timeout=120,
@@ -149,7 +154,17 @@ def certify(store: str, runner: str, frames: int) -> int:
                         print(f"FAIL {label}: {detail}")
                         failed += 1
                 else:
-                    print(f"PASS {label}: {frames} frames")
+                    media = MEDIA_PATTERN.search(result.stdout)
+                    if not media:
+                        print(f"FAIL {label}: runner did not emit media evidence")
+                        failed += 1
+                        continue
+                    non_black, hashes, audio_declared, audio_events, pcm_samples = map(int, media.groups())
+                    audio_status = "active" if audio_events else ("declared-idle" if audio_declared else "not-declared")
+                    print(
+                        f"PASS {label}: {frames} frames; graphics={non_black}px/{hashes} hashes; "
+                        f"audio={audio_status} events={audio_events} pcm_samples={pcm_samples}"
+                    )
                     passed += 1
             except (OSError, ValueError, subprocess.TimeoutExpired) as error:
                 print(f"FAIL {label}: {error}")

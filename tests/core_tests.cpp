@@ -1,5 +1,6 @@
 #include "Cartridge.h"
 #include "Framebuffer.h"
+#include "InputButtons.h"
 #include "InputState.h"
 #include "Runtime.h"
 #include "Rv32Cpu.h"
@@ -16,6 +17,13 @@ static void put32(std::vector<uint8_t>& b, size_t o, uint32_t v) {
         b[o + i] = v >> (8 * i);
 }
 int main() {
+    static_assert(prg32qt::input::Left == 1);
+    static_assert(prg32qt::input::Right == 2);
+    static_assert(prg32qt::input::Up == 4);
+    static_assert(prg32qt::input::Down == 8);
+    static_assert(prg32qt::input::A == 16);
+    static_assert(prg32qt::input::B == 32);
+    static_assert(prg32qt::input::Select == 64);
     InputState input;
     input.set(InputState::Keyboard, 1, true);
     input.set(InputState::Ui, 16, true);

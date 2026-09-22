@@ -7,7 +7,7 @@ PRG32-QT keeps cartridge execution in portable C++20 and confines host-specific 
 | Windows 10/11 | Qt 6 desktop | keyboard + WinMM USB/game controllers | GitHub Actions Windows Qt job |
 | Linux desktop | Qt 6 desktop | keyboard + Linux joystick devices | GitHub Actions Linux Qt job |
 | Raspberry Pi OS / Raspbian | Qt 6 Linux ARM | keyboard + `/dev/input/js*` controllers | ARM64 Debian Trixie Qt build proxy in CI plus native Pi build script |
-| macOS | Qt 6 desktop | keyboard + Apple GameController | GitHub Actions macOS Qt job |
+| macOS | Qt 6 desktop | keyboard + Apple GameController + generic USB HID joystick/gamepad fallback | GitHub Actions macOS Qt job |
 | iOS | Qt 6 mobile | adaptive touch controls; Apple GameController backend is available | GitHub Actions Qt iOS build |
 | Android | Qt 6 mobile | adaptive touch controls | GitHub Actions Qt Android ARM64 build |
 
@@ -53,9 +53,17 @@ The project contains no x86 assumptions. RV32 cartridge code is interpreted by t
 ./scripts/build-macos.sh
 ```
 
-Apple GameController handles USB/Bluetooth controllers and hot-plug notifications.
+Apple GameController handles supported USB/Bluetooth controllers and hot-plug notifications. An IOKit HID
+fallback covers generic USB joysticks/gamepads that macOS exposes on Generic Desktop usage `Joystick` or
+`Game Pad` but does not surface through GameController. X/Y axes and hats map to movement, HID buttons 1/2 map
+to A/B, and buttons 7–10 map to Select.
 CI uses the macOS 15 runner with Xcode 16 because the Qt 6.8.3 binary kit still links Apple's AGL framework,
 which is absent from the newer Xcode 26 SDK on `macos-latest`.
+
+Store Settings exposes Auto, Portrait, and Landscape player layouts. Fullscreen can be toggled from the player,
+with `F11`, or with `Control+Command+F`; `Escape` returns to a window. On desktop, fullscreen deliberately hides
+all chrome and touch controls and displays only the aspect-correct game surface for keyboard/controller play.
+Both choices persist through `QSettings`.
 
 ## iOS
 

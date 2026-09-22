@@ -51,10 +51,12 @@ Validated on 2026-09-22:
 ## Whole-Store certification
 
 ```sh
-python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --store http://193.205.230.7:5080 --frames 300
+python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --store http://193.205.230.7:5080 --frames 900
 ```
 
 This enumerates the Store, downloads PRG2 portable variants and executes each supported package headlessly.
+Media mode cycles neutral, directional, A, B, Select, and combined inputs; samples the framebuffer every 15
+frames; rejects an entirely black run; and reports distinct hashes plus audio sink activity.
 The report includes cartridge IDs, versions, pass/fail outcomes, and explicit skips for packages rejected as
 non-portable ABI-table cartridges. An empty catalog, a catalog with no executed portable cartridge, or a runtime
 error in a portable cartridge fails certification. CI preserves the combined report as an artifact even on failure.
@@ -63,6 +65,28 @@ The live Store is an external dependency; its state can change independently of 
 ## Physical-device checks
 
 Before signed releases verify startup, Store browsing/download, local import, graphics, audio and input on representative devices. On desktops also verify keyboard and controller connect/disconnect behavior; on mobile verify both portrait and landscape touch layouts.
+
+## macOS display, media, and input validation (2026-09-22)
+
+- Apple Silicon arm64 macOS host, native Homebrew Qt kit: application build and all four CTest targets passed.
+  The separate `$HOME/Qt/6.8.3/macos` helper attempt remains unusable on this host because its QML scanner
+  aborts with a NEON processor-feature mismatch.
+- The live Store contained 23 entries. A 900-frame control sweep passed all 21 portable variants with nonzero
+  graphics and 5–60 distinct sampled frame hashes. Audio calls were observed for 14 titles; seven declare no
+  cartridge audio. Space Invaders 1.0.0 and Terraforge 1.0.0 were explicitly excluded because their packages
+  are not portable ABI-table cartridges. No portable variant failed.
+- The Bach audio fixture produced visible eight-channel stereo activity and the instrumented audio path emitted
+  451 events in the Store run. The Qt Multimedia startup tone and game audio path were exercised; this run did
+  not use calibrated acoustic capture, so it certifies engine activity rather than speaker frequency response.
+- Keyboard Left/Right/Up/Down, Z, X, and Return were sent to a running Asteroids cartridge; the game framebuffer
+  changed after the sequence. The source/unit contract also fixes W/A/S/D, J/K, and Space aliases to the same
+  seven PRG32 mask bits.
+- A Retro Games LTD `THEGamepad` USB HID joystick (`0x1c59:0x0026`) was attached. The original GameController-only
+  backend did not enumerate it; after the IOKit fallback was added, the running player displayed `THEGamepad`.
+  Physical button actuation was not automated, while the HID axis/hat/button mapping is shared with the asserted
+  canonical input-mask constants.
+- Auto/Portrait/Landscape selection, persisted settings, the Full Screen/Exit Full Screen button, `Escape`, and
+  the fullscreen presentation were visually exercised. Current screenshots are stored under `docs/images/`.
 
 The `prg32qt_performance_contract` test executes the public reference performance cartridge for 605 frames and requires its broker state to be complete. This covers descriptor validation, case lifecycle, sample recording, aggregate calculation, and performance ABI return values.
 

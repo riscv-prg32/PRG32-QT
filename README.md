@@ -14,6 +14,7 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - Touch handheld controls on mobile; keyboard plus hot-plug game controller support on desktop.
 - RGB LED emulation, local scores, metrics/performance ABI calls and safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL settings/test, architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
+- Gamer-selectable Auto, Portrait, or Landscape player layout plus persistent fullscreen TV mode (`F11`, `Control+Command+F`, or the player button; `Escape` exits).
 - Canonical PRG32 artwork used by the PRG32 project.
 - Headless regression fixtures included for compatibility testing and live whole-Store certification tooling.
 
@@ -41,8 +42,40 @@ To exercise every discoverable Store cartridge after building the headless runne
 
 ```sh
 python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless \
-  --store http://193.205.230.7:5080 --frames 300
+  --store http://193.205.230.7:5080 --frames 900
 ```
+
+The certification input-sweeps each cartridge and records non-black rendered pixels, distinct frame hashes,
+declared audio, audio-engine events, and PCM samples. Packages with no portable ABI-table variant are named
+as exclusions rather than silently treated as passes.
+
+## Player display and controls
+
+Open **Store Settings** to choose Auto, Portrait, or Landscape independently of the window shape and to make
+fullscreen the persistent default. On Windows, macOS, and Linux fullscreen shows only the letterboxed 320x200
+game area; use the keyboard or controller, and press `Escape` to return to windowed mode. Keyboard and
+USB/Bluetooth controller inputs share this mapping:
+
+| PRG32 control | Keyboard | Controller |
+|---|---|---|
+| Move | Arrow keys or W/A/S/D | D-pad, left stick, or HID X/Y/hat |
+| A | Z or J | Button 1 / A |
+| B | X or K | Button 2 / B |
+| Select | Return, Enter, or Space | Menu/Options or buttons 7–10 |
+
+![macOS player display settings](docs/images/macos-display-settings.png)
+
+![Cartridge Store on macOS](docs/images/macos-cartridge-store.png)
+
+Portrait and landscape are explicit player choices, not merely consequences of resizing the window:
+
+| Portrait | Landscape |
+|---|---|
+| ![Asteroids in portrait mode](docs/images/macos-player-portrait.png) | ![Bach audio demo in landscape mode](docs/images/macos-player-landscape.png) |
+
+Desktop fullscreen removes all player chrome and touch controls:
+
+![Asteroids game-only fullscreen on macOS](docs/images/macos-player-fullscreen.png)
 
 ## Documentation
 

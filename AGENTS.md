@@ -30,6 +30,13 @@ be named, with the reason and manual evidence, rather than silently skipped.
   portable cartridge published by the default Cartridge Store through the headless harness. Preserve the
   full catalog snapshot (IDs and versions), each pass/fail result, and explicit non-portable exclusions as a
   CI artifact. A catalog with no executed portable cartridge is not a pass.
+- Whole-Store runs must use media verification and an input sweep. Preserve each cartridge's non-black pixel
+  count, distinct framebuffer-hash count, audio declaration, audio-event count, and PCM-sample count. Do not
+  claim audible output from instrumentation alone; record the physical output device and listening check when
+  one is performed.
+- Input changes must verify keyboard and controller masks. On macOS, test both Apple GameController devices and
+  a generic USB HID joystick/gamepad when hardware is available; record the product name and any unavailable
+  physical button-actuation limitation.
 - If the Store is unreachable in CI, certify manually before merge and attach the evidence.
 
 ## 4. Documentation currency
@@ -39,6 +46,9 @@ be named, with the reason and manual evidence, rather than silently skipped.
   claims.
 - Run the documentation-consistency check before merge and resolve all code/documentation drift.
 - Add a changelog entry for every user-visible or ABI-visible change.
+- Refresh documentation screenshots when player, Store, settings, orientation, or fullscreen presentation changes.
+- Desktop fullscreen must contain only the aspect-correct game surface. Keep keyboard/controller focus active,
+  keep `Escape` as an exit path, and do not expose touch controls or navigation chrome in that state.
 
 ## 5. Automated consistency checks
 

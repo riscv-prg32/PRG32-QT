@@ -1,6 +1,7 @@
 #include "AppController.h"
 #include "FrameItem.h"
 #include "GamepadBackend.h"
+#include "InputButtons.h"
 #include "QtAudioEngine.h"
 #include <QDir>
 #include <QFile>
@@ -10,10 +11,18 @@
 #include <QJsonObject>
 #include <QNetworkInterface>
 #include <QSaveFile>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QSysInfo>
 #include <algorithm>
 AppController::AppController(QObject* p) : QObject(p), audio_(std::make_unique<QtAudioEngine>()) {
+    QSettings settings;
+    preferredOrientation_ = settings.value("display/orientation", "auto").toString();
+    if (preferredOrientation_ != "auto" && preferredOrientation_ != "portrait" &&
+        preferredOrientation_ != "landscape") {
+        preferredOrientation_ = "auto";
+    }
+    fullScreen_ = settings.value("display/fullScreen", false).toBool();
     rt_.setAudioSink(audio_.get());
     rt_.setLEDCallback([this](prg32::RGBState v) {
         led_ = v;
@@ -45,6 +54,22 @@ AppController::AppController(QObject* p) : QObject(p), audio_(std::make_unique<Q
     connect(&ipTimer_, &QTimer::timeout, this, &AppController::refreshIp);
     ipTimer_.start();
     refreshIp();
+}
+void AppController::setPreferredOrientation(const QString& orientation) {
+    if (orientation != "auto" && orientation != "portrait" && orientation != "landscape")
+        return;
+    if (preferredOrientation_ == orientation)
+        return;
+    preferredOrientation_ = orientation;
+    QSettings().setValue("display/orientation", orientation);
+    emit displayPreferencesChanged();
+}
+void AppController::setFullScreen(bool enabled) {
+    if (fullScreen_ == enabled)
+        return;
+    fullScreen_ = enabled;
+    QSettings().setValue("display/fullScreen", enabled);
+    emit displayPreferencesChanged();
 }
 AppController::~AppController() {
     rt_.stop();
@@ -156,7 +181,9 @@ void AppController::setButton(int m, bool down) {
     input_.set(InputState::Ui, uint32_t(m), down);
 }
 void AppController::setDirectional(int m) {
-    input_.replace(InputState::Ui, (input_.value(InputState::Ui) & ~0x0fu) | (uint32_t(m) & 0x0f));
+    input_.replace(InputState::Ui,
+                   (input_.value(InputState::Ui) & ~prg32qt::input::DirectionMask) |
+                       (uint32_t(m) & prg32qt::input::DirectionMask));
 }
 void AppController::setKeyboardButton(int m, bool d) {
     input_.set(InputState::Keyboard, uint32_t(m), d);

@@ -4,6 +4,12 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Added persistent Auto/Portrait/Landscape player selection and fullscreen TV mode with player, keyboard, and
+  settings controls; desktop fullscreen shows only the aspect-correct game surface and exits with Escape; added
+  current macOS Store/settings/player screenshots.
+- Added a macOS IOKit fallback for generic USB HID joysticks/gamepads not exposed through Apple GameController.
+- Expanded whole-Store certification with a 900-frame control sweep, framebuffer evidence, and audio-event/PCM
+  evidence for every portable cartridge.
 - Corrected CI runner/SDK selections for Android, macOS, iOS, and ARM64 Linux; repaired Store certification
   for object-valued variants and made pipeline failures propagate instead of appearing green.
 - Added GitHub Actions CI artifacts and tag-driven continuous delivery with version validation, portable

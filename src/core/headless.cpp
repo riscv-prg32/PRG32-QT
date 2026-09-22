@@ -1,11 +1,65 @@
 #include "Cartridge.h"
 #include "Runtime.h"
+#include <algorithm>
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <set>
+
+namespace {
+class AuditAudioSink final : public prg32::AudioSink {
+  public:
+    void configure(int) override {
+        ++events;
+    }
+    void shutdown() override {
+    }
+    void tone(double, int, uint8_t) override {
+        ++events;
+    }
+    void noteOn(int, int, uint8_t, int8_t) override {
+        ++events;
+    }
+    void noteOff(int) override {
+        ++events;
+    }
+    void playPCM(int, const std::vector<float>& samples, double, double, uint8_t, int8_t, int, int) override {
+        ++events;
+        pcmSamples += samples.size();
+    }
+    void stop(int) override {
+        ++events;
+    }
+    void stopAll() override {
+        ++events;
+    }
+    void setMasterVolume(uint8_t) override {
+        ++events;
+    }
+    void setChannelVolume(int, uint8_t) override {
+        ++events;
+    }
+    void setChannelPan(int, int8_t) override {
+        ++events;
+    }
+    uint64_t events = 0;
+    uint64_t pcmSamples = 0;
+};
+
+uint64_t framebufferHash(const std::vector<uint16_t>& pixels) {
+    uint64_t hash = 1469598103934665603ull;
+    for (uint16_t pixel : pixels) {
+        hash ^= pixel;
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+} // namespace
+
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "usage: prg32qt-headless file.prg32 [frames] [--require-performance]\n";
+        std::cerr << "usage: prg32qt-headless file.prg32 [frames] [--require-performance] [--verify-media]\n";
         return 2;
     }
     std::ifstream f(argv[1], std::ios::binary);
@@ -17,20 +71,50 @@ int main(int argc, char** argv) {
         return 3;
     }
     prg32::Runtime r;
+    AuditAudioSink audio;
+    r.setAudioSink(&audio);
     if (!r.load(*c, e) || !r.init(e)) {
         std::cerr << e << "\n";
         return 4;
     }
     int frames = argc > 2 ? std::stoi(argv[2]) : 300;
-    for (int i = 0; i < frames; i++)
-        if (!r.frame(0, e)) {
+    bool verifyMedia = false;
+    bool requirePerformance = false;
+    for (int argument = 3; argument < argc; ++argument) {
+        verifyMedia |= std::string(argv[argument]) == "--verify-media";
+        requirePerformance |= std::string(argv[argument]) == "--require-performance";
+    }
+    constexpr std::array<uint32_t, 10> inputSequence = {0, 1, 2, 4, 8, 16, 32, 64, 17, 34};
+    std::set<uint64_t> frameHashes;
+    size_t maximumNonBlackPixels = 0;
+    for (int i = 0; i < frames; i++) {
+        uint32_t input = verifyMedia ? inputSequence[size_t(i / 30) % inputSequence.size()] : 0;
+        if (!r.frame(input, e)) {
             std::cerr << "frame " << i << ": " << e << "\n";
             return 5;
         }
-    if (argc > 3 && std::string(argv[3]) == "--require-performance" && r.performance().state != 2) {
+        if (verifyMedia && i % 15 == 0) {
+            const auto& pixels = r.framebuffer().rgb565Pixels();
+            frameHashes.insert(framebufferHash(pixels));
+            maximumNonBlackPixels = std::max(
+                maximumNonBlackPixels, size_t(std::count_if(pixels.begin(), pixels.end(), [](uint16_t pixel) {
+                    return pixel != 0;
+                })));
+        }
+    }
+    if (requirePerformance && r.performance().state != 2) {
         std::cerr << "performance suite did not complete (state " << r.performance().state << ")\n";
         return 6;
     }
     std::cout << c->name() << ": OK (" << frames << " frames)\n";
+    if (verifyMedia) {
+        std::cout << "MEDIA graphics_non_black=" << maximumNonBlackPixels
+                  << " unique_frame_hashes=" << frameHashes.size() << " audio_declared=" << bool(c->audio())
+                  << " audio_events=" << audio.events << " pcm_samples=" << audio.pcmSamples << "\n";
+        if (maximumNonBlackPixels == 0) {
+            std::cerr << "media verification found no rendered pixels\n";
+            return 7;
+        }
+    }
     return 0;
 }

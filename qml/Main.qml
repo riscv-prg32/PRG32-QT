@@ -14,6 +14,12 @@ ApplicationWindow {
     property string searchText: ""
     property string selectedTag: "All"
     property bool splashVisible: true
+    property bool documentationFullScreen: false
+    readonly property bool useLandscapePlayer: appController.preferredOrientation === "landscape" ||
+                                                (appController.preferredOrientation === "auto" && width > height)
+    readonly property bool desktopPlatform: Qt.platform.os === "windows" || Qt.platform.os === "osx" ||
+                                            Qt.platform.os === "linux"
+    readonly property bool gameOnlyFullScreen: desktopPlatform && (appController.fullScreen || documentationFullScreen)
     color: "#101216"
 
     function keyboardMask(key) {
@@ -41,6 +47,13 @@ ApplicationWindow {
         out.sort((a,b)=>gameTitle(a).localeCompare(gameTitle(b))); return out
     }
     function showPlayer() { appController.resume(); page=2; requestActivate(); keyboardHandler.forceActiveFocus() }
+    function applyFullScreen() {
+        if (appController.fullScreen)
+            root.showFullScreen()
+        else
+            root.showNormal()
+    }
+    function toggleFullScreen() { appController.fullScreen=!appController.fullScreen; applyFullScreen() }
 
     Item {
         id: keyboardHandler
@@ -50,7 +63,27 @@ ApplicationWindow {
         Keys.onReleased: event => { const m=root.keyboardMask(event.key); if(m){appController.setKeyboardButton(m,false);event.accepted=true} }
     }
     onActiveChanged: if (!active) appController.clearKeyboard()
-    Component.onCompleted: { storeClient.refresh(); appController.playStartupTone(); splashTimer.start(); requestActivate(); keyboardHandler.forceActiveFocus() }
+    Component.onCompleted: {
+        storeClient.refresh()
+        appController.playStartupTone()
+        splashTimer.start()
+        requestActivate()
+        keyboardHandler.forceActiveFocus()
+        if (documentationPage.length) {
+            splashVisible=false
+            if (documentationPage === "store") page=1
+            else if (documentationPage === "settings") settingsDialog.open()
+            else if (documentationPage === "player-portrait") { appController.preferredOrientation="portrait";showPlayer() }
+            else if (documentationPage === "player-landscape") { appController.preferredOrientation="landscape";showPlayer() }
+            else if (documentationPage === "player-fullscreen") { documentationFullScreen=true;showPlayer();root.showFullScreen() }
+        } else {
+            Qt.callLater(applyFullScreen)
+        }
+    }
+
+    Shortcut { sequence:"F11"; onActivated:root.toggleFullScreen() }
+    Shortcut { sequence:"Ctrl+Meta+F"; onActivated:root.toggleFullScreen() }
+    Shortcut { sequence:"Escape"; enabled:appController.fullScreen; onActivated:{appController.fullScreen=false;root.applyFullScreen()} }
 
     Timer { id:splashTimer; interval:900; repeat:false; onTriggered:root.splashVisible=false }
     FileDialog { id:importDialog; title:"Import PRG32 cartridge"; nameFilters:["PRG32 cartridges (*.prg32)","All files (*)"]; onAccepted: if(appController.loadFile(selectedFile)) root.showPlayer() }
@@ -58,6 +91,12 @@ ApplicationWindow {
         ColumnLayout { anchors.fill:parent; TextField { id:storeField; Layout.fillWidth:true; text:storeClient.baseUrl; placeholderText:"Cartridge Store URL" }
             RowLayout { Button{text:"Test connection";onClicked:{storeClient.baseUrl=storeField.text;storeClient.refresh()}} Button{text:"Restore default";onClicked:{storeClient.resetDefault();storeField.text=storeClient.baseUrl;storeClient.refresh()}} }
             Label { Layout.fillWidth:true; text:storeClient.error.length?storeClient.error:(storeClient.cartridges.length+" cartridges"); wrapMode:Text.Wrap }
+            Label { Layout.fillWidth:true; font.bold:true; text:"Player display" }
+            ComboBox { id:orientationBox; Layout.fillWidth:true; model:["Auto","Portrait","Landscape"]
+                Component.onCompleted:currentIndex=Math.max(0,["auto","portrait","landscape"].indexOf(appController.preferredOrientation))
+                onActivated:appController.preferredOrientation=["auto","portrait","landscape"][currentIndex] }
+            CheckBox { text:"Start and play in full screen"; checked:appController.fullScreen
+                onToggled:{appController.fullScreen=checked;root.applyFullScreen()} }
         }
     }
     Dialog { id:aboutDialog; title:"About PRG32-QT"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-32,620); height:Math.min(parent.height-32,680)
@@ -118,11 +157,12 @@ ApplicationWindow {
         // Player
         Item { id:playerPage
             Rectangle { anchors.fill:parent; color:"#0d1015" }
-            Loader { anchors.fill:parent; anchors.topMargin:48; sourceComponent:width>height?landscapePlayer:portraitPlayer }
-            RowLayout { anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:6; height:42; z:3
+            Loader { anchors.fill:parent; anchors.topMargin:root.gameOnlyFullScreen?0:48; sourceComponent:root.gameOnlyFullScreen?fullScreenPlayer:(root.useLandscapePlayer?landscapePlayer:portraitPlayer) }
+            RowLayout { visible:!root.gameOnlyFullScreen; anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:6; height:42; z:3
                 Button { text:"‹ Setup"; onClicked:{appController.pause();root.page=0} }
                 Label { Layout.fillWidth:true; text:appController.cartridgeName; elide:Text.ElideRight; font.bold:true; horizontalAlignment:Text.AlignHCenter }
                 Button { visible:appController.performanceAvailable; text:"Performance"; onClicked:appController.runPerformanceTest() }
+                Button { text:appController.fullScreen?"Exit Full Screen":"Full Screen"; onClicked:root.toggleFullScreen() }
             }
         }
     }
@@ -130,6 +170,11 @@ ApplicationWindow {
     Component { id:screenComponent
         Rectangle { color:"black"; radius:10; border.color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.min(.5,appController.ledIntensity)); border.width:2
             PRG32Frame { anchors.fill:parent; anchors.margins:10; Component.onCompleted:appController.attachFrame(this) }
+        }
+    }
+    Component { id:fullScreenPlayer
+        Item {
+            Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/200); height:width*200/320; sourceComponent:screenComponent }
         }
     }
     Component { id:dpadComponent

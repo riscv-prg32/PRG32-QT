@@ -41,6 +41,27 @@ class StoreSmokeTests(unittest.TestCase):
             # All-skipped catalogs fail: a green certification requires at least one executed cartridge.
             self.assertEqual(store_smoke.certify("https://store.example", "runner", 300), 1)
 
+    def test_success_requires_media_evidence(self):
+        item = {"id": "org.example.game", "version": "1.0.0", "architectures": ["qemu"]}
+        execution = subprocess.CompletedProcess([], 0, "game: OK (300 frames)\n", "")
+        with mock.patch.object(store_smoke, "catalog", return_value=[item]), mock.patch.object(
+            store_smoke, "fetch", return_value=b"PRG2example"
+        ), mock.patch.object(store_smoke.subprocess, "run", return_value=execution):
+            self.assertEqual(store_smoke.certify("https://store.example", "runner", 300), 1)
+
+    def test_media_evidence_is_reported_as_pass(self):
+        item = {"id": "org.example.game", "version": "1.0.0", "architectures": ["qemu"]}
+        output = (
+            "game: OK (300 frames)\n"
+            "MEDIA graphics_non_black=64000 unique_frame_hashes=12 "
+            "audio_declared=1 audio_events=4 pcm_samples=2048\n"
+        )
+        execution = subprocess.CompletedProcess([], 0, output, "")
+        with mock.patch.object(store_smoke, "catalog", return_value=[item]), mock.patch.object(
+            store_smoke, "fetch", return_value=b"PRG2example"
+        ), mock.patch.object(store_smoke.subprocess, "run", return_value=execution):
+            self.assertEqual(store_smoke.certify("https://store.example", "runner", 300), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

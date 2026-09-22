@@ -29,6 +29,9 @@ class AppController : public QObject {
     Q_PROPERTY(QString cartridgeName READ cartridgeName NOTIFY cartridgeChanged)
     Q_PROPERTY(bool performanceAvailable READ performanceAvailable NOTIFY cartridgeChanged)
     Q_PROPERTY(QString performanceState READ performanceState NOTIFY performanceChanged)
+    Q_PROPERTY(QString preferredOrientation READ preferredOrientation WRITE setPreferredOrientation NOTIFY
+                   displayPreferencesChanged)
+    Q_PROPERTY(bool fullScreen READ fullScreen WRITE setFullScreen NOTIFY displayPreferencesChanged)
     // clang-format on
 
   public:
@@ -70,6 +73,12 @@ class AppController : public QObject {
         return performanceAvailable_;
     }
     QString performanceState() const;
+    QString preferredOrientation() const {
+        return preferredOrientation_;
+    }
+    bool fullScreen() const {
+        return fullScreen_;
+    }
     QJsonObject runtimeJson() const;
     QJsonArray gamesJson() const;
     QJsonObject performanceJson() const;
@@ -91,6 +100,10 @@ class AppController : public QObject {
     Q_INVOKABLE void attachFrame(QObject*);
     Q_INVOKABLE void playStartupTone();
     Q_INVOKABLE void runPerformanceTest();
+    /** Select the player layout independently from the physical window orientation. */
+    void setPreferredOrientation(const QString& orientation);
+    /** Persist whether the desktop player should occupy the full screen. */
+    void setFullScreen(bool enabled);
   signals:
     void statusChanged();
     void controllerChanged();
@@ -100,6 +113,7 @@ class AppController : public QObject {
     void networkChanged();
     void cartridgeChanged();
     void performanceChanged();
+    void displayPreferencesChanged();
 
   private:
     void setStatus(QString);
@@ -111,11 +125,13 @@ class AppController : public QObject {
     QTimer timer_, ipTimer_;
     InputState input_;
     QString status_, deviceIp_, cartridgeName_;
+    QString preferredOrientation_ = "auto";
     QByteArray currentBytes_;
     QPointer<FrameItem> frame_;
     GamepadBackend* gamepad_ = nullptr;
     std::unique_ptr<QtAudioEngine> audio_;
     prg32::RGBState led_{};
     bool running_ = false, paused_ = false, performanceAvailable_ = false;
+    bool fullScreen_ = false;
     uint64_t frameCount_ = 0;
 };
