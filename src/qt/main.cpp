@@ -15,6 +15,7 @@ int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
     app.setOrganizationName("riscv-prg32");
     app.setApplicationName("PRG32");
+    app.setApplicationVersion(PRG32QT_VERSION);
     qmlRegisterType<FrameItem>("PRG32Qt", 1, 0, "PRG32Frame");
     qmlRegisterType<RasterImageItem>("PRG32Qt", 1, 0, "PRG32Image");
     StoreClient store;
@@ -38,6 +39,11 @@ int main(int argc, char** argv) {
     e.rootContext()->setContextProperty("storeClient", &store);
     e.rootContext()->setContextProperty("appController", &controller);
     e.rootContext()->setContextProperty("documentationPage", screenshotPage);
+#ifdef PRG32QT_TV_MODE
+    e.rootContext()->setContextProperty("tvPlatform", true);
+#else
+    e.rootContext()->setContextProperty("tvPlatform", false);
+#endif
     e.loadFromModule("PRG32Qt", "Main");
     if (e.rootObjects().isEmpty())
         return 1;

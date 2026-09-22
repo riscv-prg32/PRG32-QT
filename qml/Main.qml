@@ -19,7 +19,8 @@ ApplicationWindow {
                                                 (appController.preferredOrientation === "auto" && width > height)
     readonly property bool desktopPlatform: Qt.platform.os === "windows" || Qt.platform.os === "osx" ||
                                             Qt.platform.os === "linux"
-    readonly property bool gameOnlyFullScreen: desktopPlatform && (appController.fullScreen || documentationFullScreen)
+    readonly property bool gameOnlyFullScreen: page === 2 &&
+                                                (tvPlatform || (desktopPlatform && (appController.fullScreen || documentationFullScreen)))
     color: "#101216"
 
     function keyboardMask(key) {
@@ -29,7 +30,8 @@ ApplicationWindow {
         if (key === Qt.Key_Down || key === Qt.Key_S) return 8
         if (key === Qt.Key_Z || key === Qt.Key_J) return 16
         if (key === Qt.Key_X || key === Qt.Key_K) return 32
-        if (key === Qt.Key_Return || key === Qt.Key_Enter || key === Qt.Key_Space) return 64
+        if (key === Qt.Key_Return || key === Qt.Key_Enter || key === Qt.Key_Space ||
+                key === Qt.Key_Select) return 64
         return 0
     }
     function gameTitle(g) { return g.title || g.name || g.id || "Cartridge" }
@@ -47,8 +49,10 @@ ApplicationWindow {
         out.sort((a,b)=>gameTitle(a).localeCompare(gameTitle(b))); return out
     }
     function showPlayer() { appController.resume(); page=2; requestActivate(); keyboardHandler.forceActiveFocus() }
+    function showSetup() { appController.pause(); page=0; if(tvPlatform) browseButton.forceActiveFocus() }
+    function showStore() { page=1; if(tvPlatform) storeSearch.forceActiveFocus() }
     function applyFullScreen() {
-        if (appController.fullScreen)
+        if (tvPlatform || appController.fullScreen)
             root.showFullScreen()
         else
             root.showNormal()
@@ -58,8 +62,16 @@ ApplicationWindow {
     Item {
         id: keyboardHandler
         anchors.fill: parent
-        focus: true
-        Keys.onPressed: event => { const m=root.keyboardMask(event.key); if(m){appController.setKeyboardButton(m,true);event.accepted=true} }
+        focus: root.page === 2
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Back || event.key === Qt.Key_Escape) {
+                root.showSetup()
+                event.accepted=true
+                return
+            }
+            const m=root.keyboardMask(event.key)
+            if(m){appController.setKeyboardButton(m,true);event.accepted=true}
+        }
         Keys.onReleased: event => { const m=root.keyboardMask(event.key); if(m){appController.setKeyboardButton(m,false);event.accepted=true} }
     }
     onActiveChanged: if (!active) appController.clearKeyboard()
@@ -95,14 +107,14 @@ ApplicationWindow {
             ComboBox { id:orientationBox; Layout.fillWidth:true; model:["Auto","Portrait","Landscape"]
                 Component.onCompleted:currentIndex=Math.max(0,["auto","portrait","landscape"].indexOf(appController.preferredOrientation))
                 onActivated:appController.preferredOrientation=["auto","portrait","landscape"][currentIndex] }
-            CheckBox { text:"Start and play in full screen"; checked:appController.fullScreen
+            CheckBox { visible:!tvPlatform; text:"Start and play in full screen"; checked:appController.fullScreen
                 onToggled:{appController.fullScreen=checked;root.applyFullScreen()} }
         }
     }
     Dialog { id:aboutDialog; title:"About PRG32-QT"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-32,620); height:Math.min(parent.height-32,680)
         contentItem:ColumnLayout { spacing:6
             PRG32Image { Layout.alignment:Qt.AlignHCenter; Layout.preferredWidth:Math.min(280,aboutDialog.availableWidth); Layout.preferredHeight:120; source:"qrc:/prg32qt/assets/prg32_logo.png" }
-            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"PRG32-QT is the portable Qt/C++ runner for the PRG32 educational RISC-V gaming platform." }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"PRG32-QT "+Qt.application.version+" is the portable Qt/C++ runner for the PRG32 educational RISC-V gaming platform." }
             Label { Layout.fillWidth:true; font.bold:true; text:"Authors" }
             Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"Project lead: Raffaele Montella\nStudent contributors: Simone Boscaglia · Ivan Cafiero" }
             Label { Layout.fillWidth:true; font.bold:true; text:"University and labs" }
@@ -123,7 +135,7 @@ ApplicationWindow {
                 Label { Layout.fillWidth:true; text:"PLATFORM: "+Qt.platform.os.toUpperCase()+"\nRUNTIME: RV32IMAC · 30 FPS\nCARTRIDGES: "+storeClient.cartridges.length+"\nIP: "+(appController.deviceIp||"No local IPv4 address")+"\nWEB API: "+(appController.webApiUrl||"Unavailable"); color:"#43d17b"; font.family:"monospace"; wrapMode:Text.WrapAnywhere }
                 Button { Layout.fillWidth:true; text:"›  RUN CARTRIDGE"; enabled:appController.running; onClicked:root.showPlayer() }
                 Button { Layout.fillWidth:true; visible:appController.performanceAvailable; text:"›  RUN PERFORMANCE TEST"; onClicked:{appController.runPerformanceTest();root.showPlayer()} }
-                Button { Layout.fillWidth:true; text:"›  BROWSE STORE"; onClicked:root.page=1 }
+                Button { id:browseButton; Layout.fillWidth:true; focus:tvPlatform && root.page===0; text:"›  BROWSE STORE"; onClicked:root.showStore() }
                 Button { Layout.fillWidth:true; text:"›  IMPORT CARTRIDGE"; onClicked:importDialog.open() }
                 Button { Layout.fillWidth:true; text:"›  STORE SETTINGS"; onClicked:settingsDialog.open() }
                 Button { Layout.fillWidth:true; text:"›  ABOUT PRG32-QT"; onClicked:aboutDialog.open() }
@@ -132,9 +144,9 @@ ApplicationWindow {
         }
         // Store browser
         Item { ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8
-            RowLayout { Layout.fillWidth:true; Button{text:"Setup";onClicked:root.page=0} Label{text:"Cartridge Store";color:"#f2f4f8";font.pixelSize:20;font.bold:true} Item{Layout.fillWidth:true} Label{text:filteredGames().length+" / "+storeClient.cartridges.length;color:"#d7dde7"} Button{text:"Refresh";onClicked:storeClient.refresh()} }
+            RowLayout { Layout.fillWidth:true; Button{text:"Setup";onClicked:root.showSetup()} Label{text:"Cartridge Store";color:"#f2f4f8";font.pixelSize:20;font.bold:true} Item{Layout.fillWidth:true} Label{text:filteredGames().length+" / "+storeClient.cartridges.length;color:"#d7dde7"} Button{text:"Refresh";onClicked:storeClient.refresh()} }
             ColumnLayout { Layout.fillWidth:true; spacing:4
-                RowLayout { Layout.fillWidth:true; TextField { Layout.fillWidth:true; placeholderText:"Search cartridges"; text:root.searchText; onTextChanged:root.searchText=text }
+                RowLayout { Layout.fillWidth:true; TextField { id:storeSearch; Layout.fillWidth:true; placeholderText:"Search cartridges"; text:root.searchText; onTextChanged:root.searchText=text }
                     ComboBox { id:tagBox; Layout.preferredWidth:Math.min(150,root.width*.35); model:root.tags(); onCurrentTextChanged:root.selectedTag=currentText } }
                 RowLayout { Layout.fillWidth:true; Button { text:"Import .prg32"; onClicked:importDialog.open() }
                     Button { text:"Settings"; onClicked:settingsDialog.open() } Item { Layout.fillWidth:true }
@@ -159,10 +171,10 @@ ApplicationWindow {
             Rectangle { anchors.fill:parent; color:"#0d1015" }
             Loader { anchors.fill:parent; anchors.topMargin:root.gameOnlyFullScreen?0:48; sourceComponent:root.gameOnlyFullScreen?fullScreenPlayer:(root.useLandscapePlayer?landscapePlayer:portraitPlayer) }
             RowLayout { visible:!root.gameOnlyFullScreen; anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:6; height:42; z:3
-                Button { text:"‹ Setup"; onClicked:{appController.pause();root.page=0} }
+                Button { text:"‹ Setup"; onClicked:root.showSetup() }
                 Label { Layout.fillWidth:true; text:appController.cartridgeName; elide:Text.ElideRight; font.bold:true; horizontalAlignment:Text.AlignHCenter }
                 Button { visible:appController.performanceAvailable; text:"Performance"; onClicked:appController.runPerformanceTest() }
-                Button { text:appController.fullScreen?"Exit Full Screen":"Full Screen"; onClicked:root.toggleFullScreen() }
+                Button { visible:!tvPlatform; text:appController.fullScreen?"Exit Full Screen":"Full Screen"; onClicked:root.toggleFullScreen() }
             }
         }
     }

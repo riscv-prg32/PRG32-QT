@@ -1,7 +1,7 @@
 # AGENTS.md — Engineering Contract for PRG32-QT
 
-PRG32-QT supports Linux, Windows, Raspberry Pi OS, macOS, iOS, and Android. Every change must preserve
-a buildable and working application on all six targets.
+PRG32-QT supports Linux, Windows, Raspberry Pi OS, macOS, iOS, Android, Apple TV, and Android TV. Every change
+must preserve a buildable and working application on all eight targets.
 
 ## 1. Code quality bar (non-negotiable)
 
@@ -19,7 +19,8 @@ a buildable and working application on all six targets.
 
 The platform build scripts are the source of truth. CI must exercise Windows (`build-windows.ps1`), Linux
 (`build-linux.sh`), macOS (`build-macos.sh`), Raspberry Pi OS (`build-raspbian.sh`), Android
-(`build-android.sh`), and iOS (`build-ios.sh`). A platform that cannot be verified on an available runner must
+(`build-android.sh`), iOS (`build-ios.sh`), Android TV (`build-android-tv.sh`), and Apple TV
+(`build-tvos.sh`). A platform that cannot be verified on an available runner must
 be named, with the reason and manual evidence, rather than silently skipped.
 
 ## 3. Test and certification matrix
@@ -47,8 +48,9 @@ be named, with the reason and manual evidence, rather than silently skipped.
 - Run the documentation-consistency check before merge and resolve all code/documentation drift.
 - Add a changelog entry for every user-visible or ABI-visible change.
 - Refresh documentation screenshots when player, Store, settings, orientation, or fullscreen presentation changes.
-- Desktop fullscreen must contain only the aspect-correct game surface. Keep keyboard/controller focus active,
-  keep `Escape` as an exit path, and do not expose touch controls or navigation chrome in that state.
+- Desktop fullscreen and TV player presentation must contain only the aspect-correct game surface. Keep
+  keyboard/controller focus active, keep `Escape` as a desktop exit path, and do not expose touch controls or
+  navigation chrome in that state.
 
 ## 5. Automated consistency checks
 
@@ -59,7 +61,7 @@ documentation, and rejects structurally invalid Markdown documentation.
 ## 6. Definition of done
 
 1. `clang-format --dry-run --Werror` passes.
-2. All six platform builds pass, or unavailable targets are explicitly recorded and manually certified.
+2. All eight platform builds pass, or unavailable targets are explicitly recorded and manually certified.
 3. CTest and required Cartridge Store certification pass.
 4. Documentation consistency passes.
 5. Diff review confirms that behavioral changes are intentional and documented.

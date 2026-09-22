@@ -2,7 +2,7 @@
 
 PRG32-QT is the portable C++20 / Qt 6 host for the PRG32 cartridge ecosystem. It uses the public PRG32 cartridge ABI as its compatibility contract while sharing one Qt-free runtime across desktop, mobile, Raspberry Pi, headless tests, and Store certification.
 
-Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, and Android**. The default Cartridge Store is `http://193.205.230.7:5080`.
+Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, Android, Apple TV, and Android TV**. The default Cartridge Store is `http://193.205.230.7:5080`.
 
 ## Highlights
 
@@ -11,7 +11,7 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - PRG32 ABI 1.6 (`0x260f6136`) plus documented compatible hashes.
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
-- Touch handheld controls on mobile; keyboard plus hot-plug game controller support on desktop.
+- Touch handheld controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
 - RGB LED emulation, local scores, metrics/performance ABI calls and safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL settings/test, architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
 - Gamer-selectable Auto, Portrait, or Landscape player layout plus persistent fullscreen TV mode (`F11`, `Control+Command+F`, or the player button; `Escape` exits).
@@ -28,7 +28,11 @@ cmake --build build-core
 ctest --test-dir build-core --output-on-failure
 ```
 
-Host helpers are provided in `scripts/` for Windows, Linux, Raspberry Pi OS, macOS, iOS and Android. Platform prerequisites and exact commands are documented in [docs/PLATFORMS.md](docs/PLATFORMS.md).
+Host helpers are provided in `scripts/` for Windows, Linux, Raspberry Pi OS, macOS, iOS, Android, Apple TV and Android TV. Platform prerequisites and exact commands are documented in [docs/PLATFORMS.md](docs/PLATFORMS.md).
+
+Versions are automatic. CMake derives a clean version from an exact `vX.Y.Z` Git tag and otherwise emits
+`X.Y.Z-dev.N+gCOMMIT`, using `VERSION.txt` as the bootstrap/base version when no release tag is available. The same
+derived values drive the runtime, About dialog, Android packages and Apple bundle metadata.
 
 For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 
@@ -52,7 +56,7 @@ as exclusions rather than silently treated as passes.
 ## Player display and controls
 
 Open **Store Settings** to choose Auto, Portrait, or Landscape independently of the window shape and to make
-fullscreen the persistent default. On Windows, macOS, and Linux fullscreen shows only the letterboxed 320x200
+fullscreen the persistent default. On Windows, macOS, Linux, Apple TV, and Android TV fullscreen shows only the letterboxed 320x200
 game area; use the keyboard or controller, and press `Escape` to return to windowed mode. Keyboard and
 USB/Bluetooth controller inputs share this mapping:
 
@@ -101,6 +105,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [CODE_OF
 ### How this repository enforces its quality bar
 
 The binding engineering contract is [AGENTS.md](AGENTS.md). GitHub Actions checks the repository's
-authoritative `.clang-format`, documentation/code invariants, portable tests and fixture cartridges, all six
+authoritative `.clang-format`, documentation/code invariants, portable tests and fixture cartridges, all eight
 supported build targets, and the live Cartridge Store catalog. Platform jobs call the scripts in `scripts/`, so
 local and CI builds use the same entry points.

@@ -30,7 +30,7 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
 
-      - name: Validate tag and project version
+      - name: Validate tag and derived project version
         shell: bash
         run: |
           set -euo pipefail
@@ -38,15 +38,12 @@ jobs:
             echo "Release tag must have the form vX.Y.Z: $RELEASE_TAG" >&2
             exit 1
           fi
-          project_version="$(sed -nE 's/^project\(PRG32_QT VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)"
+          cmake -S . -B build-version -DPRG32QT_BUILD_APP=OFF -DPRG32QT_BUILD_TESTS=OFF
+          project_version="$(tr -d '\r\n' < build-version/prg32qt-version.txt)"
           if [[ "v$project_version" != "$RELEASE_TAG" ]]; then
-            echo "Tag $RELEASE_TAG does not match CMake project version v$project_version" >&2
+            echo "Tag $RELEASE_TAG does not match Git-derived project version v$project_version" >&2
             exit 1
           fi
-          grep -Fq "version: $project_version" CITATION.cff || {
-            echo "CITATION.cff does not declare version $project_version" >&2
-            exit 1
-          }
 
       - name: Run portable release tests
         run: |

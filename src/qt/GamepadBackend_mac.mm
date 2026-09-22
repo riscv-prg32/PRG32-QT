@@ -38,6 +38,8 @@ class MacGamepadBackend final : public GamepadBackend {
     ~MacGamepadBackend() override {
         if (controller_.extendedGamepad)
             controller_.extendedGamepad.valueChangedHandler = nil;
+        if (controller_.microGamepad)
+            controller_.microGamepad.valueChangedHandler = nil;
         if (connectObs_)
             [center_ removeObserver:connectObs_];
         if (disconnectObs_)
@@ -78,9 +80,31 @@ class MacGamepadBackend final : public GamepadBackend {
         }
         publish(m);
     }
+    void updateMicro(GCMicroGamepad* gamepad) {
+        if (!gamepad) {
+            publish(0);
+            return;
+        }
+        quint32 mask = 0;
+        if (gamepad.dpad.left.isPressed)
+            mask |= prg32qt::input::Left;
+        if (gamepad.dpad.right.isPressed)
+            mask |= prg32qt::input::Right;
+        if (gamepad.dpad.up.isPressed)
+            mask |= prg32qt::input::Up;
+        if (gamepad.dpad.down.isPressed)
+            mask |= prg32qt::input::Down;
+        if (gamepad.buttonA.isPressed)
+            mask |= prg32qt::input::A;
+        if (gamepad.buttonX.isPressed)
+            mask |= prg32qt::input::B;
+        publish(mask);
+    }
     void attachFirst() {
         if (controller_.extendedGamepad)
             controller_.extendedGamepad.valueChangedHandler = nil;
+        if (controller_.microGamepad)
+            controller_.microGamepad.valueChangedHandler = nil;
         NSArray<GCController*>* controllers = [GCController controllers];
         controller_ = controllers.count ? controllers.firstObject : nil;
         if (!controller_) {
@@ -96,7 +120,15 @@ class MacGamepadBackend final : public GamepadBackend {
         setState(true, QString::fromUtf8([vendor UTF8String]));
         GCExtendedGamepad* pad = controller_.extendedGamepad;
         if (!pad) {
-            publish(0);
+            GCMicroGamepad* microGamepad = controller_.microGamepad;
+            if (!microGamepad) {
+                publish(0);
+                return;
+            }
+            microGamepad.valueChangedHandler = ^(GCMicroGamepad* gamepad, GCControllerElement*) {
+              updateMicro(gamepad);
+            };
+            updateMicro(microGamepad);
             return;
         }
         pad.valueChangedHandler = ^(GCExtendedGamepad* gamepad, GCControllerElement*) {

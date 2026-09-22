@@ -10,6 +10,8 @@ PRG32-QT keeps cartridge execution in portable C++20 and confines host-specific 
 | macOS | Qt 6 desktop | keyboard + Apple GameController + generic USB HID joystick/gamepad fallback | GitHub Actions macOS Qt job |
 | iOS | Qt 6 mobile | adaptive touch controls; Apple GameController backend is available | GitHub Actions Qt iOS build |
 | Android | Qt 6 mobile | adaptive touch controls | GitHub Actions Qt Android ARM64 build |
+| Apple TV | Qt 6 tvOS | Siri Remote / Apple GameController | CI contract check and Qt-tvOS-kit build when configured |
+| Android TV | Qt 6 Android/Leanback | TV remote and Android game controller key events | GitHub Actions Qt Android TV ARM64 build |
 
 ## Common requirements
 
@@ -99,6 +101,25 @@ xcrun devicectl device process launch --device <device-udid> \
 
 The plain-HTTP default Store requires the included App Transport Security allowance. Prefer HTTPS for production distribution.
 
+## Apple TV
+
+Apple TV uses the portable runtime and Apple GameController backend, built with a Qt kit compiled for tvOS.
+The player is always a game-only, aspect-correct fullscreen surface. Siri Remote and game-controller D-pad,
+A/B and Menu/Options input map to PRG32 input; touch and desktop window controls are not shown.
+
+```sh
+QT_ROOT=/path/to/Qt/tvos \
+QT_HOST_ROOT=/path/to/Qt/macos \
+TVOS_DESTINATION='generic/platform=tvOS Simulator' \
+./scripts/build-tvos.sh
+```
+
+For a signed device build, set `TVOS_TEAM_ID` and use `platform=tvOS,id=<device-udid>`. The helper selects
+`appletvsimulator`/`x86_64` or `appletvos`/`arm64`; `TVOS_ARCHS` can override the architecture. Qt's public
+online installer and `install-qt-action` do not currently publish an open-source tvOS binary kit, so CI records
+that limitation unless `PRG32QT_TVOS_QT_ROOT` and `PRG32QT_TVOS_QT_HOST_ROOT` identify a preinstalled kit. That
+limitation artifact is not a successful Apple TV compile; release qualification still requires one.
+
 ## Android
 
 Install an Android SDK with platform 34, NDK 26.1.10909125 (r26b), JDK 17 or newer, Ninja, and matching Qt host and Android ARM64 kits. Both Qt kits must include Core, Gui, Quick, QuickControls2, Network and Multimedia. With Qt 6.8.3 in the standard macOS locations, build with:
@@ -118,3 +139,17 @@ ANDROID_NDK_ROOT=/path/to/android-ndk \
 ```
 
 The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The manifest enables Internet access and cleartext HTTP for the current default Store and retains Qt's required activity metadata and file provider.
+
+## Android TV
+
+Android TV reuses the Android ARM64 Qt kit and SDK/NDK requirements:
+
+```sh
+./scripts/build-android-tv.sh
+```
+
+The APK below `build-android-tv/android-build/build/outputs/apk/` uses application ID
+`org.riscvprg32.prg32qt.tv`. Its manifest requires Leanback, makes touch optional, fixes landscape orientation,
+and advertises a TV banner. Its activity reapplies immersive fullscreen whenever it regains focus. In the
+player, remote/gamepad keys feed the PRG32 D-pad, A, B and Select masks. The game surface is letterboxed to
+320:200 and navigation/touch chrome is hidden.

@@ -16,6 +16,8 @@ SUPPORTED_PLATFORMS = (
     "macOS",
     "iOS",
     "Android",
+    "Apple TV",
+    "Android TV",
 )
 
 
@@ -59,6 +61,8 @@ expected_helpers = {
     "macOS": "scripts/build-macos.sh",
     "iOS": "scripts/build-ios.sh",
     "Android": "scripts/build-android.sh",
+    "Apple TV": "scripts/build-tvos.sh",
+    "Android TV": "scripts/build-android-tv.sh",
 }
 for platform, helper in expected_helpers.items():
     if not (ROOT / helper).is_file():

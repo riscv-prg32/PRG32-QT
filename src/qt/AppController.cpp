@@ -261,7 +261,7 @@ QJsonObject AppController::runtimeJson() const {
         {"generation", int(frameCount_ ? 1 : 0)}};
     return {
         {"name", "PRG32"},
-        {"firmware_version", "qt-0.3.0"},
+        {"firmware_version", "qt-" PRG32QT_VERSION},
         {"cart_magic", "PRG2"},
         {"cart_abi_major", 1},
         {"cart_abi_minor", 6},

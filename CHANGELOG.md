@@ -4,6 +4,11 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Added automatic Git-derived application/package versioning with one source-archive fallback and consistent
+  runtime, About, Android and Apple bundle metadata.
+- Added Apple TV and Android TV build targets, controller-first input, game-only fullscreen presentation,
+  Android TV Leanback packaging and immersive system UI, platform documentation, and CI coverage.
+
 - Added persistent Auto/Portrait/Landscape player selection and fullscreen TV mode with player, keyboard, and
   settings controls; desktop fullscreen shows only the aspect-correct game surface and exits with Escape; added
   current macOS Store/settings/player screenshots.

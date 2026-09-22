@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.21)
-project(PRG32_QT VERSION 0.3.0 LANGUAGES CXX)
+include(cmake/PRG32Version.cmake)
+project(PRG32_QT VERSION ${PRG32QT_VERSION_CORE} LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(PRG32QT_BUILD_APP "Build Qt application" ON)
 option(PRG32QT_BUILD_TESTS "Build portable core tests" ON)
+option(PRG32QT_TV_MODE "Build a controller-first fullscreen TV application" OFF)
+
+file(WRITE "${CMAKE_BINARY_DIR}/prg32qt-version.txt" "${PRG32QT_VERSION}\n")
 
 add_library(prg32qt_core
     src/core/Audio.cpp
@@ -12,7 +16,7 @@ add_library(prg32qt_core
     src/core/Rv32Cpu.cpp
     src/core/Runtime.cpp)
 target_include_directories(prg32qt_core PUBLIC src/core)
-target_compile_definitions(prg32qt_core PUBLIC PRG32QT_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(prg32qt_core PUBLIC PRG32QT_VERSION="${PRG32QT_VERSION}")
 
 if(PRG32QT_BUILD_TESTS)
   enable_testing()
@@ -49,23 +53,31 @@ if(PRG32QT_BUILD_APP)
   qt_add_resources(PRG32_QT prg32qt_assets PREFIX "/prg32qt" FILES assets/prg32_logo.png assets/prg32_appicon_1024.png)
   target_include_directories(PRG32_QT PRIVATE src/core src/qt)
   target_link_libraries(PRG32_QT PRIVATE prg32qt_core Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Network Qt6::Multimedia)
-  if(IOS)
+  if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "tvOS")
     qt_import_plugins(PRG32_QT EXCLUDE Qt6::QFFmpegMediaPlugin)
   endif()
   target_compile_definitions(PRG32_QT PRIVATE PRG32QT_DEFAULT_STORE="http://193.205.230.7:5080")
+  if(PRG32QT_TV_MODE)
+    target_compile_definitions(PRG32_QT PRIVATE PRG32QT_TV_MODE=1)
+  endif()
   set_target_properties(PRG32_QT PROPERTIES OUTPUT_NAME "PRG32" MACOSX_BUNDLE TRUE MACOSX_BUNDLE_BUNDLE_NAME "PRG32" MACOSX_BUNDLE_GUI_IDENTIFIER "org.riscv-prg32.prg32qt" MACOSX_BUNDLE_ICON_FILE "prg32.icns" WIN32_EXECUTABLE TRUE)
   if(ANDROID)
     set_target_properties(PRG32_QT PROPERTIES
       QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/platform/android"
       QT_ANDROID_PACKAGE_NAME "org.riscvprg32.prg32qt"
-      QT_ANDROID_VERSION_CODE 3
-      QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}")
+      QT_ANDROID_VERSION_CODE ${PRG32QT_ANDROID_VERSION_CODE}
+      QT_ANDROID_VERSION_NAME "${PRG32QT_VERSION}")
+    if(PRG32QT_TV_MODE)
+      set_target_properties(PRG32_QT PROPERTIES
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/platform/android-tv"
+        QT_ANDROID_PACKAGE_NAME "org.riscvprg32.prg32qt.tv")
+    endif()
   endif()
   if(APPLE)
     target_sources(PRG32_QT PRIVATE assets/prg32.icns)
     set_source_files_properties(assets/prg32.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     target_link_libraries(PRG32_QT PRIVATE "-framework GameController")
-    if(NOT IOS)
+    if(NOT IOS AND NOT CMAKE_SYSTEM_NAME STREQUAL "tvOS")
       target_link_libraries(PRG32_QT PRIVATE "-framework IOKit")
     endif()
   endif()
@@ -75,6 +87,9 @@ if(PRG32QT_BUILD_APP)
   if(IOS)
     target_sources(PRG32_QT PRIVATE platform/ios/Assets.xcassets)
     set_source_files_properties(platform/ios/Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    set_target_properties(PRG32_QT PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/platform/ios/Info.plist" XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.riscv-prg32.prg32qt" XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon")
+    set_target_properties(PRG32_QT PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/platform/ios/Info.plist" XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.riscv-prg32.prg32qt" XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon" XCODE_ATTRIBUTE_MARKETING_VERSION "${PRG32QT_VERSION_CORE}" XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "${PRG32QT_ANDROID_VERSION_CODE}")
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+    set_target_properties(PRG32_QT PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/platform/tvos/Info.plist" XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.riscv-prg32.prg32qt.tv" XCODE_ATTRIBUTE_MARKETING_VERSION "${PRG32QT_VERSION_CORE}" XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "${PRG32QT_ANDROID_VERSION_CODE}" XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "3")
   endif()
 endif()

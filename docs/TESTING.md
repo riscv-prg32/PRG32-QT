@@ -14,7 +14,7 @@ The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` inclu
 
 ## Platform compilation
 
-`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS and Android. ARM64 Debian Trixie is the continuous architecture/build proxy for Raspberry Pi OS/Raspbian portability; release qualification should also be performed natively on the target Pi hardware/image.
+`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS, Android and Android TV. ARM64 Debian Trixie is the continuous architecture/build proxy for Raspberry Pi OS/Raspbian portability; release qualification should also be performed natively on the target Pi hardware/image. Apple TV is compiled when a source-built Qt tvOS kit is configured; otherwise its job uploads an explicit limitation artifact and release qualification requires a manual build.
 
 The same workflow runs a dedicated Qt-free Release build and uploads its Linux headless runner. Successful
 desktop jobs upload their application build as a short-lived Actions artifact. These CI artifacts are diagnostic
@@ -38,6 +38,19 @@ adb shell monkey -p org.riscvprg32.prg32qt \
 ```
 
 Confirm that Setup renders the PRG32 logo with every button contained inside the viewport. Open Browse Store and verify the catalog loads with distinct cartridge icons and legible action labels. Open About and verify the logo, description, authors, university/lab information and license all fit without scrolling. Finally, confirm the application process remains alive and `adb logcat` contains neither a fatal exception nor a Qt main-library loading failure.
+
+## TV validation
+
+For Android TV, install the APK on an ARM64 Leanback emulator or device, confirm it appears in the TV launcher,
+and verify system navigation/status UI remains hidden after focus changes. Navigate Setup and Store with a TV
+remote, launch a cartridge, and verify the game-only 320:200 surface remains aspect-correct. Exercise D-pad,
+A, B and Select with both the remote where available and a controller; no touch controls or player chrome may
+be visible.
+
+For Apple TV, install the signed application on hardware and repeat the fullscreen/aspect/input checks with a
+Siri Remote and Apple GameController device. Record the Qt tvOS kit revision, Xcode/tvOS SDK, hardware model,
+display mode and controller product. A plist/build-contract check without a tvOS Qt kit is not a platform
+compile or physical-device certification.
 
 ## iOS validation
 
@@ -121,3 +134,21 @@ Qt install action's exported iOS/Android paths, and a Debian Trixie ARM64 Qt kit
 uses `pipefail` so a certification-script exception cannot be hidden by `tee`. Local validation covered the
 portable CMake/CTest suite, Store parser unit tests, documentation consistency, and the live 22-entry Store
 catalog. Hosted platform jobs remain to be confirmed by the next Actions run.
+
+## Automatic versioning and TV target validation (2026-09-22)
+
+- The Git-derived version was configured locally in a Qt-free build and compared with the application compile
+  definition and generated package values. The untagged checkout derived the expected
+  `0.3.0-dev.N+gCOMMIT` form; the macOS Qt application compiled with that definition.
+- The native Apple Silicon macOS Qt application and QML cache compiled, and all four CTest targets passed.
+  The Android TV Java activity compiled against Android API 34 and Qt 6.8.3's Android activity base.
+- Android TV ARM64 configuration reached Qt QML import scanning. The installed target-side Qt scanner aborts
+  on this host with an incompatible NEON-feature check, the same local-kit limitation as the handheld Android
+  build; APK/Leanback launcher validation therefore remains assigned to the Linux CI job.
+- Apple Silicon macOS was the available host. No Qt tvOS kit, Apple TV hardware, Android TV emulator or Android
+  TV hardware was installed, so those target application/device checks remain required. The Apple TV CI job
+  records the missing public binary-kit constraint instead of claiming a compile.
+- The default Store contained 23 entries. The 900-frame media/input sweep passed all 21 portable variants with
+  non-black graphics and 5–60 distinct framebuffer hashes. Space Invaders 1.0.0 and Terraforge 1.0.0 were the
+  two explicit non-portable exclusions; no portable cartridge failed. Fourteen cartridges emitted audio
+  events and seven declared no cartridge audio; this was instrumentation evidence, not a listening check.

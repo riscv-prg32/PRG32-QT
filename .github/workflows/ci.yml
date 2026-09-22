@@ -116,6 +116,37 @@ jobs:
       - name: Compile unsigned simulator application
         run: QT_ROOT="$QT_ROOT_DIR" QT_HOST_ROOT="$QT_HOST_PATH" IOS_DESTINATION='generic/platform=iOS Simulator' IOS_ARCHS=x86_64 ./scripts/build-ios.sh
 
+  tvos:
+    name: Apple TV compile
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Apple TV build contract
+        shell: bash
+        run: |
+          test -x scripts/build-tvos.sh
+          test -f platform/tvos/Info.plist
+          grep -Fq 'CMAKE_SYSTEM_NAME=tvOS' scripts/build-tvos.sh
+          grep -Fq 'PRG32QT_TV_MODE=ON' scripts/build-tvos.sh
+      - name: Compile with configured Qt tvOS kit
+        if: ${{ vars.PRG32QT_TVOS_QT_ROOT != '' }}
+        env:
+          QT_ROOT: ${{ vars.PRG32QT_TVOS_QT_ROOT }}
+          QT_HOST_ROOT: ${{ vars.PRG32QT_TVOS_QT_HOST_ROOT }}
+          TVOS_DESTINATION: generic/platform=tvOS Simulator
+          TVOS_ARCHS: x86_64
+        run: ./scripts/build-tvos.sh
+      - name: Record hosted-runner limitation
+        if: ${{ vars.PRG32QT_TVOS_QT_ROOT == '' }}
+        run: |
+          echo 'Apple TV application compilation was not run: Qt does not publish an open-source tvOS binary kit through aqt/install-qt-action. Configure PRG32QT_TVOS_QT_ROOT and PRG32QT_TVOS_QT_HOST_ROOT on a runner with a source-built Qt tvOS kit.' | tee tvos-build-limitation.txt
+      - uses: actions/upload-artifact@v4
+        if: ${{ vars.PRG32QT_TVOS_QT_ROOT == '' }}
+        with:
+          name: tvos-build-limitation
+          path: tvos-build-limitation.txt
+          if-no-files-found: error
+
   android:
     name: Android ARM64 package
     runs-on: ubuntu-latest
@@ -136,6 +167,27 @@ jobs:
           modules: 'qtmultimedia'
       - name: Build Android package
         run: QT_ROOT="$QT_ROOT_DIR" QT_HOST_PATH="${QT_HOST_PATH:-${QT_ROOT_DIR%/*}/gcc_64}" ./scripts/build-android.sh
+
+  android-tv:
+    name: Android TV ARM64 package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          target: android
+          arch: android_arm64_v8a
+          modules: 'qtmultimedia'
+      - name: Build Android TV package
+        run: QT_ROOT="$QT_ROOT_DIR" QT_HOST_PATH="${QT_HOST_PATH:-${QT_ROOT_DIR%/*}/gcc_64}" ./scripts/build-android-tv.sh
 
   store-certification:
     name: Cartridge Store certification
