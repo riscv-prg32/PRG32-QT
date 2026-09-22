@@ -38,7 +38,7 @@ Local scores and the public performance broker are implemented. The host also se
 
 ## Layer 2 — Qt host (`src/qt`)
 
-`AppController` owns one runtime instance, a 60 Hz frame timer, local cartridge persistence, input multiplexing, RGB LED presentation state, and the Qt audio backend. `StoreClient` owns Store settings, catalog/discovery requests, architecture-aware downloads, and icons. `FrameItem` renders the 320×200 image without smoothing.
+`AppController` owns one runtime instance, a 60 Hz frame timer, local cartridge persistence, input multiplexing, RGB LED presentation state, and the Qt audio backend. `StoreClient` owns Store settings, catalog/discovery requests, architecture-aware downloads, and an in-memory icon cache. `FrameItem` renders the 320×200 image without smoothing. `RasterImageItem` paints bundled and data-URL raster artwork through `QPainter`, providing consistent image rendering on Qt's Android graphics path.
 
 `QtAudioEngine` uses Qt Multimedia and therefore shares one audio implementation across all Qt targets.
 
@@ -56,7 +56,7 @@ All adapters produce the same PRG32 bit mask.
 
 ## Layer 4 — Qt Quick UI (`qml`)
 
-The UI provides: startup splash/tone, setup menu, Store browser, search and tag filtering, Store settings/testing, local `.prg32` import, cartridge icons, adaptive portrait/landscape player, touch controls, RGB LED/bezel feedback, controller status, and About information.
+The UI provides: startup splash/tone, a viewport-constrained setup menu, Store browser, search and tag filtering, Store settings/testing, local `.prg32` import, cartridge icons, adaptive portrait/landscape player, touch controls, RGB LED/bezel feedback, controller status, and a compact non-scrolling About panel.
 
 ## Platform packaging
 

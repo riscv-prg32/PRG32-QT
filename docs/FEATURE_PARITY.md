@@ -26,7 +26,7 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | Default Store `http://193.205.230.7:5080` | build definition / `StoreClient` |
 | Store URL persistence, settings, test connection | `QSettings`, QML |
 | Search and tag filtering | QML |
-| Store cartridge icons | `StoreClient::iconUrl`, QML |
+| Store cartridge icons | `StoreClient` image cache, `RasterImageItem`, QML |
 | Local `.prg32` import | Qt `FileDialog` + `AppController` |
 | Save successfully launched cartridges in app data | `AppController` |
 | Local score APIs/current player | `Runtime` |

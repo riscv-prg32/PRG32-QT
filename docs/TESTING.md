@@ -32,7 +32,7 @@ adb shell monkey -p org.riscvprg32.prg32qt \
   -c android.intent.category.LAUNCHER 1
 ```
 
-Confirm that Setup renders, Browse Store loads the catalog, the application process remains alive, and `adb logcat` contains neither a fatal exception nor a Qt main-library loading failure.
+Confirm that Setup renders the PRG32 logo with every button contained inside the viewport. Open Browse Store and verify the catalog loads with distinct cartridge icons and legible action labels. Open About and verify the logo, description, authors, university/lab information and license all fit without scrolling. Finally, confirm the application process remains alive and `adb logcat` contains neither a fatal exception nor a Qt main-library loading failure.
 
 ## Whole-Store certification
 

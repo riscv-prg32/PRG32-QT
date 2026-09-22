@@ -1,6 +1,7 @@
 #pragma once
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QHash>
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QUrl>
@@ -10,10 +11,12 @@ class StoreClient:public QObject{
  Q_PROPERTY(QJsonArray cartridges READ cartridges NOTIFY cartridgesChanged)
  Q_PROPERTY(QString error READ error NOTIFY errorChanged)
  Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
+ Q_PROPERTY(int iconRevision READ iconRevision NOTIFY iconRevisionChanged)
 public:
  explicit StoreClient(QObject*p=nullptr);QString baseUrl()const{return base_.toString();}void setBaseUrl(const QString&);QJsonArray cartridges()const{return carts_;}QString error()const{return error_;}bool loading()const{return loading_;}
+ int iconRevision()const{return iconRevision_;}
  Q_INVOKABLE void refresh();Q_INVOKABLE void downloadGame(const QJsonObject&game);Q_INVOKABLE QString iconUrl(const QString&id)const;Q_INVOKABLE void resetDefault();
-signals:void baseUrlChanged();void cartridgesChanged();void errorChanged();void loadingChanged();void cartridgeDownloaded(const QString&id,const QByteArray&data);
+signals:void baseUrlChanged();void cartridgesChanged();void errorChanged();void loadingChanged();void iconRevisionChanged();void cartridgeDownloaded(const QString&id,const QByteArray&data);
 private:
- void setError(QString);void setLoading(bool);void fetchGamesDirect(bool allowDiscoveryFallback=true);void fetchDiscovery();void fetchCatalog(const QJsonObject&);QUrl join(QString)const;QNetworkAccessManager net_;QUrl base_;QJsonArray carts_;QString error_;bool loading_=false;
+ void setError(QString);void setLoading(bool);void fetchGamesDirect(bool allowDiscoveryFallback=true);void fetchDiscovery();void fetchCatalog(const QJsonObject&);void fetchIcons();QUrl join(QString)const;QNetworkAccessManager net_;QUrl base_;QJsonArray carts_;QHash<QString,QByteArray> icons_;QString error_;bool loading_=false;int iconRevision_=0;
 };

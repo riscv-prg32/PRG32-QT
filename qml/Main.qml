@@ -27,6 +27,7 @@ ApplicationWindow {
         return 0
     }
     function gameTitle(g) { return g.title || g.name || g.id || "Cartridge" }
+    function gameIcon(id) { const revision=storeClient.iconRevision; return storeClient.iconUrl(id||"") }
     function tags() {
         let out=["All"], seen={}
         const a=storeClient.cartridges
@@ -59,22 +60,26 @@ ApplicationWindow {
             Label { Layout.fillWidth:true; text:storeClient.error.length?storeClient.error:(storeClient.cartridges.length+" cartridges"); wrapMode:Text.Wrap }
         }
     }
-    Dialog { id:aboutDialog; title:"About PRG32-QT"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-40,660); height:Math.min(parent.height-60,620)
-        ScrollView { anchors.fill:parent; ColumnLayout { width:parent.width; spacing:12
-            Image { Layout.alignment:Qt.AlignHCenter; source:"qrc:/prg32qt/assets/prg32_logo.png"; sourceSize.width:420; fillMode:Image.PreserveAspectFit }
-            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; text:"PRG32-QT is the portable Qt/C++ runner for the PRG32 educational RISC-V gaming platform." }
-            GroupBox { title:"People"; Layout.fillWidth:true; ColumnLayout { Label{text:"Project lead: Raffaele Montella"} Label{text:"Student contributor: Simone Boscaglia"} Label{text:"Student contributor: Ivan Cafiero"} } }
-            GroupBox { title:"University and labs"; Layout.fillWidth:true; Label { width:parent.width; wrapMode:Text.Wrap; text:"Università degli Studi di Napoli Parthenope. PRG32 teaching labs cover console output, input, graphics, sound and timing, scores, and multiplayer on ESP32-C6 hardware or QEMU." } }
-            GroupBox { title:"License"; Layout.fillWidth:true; Label { width:parent.width; wrapMode:Text.Wrap; text:"MIT License · Copyright © 2026 Raffaele Montella. See docs/LICENSING.md and LICENSE." } }
-        } }
+    Dialog { id:aboutDialog; title:"About PRG32-QT"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-32,620); height:Math.min(parent.height-32,680)
+        contentItem:ColumnLayout { spacing:6
+            PRG32Image { Layout.alignment:Qt.AlignHCenter; Layout.preferredWidth:Math.min(280,aboutDialog.availableWidth); Layout.preferredHeight:120; source:"qrc:/prg32qt/assets/prg32_logo.png" }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"PRG32-QT is the portable Qt/C++ runner for the PRG32 educational RISC-V gaming platform." }
+            Label { Layout.fillWidth:true; font.bold:true; text:"Authors" }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"Project lead: Raffaele Montella\nStudent contributors: Simone Boscaglia · Ivan Cafiero" }
+            Label { Layout.fillWidth:true; font.bold:true; text:"University and labs" }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"Università degli Studi di Napoli Parthenope. Teaching labs cover console I/O, graphics, sound, timing, scores and multiplayer on ESP32-C6 hardware or QEMU." }
+            Label { Layout.fillWidth:true; font.bold:true; text:"License" }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"MIT License · Copyright © 2026 Raffaele Montella" }
+        }
     }
 
     StackLayout { anchors.fill:parent; currentIndex:root.page
         // Setup screen
         Rectangle { color:"black"
-            ScrollView { anchors.fill:parent; ColumnLayout { width:Math.min(parent.width-48,560); anchors.horizontalCenter:parent.horizontalCenter; spacing:12
+            ScrollView { id:setupScroll; anchors.fill:parent; contentWidth:availableWidth; ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                ColumnLayout { width:Math.max(0,Math.min(setupScroll.availableWidth-48,560)); x:(setupScroll.availableWidth-width)/2; spacing:12
                 Item { Layout.preferredHeight:22 }
-                Image { Layout.alignment:Qt.AlignHCenter; source:"qrc:/prg32qt/assets/prg32_logo.png"; Layout.preferredHeight:130; Layout.preferredWidth:500; fillMode:Image.PreserveAspectFit }
+                PRG32Image { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,setupScroll.availableHeight*.18); source:"qrc:/prg32qt/assets/prg32_logo.png" }
                 Label { text:"PRG32 SETUP"; color:"white"; font.family:"monospace"; font.pixelSize:18 }
                 Label { Layout.fillWidth:true; text:"PLATFORM: "+Qt.platform.os.toUpperCase()+"\nRUNTIME: RV32IMAC · 30 FPS\nCARTRIDGES: "+storeClient.cartridges.length+"\nIP: "+(appController.deviceIp||"No local IPv4 address")+"\nWEB API: "+(appController.webApiUrl||"Unavailable"); color:"#43d17b"; font.family:"monospace"; wrapMode:Text.WrapAnywhere }
                 Button { Layout.fillWidth:true; text:"›  RUN CARTRIDGE"; enabled:appController.running; onClicked:root.showPlayer() }
@@ -88,7 +93,7 @@ ApplicationWindow {
         }
         // Store browser
         Item { ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8
-            RowLayout { Layout.fillWidth:true; Button{text:"Setup";onClicked:root.page=0} Label{text:"Cartridge Store";font.pixelSize:20;font.bold:true} Item{Layout.fillWidth:true} Label{text:filteredGames().length+" / "+storeClient.cartridges.length} Button{text:"Refresh";onClicked:storeClient.refresh()} }
+            RowLayout { Layout.fillWidth:true; Button{text:"Setup";onClicked:root.page=0} Label{text:"Cartridge Store";color:"#f2f4f8";font.pixelSize:20;font.bold:true} Item{Layout.fillWidth:true} Label{text:filteredGames().length+" / "+storeClient.cartridges.length;color:"#d7dde7"} Button{text:"Refresh";onClicked:storeClient.refresh()} }
             ColumnLayout { Layout.fillWidth:true; spacing:4
                 RowLayout { Layout.fillWidth:true; TextField { Layout.fillWidth:true; placeholderText:"Search cartridges"; text:root.searchText; onTextChanged:root.searchText=text }
                     ComboBox { id:tagBox; Layout.preferredWidth:Math.min(150,root.width*.35); model:root.tags(); onCurrentTextChanged:root.selectedTag=currentText } }
@@ -101,9 +106,9 @@ ApplicationWindow {
             ListView { Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:4; model:root.filteredGames()
                 delegate:ItemDelegate { width:ListView.view.width; height:78
                     contentItem:RowLayout { spacing:12
-                        Rectangle { Layout.preferredWidth:58; Layout.preferredHeight:58; radius:8; color:"#252932"; Image { anchors.fill:parent; anchors.margins:3; source:storeClient.iconUrl(modelData.id||""); fillMode:Image.PreserveAspectFit; asynchronous:true } }
-                        ColumnLayout { Layout.fillWidth:true; Label{text:root.gameTitle(modelData);font.bold:true} Label{Layout.fillWidth:true;text:modelData.summary||modelData.id||"";elide:Text.ElideRight;color:"#aeb5c0"} Label{text:(modelData.tags||[]).slice(0,3).join(" · ");color:"#43c8ef";font.pixelSize:11} }
-                        Label { text:"▶"; font.pixelSize:22 }
+                        Rectangle { Layout.preferredWidth:58; Layout.preferredHeight:58; radius:8; color:"#252932"; PRG32Image { anchors.fill:parent; anchors.margins:3; source:root.gameIcon(modelData.id) } }
+                        ColumnLayout { Layout.fillWidth:true; Label{text:root.gameTitle(modelData);color:"#f2f4f8";font.bold:true} Label{Layout.fillWidth:true;text:modelData.summary||modelData.id||"";elide:Text.ElideRight;color:"#aeb5c0"} Label{text:(modelData.tags||[]).slice(0,3).join(" · ");color:"#43c8ef";font.pixelSize:11} }
+                        Label { text:"PLAY"; color:"#d7dde7"; font.bold:true; font.pixelSize:11 }
                     }
                     onClicked:storeClient.downloadGame(modelData)
                 }
@@ -141,7 +146,7 @@ ApplicationWindow {
     }
     Component { id:portraitPlayer
         ColumnLayout { anchors.fill:parent; anchors.margins:18; spacing:12
-            RowLayout { Layout.fillWidth:true; Image{source:"qrc:/prg32qt/assets/prg32_logo.png";Layout.preferredWidth:150;Layout.preferredHeight:42;fillMode:Image.PreserveAspectFit} Item{Layout.fillWidth:true} Rectangle{width:9;height:9;radius:5;color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.max(.15,appController.ledIntensity))} }
+            RowLayout { Layout.fillWidth:true; PRG32Image{source:"qrc:/prg32qt/assets/prg32_logo.png";Layout.preferredWidth:150;Layout.preferredHeight:42} Item{Layout.fillWidth:true} Rectangle{width:9;height:9;radius:5;color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.max(.15,appController.ledIntensity))} }
             Loader { Layout.fillWidth:true; Layout.preferredHeight:Math.min(330,width*200/320+20); Layout.fillHeight:true; sourceComponent:screenComponent }
             RowLayout { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,Math.max(110,parent.height*.2)); Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(130,parent.width);height:Math.min(130,parent.height);sourceComponent:dpadComponent}} Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(150,parent.width);height:Math.min(120,parent.height);sourceComponent:actionsComponent}} }
             Button { Layout.alignment:Qt.AlignHCenter; text:"SELECT"; onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false) }
@@ -151,7 +156,7 @@ ApplicationWindow {
     }
     Component { id:landscapePlayer
         RowLayout { anchors.fill:parent; anchors.margins:14; spacing:12
-            ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png";fillMode:Image.PreserveAspectFit} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Button{Layout.alignment:Qt.AlignHCenter;text:"SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Item{Layout.fillHeight:true} }
+            ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png"} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Button{Layout.alignment:Qt.AlignHCenter;text:"SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Item{Layout.fillHeight:true} }
             ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Loader{Layout.fillWidth:true;Layout.fillHeight:true;sourceComponent:screenComponent} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:150;Layout.preferredHeight:130;sourceComponent:actionsComponent} Label{Layout.alignment:Qt.AlignHCenter;text:"PRG32";font.bold:true} Item{Layout.fillHeight:true} }
         }
@@ -160,6 +165,6 @@ ApplicationWindow {
     Connections { target:storeClient; function onCartridgeDownloaded(id,data){ if(appController.loadBytes(data,id)) root.showPlayer() } }
 
     Rectangle { visible:root.splashVisible; anchors.fill:parent; color:"black"; z:100
-        ColumnLayout { anchors.centerIn:parent; width:Math.min(parent.width-50,560); Image{Layout.fillWidth:true;Layout.preferredHeight:220;source:"qrc:/prg32qt/assets/prg32_logo.png";fillMode:Image.PreserveAspectFit} Label{Layout.alignment:Qt.AlignHCenter;text:"RISC-V PLAYGROUND";color:"#45c9ff";font.family:"monospace";font.letterSpacing:3} }
+        ColumnLayout { anchors.centerIn:parent; width:Math.min(parent.width-50,560); PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:220;source:"qrc:/prg32qt/assets/prg32_logo.png"} Label{Layout.alignment:Qt.AlignHCenter;text:"RISC-V PLAYGROUND";color:"#45c9ff";font.family:"monospace";font.letterSpacing:3} }
     }
 }
