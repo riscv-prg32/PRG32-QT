@@ -4,6 +4,8 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Corrected CI runner/SDK selections for Android, macOS, iOS, and ARM64 Linux; repaired Store certification
+  for object-valued variants and made pipeline failures propagate instead of appearing green.
 - Added GitHub Actions CI artifacts and tag-driven continuous delivery with version validation, portable
   release tests, checksummed source archives, and generated GitHub Releases.
 - Reformatted the C++ implementation for reviewability and added an enforced formatting, documentation,

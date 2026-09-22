@@ -1,65 +1,176 @@
 #!/usr/bin/env python3
-"""Enumerate a PRG32 Store, download every portable PRG2 package, and run it headlessly."""
-import argparse,json,os,subprocess,sys,tempfile,urllib.request,urllib.parse
-DEFAULT="http://193.205.230.7:5080"
-def get(url):
-    req=urllib.request.Request(url,headers={'User-Agent':'PRG32-QT-store-certification/0.3'})
-    with urllib.request.urlopen(req,timeout=20) as r:return r.read()
-def join(base,path):return urllib.parse.urljoin(base.rstrip('/')+'/',path)
-def items_from(data):
-    if isinstance(data,list):return data
-    if isinstance(data,dict):
-        for k in ('games','cartridges','items','results'):
-            if isinstance(data.get(k),list):return data[k]
+"""Certify portable PRG32 Store variants using the headless runtime."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import subprocess
+import sys
+import tempfile
+import urllib.parse
+import urllib.request
+
+DEFAULT_STORE = "http://193.205.230.7:5080"
+PORTABLE_ARCHITECTURES = ("qt", "qemu", "ios")
+NONPORTABLE_ERROR = "PRG32-QT accepts portable ABI-table PRG32 cartridges only"
+
+
+def fetch(url: str) -> bytes:
+    """Read a Store endpoint with a bounded timeout."""
+    request = urllib.request.Request(url, headers={"User-Agent": "PRG32-QT-store-certification/0.3"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return response.read()
+
+
+def store_url(base: str, path: str) -> str:
+    """Resolve a Store-relative URL without rewriting an absolute URL."""
+    return urllib.parse.urljoin(base.rstrip("/") + "/", path)
+
+
+def catalog_items(document: object) -> list | None:
+    """Accept both list catalogs and the public API envelope."""
+    if isinstance(document, list):
+        return document
+    if isinstance(document, dict):
+        for key in ("games", "cartridges", "items", "results"):
+            if isinstance(document.get(key), list):
+                return document[key]
     return None
-def catalog(store):
-    # Match the iOS client: try the modern game API first, then discovery/catalog fallbacks.
+
+
+def catalog(store: str) -> list:
+    """Read the current catalog through the game API or discovery document."""
     try:
-        x=items_from(json.loads(get(join(store,'api/games'))))
-        if x is not None:return x
-    except Exception:pass
-    disc=json.loads(get(join(store,'.well-known/prg32-store.json')))
-    if disc.get('abi')!='prg32-store-discovery-1.0':raise RuntimeError('unsupported store discovery ABI')
-    eps=[]
-    for k in ('catalog','catalog_url','cartridges','cartridges_url','api'):
-        if isinstance(disc.get(k),str):eps.append(disc[k])
-    eps += ['api/games','api/cartridges','cartridges.json','catalog.json']
-    for ep in eps:
+        items = catalog_items(json.loads(fetch(store_url(store, "api/games"))))
+        if items is not None:
+            return items
+    except (OSError, ValueError):
+        pass
+    discovery = json.loads(fetch(store_url(store, ".well-known/prg32-store.json")))
+    if discovery.get("abi") != "prg32-store-discovery-1.0":
+        raise RuntimeError("unsupported Store discovery ABI")
+    endpoints = [
+        discovery[key]
+        for key in ("catalog", "catalog_url", "cartridges", "cartridges_url", "api")
+        if isinstance(discovery.get(key), str)
+    ]
+    endpoints += ["api/games", "api/cartridges", "cartridges.json", "catalog.json"]
+    for endpoint in endpoints:
         try:
-            x=items_from(json.loads(get(join(store,ep))))
-            if x is not None:return x
-        except Exception:pass
-    raise RuntimeError('no supported catalog endpoint')
-def download_url(store,item):
-    direct=item.get('download_url') or item.get('url') or item.get('package_url') or item.get('cartridge_url')
-    variants=item.get('variants')
-    if isinstance(variants,dict):direct=variants.get('qt') or variants.get('qemu') or variants.get('esp32c6') or variants.get('ios') or direct
-    if direct:return join(store,direct)
-    ident=str(item.get('id') or '')
-    if not ident:return None
-    offered=[str(x) for x in item.get('architectures',[]) if isinstance(x,str)]
-    arch=next((x for x in ('qt','qemu','esp32c6','ios') if x in offered),'qemu')
-    base=join(store,'api/games/'+urllib.parse.quote(ident,safe='')+'/download')
-    q={'architecture':arch}
-    if item.get('version'):q['version']=str(item['version'])
-    return base+'?'+urllib.parse.urlencode(q)
-def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--store',default=DEFAULT);ap.add_argument('--runner',default='./build-core/prg32qt-headless');ap.add_argument('--frames',type=int,default=300);a=ap.parse_args()
-    items=catalog(a.store);failures=[]
-    with tempfile.TemporaryDirectory() as td:
-        for n,item in enumerate(items):
-            if not isinstance(item,dict):failures.append((f'item-{n}','invalid catalog object'));continue
-            ident=str(item.get('id') or item.get('name') or f'cart-{n}')
-            u=download_url(a.store,item)
-            if not u:failures.append((ident,'no download URL or id'));continue
-            try:data=get(u)
-            except Exception as ex:failures.append((ident,f'download: {ex}'));continue
-            if not data.startswith(b'PRG2'):failures.append((ident,'not PRG2'));continue
-            path=os.path.join(td,ident.replace('/','_')+'.prg32');open(path,'wb').write(data)
-            p=subprocess.run([a.runner,path,str(a.frames)],capture_output=True,text=True)
-            if p.returncode:failures.append((ident,(p.stderr or p.stdout).strip()))
-            else:print(p.stdout.strip())
-    print(f'catalog: {len(items)} cartridge(s); failures: {len(failures)}')
-    for x in failures:print('FAIL',*x,sep=': ',file=sys.stderr)
-    return 1 if failures else 0
-if __name__=='__main__':raise SystemExit(main())
+            items = catalog_items(json.loads(fetch(store_url(store, endpoint))))
+            if items is not None:
+                return items
+        except (OSError, ValueError):
+            pass
+    raise RuntimeError("no supported catalog endpoint")
+
+
+def download_url(store: str, item: dict) -> str | None:
+    """Resolve string- or object-valued portable variants in catalog order."""
+    direct = next(
+        (item[key] for key in ("download_url", "url", "package_url", "cartridge_url") if isinstance(item.get(key), str)),
+        None,
+    )
+    variants = item.get("variants")
+    if isinstance(variants, dict):
+        for architecture in PORTABLE_ARCHITECTURES:
+            variant = variants.get(architecture)
+            if isinstance(variant, str):
+                direct = variant
+                break
+            if isinstance(variant, dict):
+                candidate = next(
+                    (variant[key] for key in ("download_url", "url") if isinstance(variant.get(key), str)),
+                    None,
+                )
+                if candidate:
+                    direct = candidate
+                    break
+    if direct:
+        return store_url(store, direct)
+
+    identifier = item.get("id")
+    offered = item.get("architectures")
+    if not isinstance(identifier, str) or not identifier or not isinstance(offered, list):
+        return None
+    architecture = next((name for name in PORTABLE_ARCHITECTURES if name in offered), None)
+    if architecture is None:
+        return None
+    query = {"architecture": architecture}
+    version = item.get("selected_version") or item.get("version") or item.get("latest_version")
+    if version:
+        query["version"] = str(version)
+    endpoint = "api/games/" + urllib.parse.quote(identifier, safe="") + "/download"
+    return store_url(store, endpoint) + "?" + urllib.parse.urlencode(query)
+
+
+def certify(store: str, runner: str, frames: int) -> int:
+    """Print an ID/version/result snapshot and fail for portable runtime errors."""
+    items = catalog(store)
+    if not items:
+        print("FAIL: Store catalog is empty", file=sys.stderr)
+        return 1
+    passed = skipped = failed = 0
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                print(f"FAIL item-{index}: invalid catalog entry")
+                failed += 1
+                continue
+            identifier = str(item.get("id") or item.get("name") or f"item-{index}")
+            version = str(item.get("selected_version") or item.get("version") or item.get("latest_version") or "unknown")
+            label = f"{identifier} {version}"
+            url = download_url(store, item)
+            if not url:
+                print(f"SKIP {label}: no portable variant advertised")
+                skipped += 1
+                continue
+            try:
+                package = fetch(url)
+                if not package.startswith(b"PRG2"):
+                    raise ValueError("download is not a PRG2 package")
+                package_path = pathlib.Path(temporary_directory) / f"cartridge-{index}.prg32"
+                package_path.write_bytes(package)
+                result = subprocess.run(
+                    [runner, str(package_path), str(frames)],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    check=False,
+                )
+                if result.returncode:
+                    detail = (result.stderr or result.stdout).strip()
+                    if NONPORTABLE_ERROR in detail:
+                        print(f"SKIP {label}: {NONPORTABLE_ERROR}")
+                        skipped += 1
+                    else:
+                        print(f"FAIL {label}: {detail}")
+                        failed += 1
+                else:
+                    print(f"PASS {label}: {frames} frames")
+                    passed += 1
+            except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+                print(f"FAIL {label}: {error}")
+                failed += 1
+    print(f"catalog={len(items)} passed={passed} skipped_nonportable={skipped} failed={failed}")
+    return 0 if passed > 0 and failed == 0 else 1
+
+
+def main() -> int:
+    """Parse options and report discovery failures as a failed certification."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--store", default=DEFAULT_STORE)
+    parser.add_argument("--runner", default="./build-core/prg32qt-headless")
+    parser.add_argument("--frames", type=int, default=300)
+    arguments = parser.parse_args()
+    try:
+        return certify(arguments.store, arguments.runner, arguments.frames)
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"FAIL: Store certification could not start: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

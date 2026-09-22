@@ -27,8 +27,9 @@ be named, with the reason and manual evidence, rather than silently skipped.
 - Run `ctest --output-on-failure`, including core tests, the Asteroids and Bach headless fixtures, and the
   `PerformanceTest.prg32 --require-performance` contract fixture.
 - Any release candidate or change to the portable runtime, Qt host, cartridge parser, or ABI must run every
-  cartridge published by the default Cartridge Store through the headless harness. Preserve the catalog
-  snapshot (IDs and versions) and per-cartridge result as a CI artifact.
+  portable cartridge published by the default Cartridge Store through the headless harness. Preserve the
+  full catalog snapshot (IDs and versions), each pass/fail result, and explicit non-portable exclusions as a
+  CI artifact. A catalog with no executed portable cartridge is not a pass.
 - If the Store is unreachable in CI, certify manually before merge and attach the evidence.
 
 ## 4. Documentation currency

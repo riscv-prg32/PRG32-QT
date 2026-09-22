@@ -6,7 +6,7 @@ PRG32-QT keeps cartridge execution in portable C++20 and confines host-specific 
 |---|---|---|---|
 | Windows 10/11 | Qt 6 desktop | keyboard + WinMM USB/game controllers | GitHub Actions Windows Qt job |
 | Linux desktop | Qt 6 desktop | keyboard + Linux joystick devices | GitHub Actions Linux Qt job |
-| Raspberry Pi OS / Raspbian | Qt 6 Linux ARM | keyboard + `/dev/input/js*` controllers | native ARM64 Linux CI plus native Pi build script |
+| Raspberry Pi OS / Raspbian | Qt 6 Linux ARM | keyboard + `/dev/input/js*` controllers | ARM64 Debian Trixie Qt build proxy in CI plus native Pi build script |
 | macOS | Qt 6 desktop | keyboard + Apple GameController | GitHub Actions macOS Qt job |
 | iOS | Qt 6 mobile | adaptive touch controls; Apple GameController backend is available | GitHub Actions Qt iOS build |
 | Android | Qt 6 mobile | adaptive touch controls | GitHub Actions Qt Android ARM64 build |
@@ -45,7 +45,7 @@ sudo apt install cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-mult
 ./scripts/build-raspbian.sh
 ```
 
-The project contains no x86 assumptions. RV32 cartridge code is interpreted by the portable core, so a Pi host can be either ARM32 or ARM64 when the required Qt 6 packages are available. CI exercises the full Qt application on ARM64 Linux; final release qualification should additionally run on the intended Raspberry Pi model and Raspberry Pi OS image.
+The project contains no x86 assumptions. RV32 cartridge code is interpreted by the portable core, so a Pi host can be either ARM32 or ARM64 when the required Qt 6 packages are available. CI exercises the full Qt application in an ARM64 Debian Trixie container; this is an architecture proxy, not a Raspberry Pi OS image. Ubuntu 24.04's Qt 6.4.2 is below the application's Qt 6.5 minimum. Final release qualification must run on the intended Raspberry Pi model and Raspberry Pi OS image with a sufficiently recent Qt kit.
 
 ## macOS
 
@@ -54,6 +54,8 @@ The project contains no x86 assumptions. RV32 cartridge code is interpreted by t
 ```
 
 Apple GameController handles USB/Bluetooth controllers and hot-plug notifications.
+CI uses the macOS 15 runner with Xcode 16 because the Qt 6.8.3 binary kit still links Apple's AGL framework,
+which is absent from the newer Xcode 26 SDK on `macos-latest`.
 
 ## iOS
 

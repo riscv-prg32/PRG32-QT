@@ -14,7 +14,7 @@ The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` inclu
 
 ## Platform compilation
 
-`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS and Android. ARM64 Linux is the continuous build proxy for Raspberry Pi OS/Raspbian portability; release qualification should also be performed natively on the target Pi hardware/image.
+`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS and Android. ARM64 Debian Trixie is the continuous architecture/build proxy for Raspberry Pi OS/Raspbian portability; release qualification should also be performed natively on the target Pi hardware/image.
 
 The same workflow runs a dedicated Qt-free Release build and uploads its Linux headless runner. Successful
 desktop jobs upload their application build as a short-lived Actions artifact. These CI artifacts are diagnostic
@@ -54,7 +54,11 @@ Validated on 2026-09-22:
 python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --store http://193.205.230.7:5080 --frames 300
 ```
 
-This enumerates the Store, downloads PRG2 cartridges and executes every package headlessly. It is intentionally separated from deterministic PR CI because the Store is an external service.
+This enumerates the Store, downloads PRG2 portable variants and executes each supported package headlessly.
+The report includes cartridge IDs, versions, pass/fail outcomes, and explicit skips for packages rejected as
+non-portable ABI-table cartridges. An empty catalog, a catalog with no executed portable cartridge, or a runtime
+error in a portable cartridge fails certification. CI preserves the combined report as an artifact even on failure.
+The live Store is an external dependency; its state can change independently of the repository.
 
 ## Physical-device checks
 
@@ -80,6 +84,16 @@ The `prg32qt_performance_contract` test executes the public reference performanc
   than silently omitting it.
 - The default Store catalog snapshot contained 22 cartridges. Twenty qemu variants completed 300 headless
   frames. `it.uniparthenope.space_invaders` 1.0.0 and `it.uniparthenope.terraforge` 1.0.0 were rejected because
-  they are not portable ABI-table cartridges. The repository's existing `store-smoke.py` also cannot consume
-  the current object-valued `variants.qemu` catalog entry; this pre-existing certification-tool defect was not
-  changed in the behavior-preserving readability pass and requires a separate fix.
+  they are not portable ABI-table cartridges. The subsequent CI repair taught `store-smoke.py` to consume
+  object-valued variants and to report these two exclusions explicitly; the 22-entry snapshot then completed
+  with 20 passes, two non-portable skips, and no portable runtime failures.
+
+## Actions run repair (2026-09-22)
+
+Run `35691364645` exposed CI environment assumptions: the obsolete Android SDK `tools` package, a macOS SDK
+without AGL, an iOS Qt path outside the helper's default home directory, and ARM64 Ubuntu's Qt 6.4.2 below the
+project's minimum. The CI workflow now selects maintained Android SDK packages, a macOS 15/Xcode 16 image, the
+Qt install action's exported iOS/Android paths, and a Debian Trixie ARM64 Qt kit. The Store job additionally
+uses `pipefail` so a certification-script exception cannot be hidden by `tee`. Local validation covered the
+portable CMake/CTest suite, Store parser unit tests, documentation consistency, and the live 22-entry Store
+catalog. Hosted platform jobs remain to be confirmed by the next Actions run.

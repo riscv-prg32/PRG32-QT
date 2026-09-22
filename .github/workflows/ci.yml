@@ -45,6 +45,8 @@ jobs:
         run: clang-format --dry-run --Werror src/core/*.cpp src/core/*.h src/qt/*.cpp src/qt/*.h src/qt/*.mm tests/core_tests.cpp
       - name: Check documentation contracts
         run: python3 scripts/check-docs.py
+      - name: Check Store certification parser
+        run: python3 -m unittest discover -s tests -p 'store_smoke_tests.py'
 
   desktop:
     name: ${{ matrix.platform }} Qt build
@@ -59,7 +61,8 @@ jobs:
             os: windows-latest
             command: pwsh -File scripts/build-windows.ps1
           - platform: macOS
-            os: macos-latest
+            # Qt 6.8.3 links AGL, which is absent from the Xcode 26 SDK on macos-latest.
+            os: macos-15
             command: ./scripts/build-macos.sh
     runs-on: ${{ matrix.os }}
     steps:
@@ -87,16 +90,21 @@ jobs:
   raspberry-pi:
     name: Raspberry Pi OS compatibility (ARM64 Linux)
     runs-on: ubuntu-24.04-arm
+    # Ubuntu 24.04 supplies Qt 6.4.2, below the application's Qt 6.5 minimum.
+    # Debian Trixie supplies a compatible Qt 6 kit on the same ARM64 runner.
+    container: debian:trixie
     steps:
-      - uses: actions/checkout@v4
       - name: Install Qt and build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-multimedia-dev
+        run: apt-get update && apt-get install -y ca-certificates git cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-multimedia-dev
+      - uses: actions/checkout@v4
+      - name: Report Qt version
+        run: pkg-config --modversion Qt6Core
       - name: Build and test through the Raspberry Pi helper
         run: ./scripts/build-raspbian.sh
 
   ios:
     name: iOS compile
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: jurplel/install-qt-action@v4
@@ -106,7 +114,7 @@ jobs:
           host: mac
           modules: 'qtmultimedia'
       - name: Compile unsigned simulator application
-        run: IOS_DESTINATION='generic/platform=iOS Simulator' IOS_ARCHS=arm64 ./scripts/build-ios.sh
+        run: QT_ROOT="$QT_ROOT_DIR" QT_HOST_ROOT="$QT_HOST_PATH" IOS_DESTINATION='generic/platform=iOS Simulator' IOS_ARCHS=x86_64 ./scripts/build-ios.sh
 
   android:
     name: Android ARM64 package
@@ -117,7 +125,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
@@ -125,7 +135,7 @@ jobs:
           arch: android_arm64_v8a
           modules: 'qtmultimedia'
       - name: Build Android package
-        run: QT_ROOT="$Qt6_DIR/../.." QT_HOST_PATH="$IQTA_TOOLS/Qt/6.8.3/gcc_64" ./scripts/build-android.sh
+        run: QT_ROOT="$QT_ROOT_DIR" QT_HOST_PATH="${QT_HOST_PATH:-${QT_ROOT_DIR%/*}/gcc_64}" ./scripts/build-android.sh
 
   store-certification:
     name: Cartridge Store certification
@@ -136,9 +146,12 @@ jobs:
       - name: Build portable runner
         run: cmake -S . -B build-core -DPRG32QT_BUILD_APP=OFF -DCMAKE_BUILD_TYPE=Release && cmake --build build-core --parallel
       - name: Certify current catalog
-        run: python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 300 | tee store-certification.txt
+        run: |
+          set -o pipefail
+          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 300 2>&1 | tee store-certification.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cartridge-store-certification
           path: store-certification.txt
+          if-no-files-found: error
