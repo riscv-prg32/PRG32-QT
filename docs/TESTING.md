@@ -60,6 +60,7 @@ Validated on 2026-09-22:
 
 - iPhone 16 Pro Max simulator, iOS 18.1, x86_64 through Rosetta on Apple Silicon: Release build, install and launch succeeded; the Setup screen rendered in portrait; `GET /api/runtime` returned the active runtime state.
 - iPhone 12 Pro Max, iOS 27.0, arm64: Release build was development signed, installed and launched on the connected device; the application process remained active after launch.
+- The connected iPhone was updated to bundle version `3000015` (`0.3.0-dev.15+g3e45eb76c8b1`). Its Setup screen rendered and `/api/runtime` reported the same version. The full 23-entry official Store catalog was exercised: 21 portable packages loaded, advanced frames, and produced non-black framebuffer output on the device; Space Invaders and Terraforge received the expected non-portable ABI rejection. The 900-frame host media/input sweep passed all 21 portable packages with no failures. See the [complete catalog and device evidence](STORE-CERTIFICATION-2026-09-22-IPHONE.md). Physical touch/controller actuation, UI Store browsing, orientation changes, and speaker listening were not performed in this automated device session.
 
 ## Whole-Store certification
 
