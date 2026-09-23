@@ -17,4 +17,6 @@ The intended host set is Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, a
 
 ## Non-goals
 
-PRG32-QT is not an ESP32 peripheral emulator and does not pretend to provide Wi-Fi or multiplayer services when the host cannot support them. Cartridges requiring unavailable host features are rejected from their declared feature mask rather than being given misleading partial behavior.
+PRG32-QT is not an ESP32 peripheral emulator. Multiplayer uses the public Store relay protocol rather than
+emulating ESP32 networking, while unavailable Wi-Fi and keyboard services remain unadvertised instead of
+receiving misleading partial behavior.

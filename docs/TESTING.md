@@ -104,6 +104,31 @@ depending on host event timing.
   the safe area, but physical Setup-to-player touch actuation, external controller actuation, and speaker
   listening were not completed for this revision.
 
+## NaCup-napoli97 multiplayer validation (2026-09-23)
+
+- The Store `org.riscv-prg32.nacup-napoli97` 3.1.0 qemu package was downloaded through the official Store API.
+  Its 64,786-byte payload matched SHA-256
+  `970da9cb5f9db8888d18417d3b834b6ecb060c260293e9421591dd6f78ce93fd`.
+- After implementing public PRG32 multiplayer ABI calls #32-#40, the arm64 macOS headless runner executed the
+  package for 900 frames. Media verification reported 64,000 non-black pixels, 10 distinct framebuffer hashes,
+  eight audio events, and zero PCM samples. Two independent Qt clients joined a live Store relay room and
+  exchanged validated position, sprite, flags, input, and frame snapshots in both directions.
+- The native arm64 macOS application built with the Homebrew Qt kit and all four CTest targets passed. The
+  standard `$HOME/Qt/6.8.3/macos` helper remains blocked because its QML scanner aborts with a NEON
+  processor-feature mismatch.
+- A development-signed arm64 iOS build of Git version `0.3.0-dev.18+g3a35b448dd36` with Qt WebSockets compiled,
+  installed, and launched on the wired iPhone 12 Pro Max (`iPhone13,4`, iOS 27.0). The device API accepted and
+  selected the exact package in `cart0`; `/api/runtime` reported feature mask 477, `cart_loaded=true`, and 98
+  frames after the three-second sample.
+- Android ARM64 and Android TV ARM64 configuration reached Qt's target QML import scan, where the installed
+  scanner aborted because it requires an incompatible NEON host feature set. The tvOS Qt kit was not
+  installed. Windows PowerShell and a Windows runner, a Linux host, and Raspberry Pi hardware/Raspberry Pi OS
+  were unavailable on this macOS host. These targets therefore have no cartridge execution result from this
+  run and require their platform CI runners or physical hardware for qualification.
+- The post-change 25-entry Store sweep passed all 23 portable cartridges for 900 frames, including NaCup, with
+  two explicit non-portable exclusions and no portable failures. This was instrumented media evidence rather
+  than a physical speaker listening check.
+
 ## Physical-device checks
 
 Before signed releases verify startup, Store browsing/download, local import, graphics, audio and input on representative devices. On desktops also verify keyboard and controller connect/disconnect behavior; on mobile verify both portrait and landscape touch layouts.

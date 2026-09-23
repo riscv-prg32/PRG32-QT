@@ -9,10 +9,12 @@ PRG32-QT targets portable ABI-table PRG32 cartridges and follows the public PRG3
 - PRG32 ABI 1.6, current hash `0x260f6136`.
 - Compatible hashes `0x006427c2` and `0x6be6e8d0`.
 - 139-entry ABI table.
-- Provided features exactly matching the public PRG32 ABI: audio, metrics, audio-plus, tilemap, platformer, sprites.
+- Provided features exactly matching the implemented public PRG32 ABI: audio, multiplayer, metrics,
+  audio-plus, tilemap, platformer, and sprites.
 - 320×200 indexed framebuffer with a 256-entry RGB565 palette.
 - `AUD0` packaged audio.
 - Store API `/api/games` and Store discovery ABI `prg32-store-discovery-1.0`.
+- Multiplayer ABI calls #32-#40 and the Store `/api/multiplayer` WebSocket snapshot protocol.
 
 Hardware-specific cartridges that bypass the portable ABI and depend directly on ESP32 peripherals are outside this host's compatibility target.
 

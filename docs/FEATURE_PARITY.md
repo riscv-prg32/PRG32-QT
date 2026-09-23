@@ -32,7 +32,8 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | Save successfully launched cartridges in app data | `AppController` |
 | Local score APIs/current player | `Runtime` |
 | Performance ABI calls | `Runtime` |
-| Safe unavailable Wi-Fi/multiplayer semantics | `Runtime` |
+| Multiplayer rooms and player snapshots | `MultiplayerService`, `QtMultiplayerService`, `Runtime` ABI #32-#40 |
+| Safe unavailable Wi-Fi semantics | `Runtime` |
 | Band/keyboard/text-input baseline stub semantics | `Runtime` |
 | Canonical PRG32 artwork | `assets/` |
 | PRG32 regression cartridges | `tests/fixtures/` + CTest |

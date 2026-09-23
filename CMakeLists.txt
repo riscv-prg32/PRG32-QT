@@ -32,11 +32,12 @@ if(PRG32QT_BUILD_TESTS)
 endif()
 
 if(PRG32QT_BUILD_APP)
-  find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Network Multimedia)
+  find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Network Multimedia WebSockets)
   qt_standard_project_setup(REQUIRES 6.5)
   set(PRG32QT_APP_SOURCES
       src/qt/main.cpp src/qt/AppController.cpp src/qt/StoreClient.cpp src/qt/FrameItem.cpp src/qt/WebApiServer.cpp
-      src/qt/QtAudioEngine.cpp src/qt/RasterImageItem.cpp src/qt/RasterImageItem.h src/qt/GamepadBackend.h
+      src/qt/QtAudioEngine.cpp src/qt/QtMultiplayerService.cpp src/qt/QtMultiplayerService.h
+      src/qt/RasterImageItem.cpp src/qt/RasterImageItem.h src/qt/GamepadBackend.h
       src/qt/MobileSafeArea.h)
   if(IOS)
     enable_language(OBJCXX)
@@ -58,7 +59,7 @@ if(PRG32QT_BUILD_APP)
   qt_add_qml_module(PRG32_QT URI PRG32Qt VERSION 1.0 QML_FILES qml/Main.qml)
   qt_add_resources(PRG32_QT prg32qt_assets PREFIX "/prg32qt" FILES assets/prg32_logo.png assets/prg32_appicon_1024.png)
   target_include_directories(PRG32_QT PRIVATE src/core src/qt)
-  target_link_libraries(PRG32_QT PRIVATE prg32qt_core Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Network Qt6::Multimedia)
+  target_link_libraries(PRG32_QT PRIVATE prg32qt_core Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Network Qt6::Multimedia Qt6::WebSockets)
   if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "tvOS")
     qt_import_plugins(PRG32_QT EXCLUDE Qt6::QFFmpegMediaPlugin)
   endif()

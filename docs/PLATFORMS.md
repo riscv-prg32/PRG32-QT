@@ -15,7 +15,8 @@ PRG32-QT keeps cartridge execution in portable C++20 and confines host-specific 
 
 ## Common requirements
 
-CMake 3.21+, a C++20 compiler, Qt 6.5+ with Core, Gui, Quick, QuickControls2, Network and Multimedia. CI currently uses Qt 6.8.3 where binary Qt kits are installed.
+CMake 3.21+, a C++20 compiler, Qt 6.5+ with Core, Gui, Quick, QuickControls2, Network, Multimedia and
+WebSockets. CI currently uses Qt 6.8.3 where binary Qt kits are installed.
 
 ## Windows
 
@@ -43,7 +44,7 @@ On a current Raspberry Pi OS release with Qt 6 packages installed, build nativel
 
 ```sh
 sudo apt update
-sudo apt install cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-multimedia-dev
+sudo apt install cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-multimedia-dev qt6-websockets-dev
 ./scripts/build-raspbian.sh
 ```
 

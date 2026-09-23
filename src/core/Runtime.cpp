@@ -139,6 +139,8 @@ bool Runtime::frame(uint32_t in, std::string& e) {
 }
 void Runtime::stop() {
     track_.reset();
+    if (multiplayer_)
+        multiplayer_->leave();
     if (audio_) {
         audio_->stopAll();
         audio_->shutdown();
@@ -715,23 +717,63 @@ void Runtime::hostCall(uint32_t i) {
         break;
     case 26:
     case 31:
-    case 32:
-    case 34:
-    case 35:
-    case 36:
-    case 37:
-    case 38:
-    case 40:
         ret(uint32_t(-1));
         break;
     case 27:
     case 28:
     case 29:
     case 30:
-    case 33:
-    case 39:
         ret(0);
         break;
+    case 32:
+        // ABI #32 multiplayer_init(): initialize the shared Store WebSocket transport.
+        if (multiplayer_)
+            multiplayer_->initialize();
+        break;
+    case 33:
+        // ABI #33 multiplayer_available(): the transport is compiled into every Qt target.
+        ret(multiplayer_ && multiplayer_->available() ? 1 : 0);
+        break;
+    case 34:
+        // ABI #34 multiplayer_join(signature, flags): signatures use [A-Za-z0-9_.:-]{1,47}.
+        ret(multiplayer_ ? uint32_t(multiplayer_->join(guestString(a(0), 48), a(1))) : uint32_t(-1));
+        break;
+    case 35:
+        ret(multiplayer_ ? uint32_t(multiplayer_->leave()) : uint32_t(-1));
+        break;
+    case 36:
+        if (multiplayer_)
+            multiplayer_->tick(uint32_t(nowUs() / 1000));
+        break;
+    case 37:
+        ret(multiplayer_ ? uint32_t(multiplayer_->setLocalState(
+                               int16_t(a(0)), int16_t(a(1)), uint16_t(a(2)), uint16_t(a(3))))
+                         : uint32_t(-1));
+        break;
+    case 38:
+        ret(multiplayer_ ? uint32_t(multiplayer_->setInput(a(0))) : uint32_t(-1));
+        break;
+    case 39:
+        ret(multiplayer_ ? uint32_t(multiplayer_->peerCount(uint32_t(nowUs() / 1000))) : 0);
+        break;
+    case 40: {
+        // ABI #40 multiplayer_get_peer(index, out): write the public 24-byte player snapshot field by field.
+        MultiplayerPeer peer;
+        if (!multiplayer_ || multiplayer_->peer(si(a(0)), uint32_t(nowUs() / 1000), peer) != 0) {
+            ret(uint32_t(-1));
+            break;
+        }
+        cpu_.store32(a(1), peer.playerId, ok);
+        cpu_.store16(a(1) + 4, uint16_t(peer.x), ok);
+        cpu_.store16(a(1) + 6, uint16_t(peer.y), ok);
+        cpu_.store16(a(1) + 8, peer.sprite, ok);
+        cpu_.store16(a(1) + 10, peer.flags, ok);
+        cpu_.store32(a(1) + 12, peer.input, ok);
+        cpu_.store32(a(1) + 16, peer.frame, ok);
+        cpu_.store32(a(1) + 20, peer.lastSeenMs, ok);
+        ret(ok ? 0 : uint32_t(-1));
+        break;
+    }
     case 41:
         ret(1);
         break;

@@ -12,6 +12,7 @@
 class FrameItem;
 class GamepadBackend;
 class QtAudioEngine;
+class QtMultiplayerService;
 class AppController : public QObject {
     Q_OBJECT
     // clang-format off
@@ -100,6 +101,8 @@ class AppController : public QObject {
     Q_INVOKABLE void attachFrame(QObject*);
     Q_INVOKABLE void playStartupTone();
     Q_INVOKABLE void runPerformanceTest();
+    /** Point multiplayer rooms at the configured Cartridge Store relay. */
+    void setMultiplayerStoreUrl(const QUrl& url);
     /** Select the player layout independently from the physical window orientation. */
     void setPreferredOrientation(const QString& orientation);
     /** Persist whether the desktop player should occupy the full screen. */
@@ -130,6 +133,7 @@ class AppController : public QObject {
     QPointer<FrameItem> frame_;
     GamepadBackend* gamepad_ = nullptr;
     std::unique_ptr<QtAudioEngine> audio_;
+    std::unique_ptr<QtMultiplayerService> multiplayer_;
     prg32::RGBState led_{};
     bool running_ = false, paused_ = false, performanceAvailable_ = false;
     bool fullScreen_ = false;

@@ -4,6 +4,7 @@
 #include "Audio.h"
 #include "Cartridge.h"
 #include "Framebuffer.h"
+#include "Multiplayer.h"
 #include "Rv32Cpu.h"
 #include <array>
 #include <chrono>
@@ -39,8 +40,9 @@ class Runtime {
     static constexpr uint32_t FeatureAudio = 1u << 0, FeatureWifi = 1u << 1, FeatureMultiplayer = 1u << 2,
                               FeatureMetrics = 1u << 3, FeatureAudioPlus = 1u << 4, FeatureKeyboard = 1u << 5,
                               FeatureTilemap = 1u << 6, FeaturePlatformer = 1u << 7, FeatureSprites = 1u << 8;
-    static constexpr uint32_t ProvidedFeatures = FeatureAudio | FeatureMetrics | FeatureAudioPlus |
-                                                 FeatureTilemap | FeaturePlatformer | FeatureSprites;
+    static constexpr uint32_t ProvidedFeatures = FeatureAudio | FeatureMultiplayer | FeatureMetrics |
+                                                 FeatureAudioPlus | FeatureTilemap | FeaturePlatformer |
+                                                 FeatureSprites;
     /** Validate compatibility, allocate guest memory, and install the synthetic ABI table. */
     bool load(const Cartridge&, std::string&);
     /** Invoke the cartridge initialization entry point. */
@@ -96,6 +98,10 @@ class Runtime {
     void setAudioSink(AudioSink* s) {
         audio_ = s;
     }
+    /** Install the platform transport used by multiplayer ABI calls #32 through #40. */
+    void setMultiplayerService(MultiplayerService* service) {
+        multiplayer_ = service;
+    }
 
   private:
     void hostCall(uint32_t);
@@ -147,6 +153,7 @@ class Runtime {
     std::chrono::steady_clock::time_point started_;
     uint32_t rng_ = 0x12345678u;
     AudioSink* audio_ = nullptr;
+    MultiplayerService* multiplayer_ = nullptr;
     RGBState led_{};
     uint8_t masterVolume_ = 220;
     std::array<uint8_t, 8> channelVolumes_{};

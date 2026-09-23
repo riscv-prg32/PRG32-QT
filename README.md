@@ -12,7 +12,8 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
 - Safe-area-aware touch controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
-- RGB LED emulation, local scores, metrics/performance ABI calls and safe unavailable-service stubs.
+- Store-relayed multiplayer snapshots, RGB LED emulation, local scores, metrics/performance ABI calls, and
+  safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL settings/test, architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
 - Gamer-selectable Auto, Portrait, or Landscape player layout plus persistent fullscreen TV mode (`F11`, `Control+Command+F`, or the player button; `Escape` exits).
 - Canonical PRG32 artwork used by the PRG32 project.
@@ -41,6 +42,10 @@ For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 ```
 
 The APK is written to `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`.
+
+Qt application builds require the Qt Multimedia and Qt WebSockets modules. Multiplayer ABI calls #32 through
+#40 use the configured Store's `/api/multiplayer` WebSocket relay and share one implementation on every Qt
+target.
 
 To exercise every discoverable Store cartridge after building the headless runner:
 

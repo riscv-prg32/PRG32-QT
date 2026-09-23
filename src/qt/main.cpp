@@ -21,6 +21,10 @@ int main(int argc, char** argv) {
     qmlRegisterType<RasterImageItem>("PRG32Qt", 1, 0, "PRG32Image");
     StoreClient store;
     AppController controller;
+    controller.setMultiplayerStoreUrl(QUrl(store.baseUrl()));
+    QObject::connect(&store, &StoreClient::baseUrlChanged, &controller, [&store, &controller] {
+        controller.setMultiplayerStoreUrl(QUrl(store.baseUrl()));
+    });
     MobileSafeArea mobileSafeArea;
     QString screenshotPath;
     QString screenshotPage;

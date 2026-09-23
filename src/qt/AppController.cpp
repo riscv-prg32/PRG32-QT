@@ -3,6 +3,7 @@
 #include "GamepadBackend.h"
 #include "InputButtons.h"
 #include "QtAudioEngine.h"
+#include "QtMultiplayerService.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -15,7 +16,9 @@
 #include <QStandardPaths>
 #include <QSysInfo>
 #include <algorithm>
-AppController::AppController(QObject* p) : QObject(p), audio_(std::make_unique<QtAudioEngine>()) {
+AppController::AppController(QObject* p)
+    : QObject(p), audio_(std::make_unique<QtAudioEngine>()),
+      multiplayer_(std::make_unique<QtMultiplayerService>()) {
     QSettings settings;
     preferredOrientation_ = settings.value("display/orientation", "auto").toString();
     if (preferredOrientation_ != "auto" && preferredOrientation_ != "portrait" &&
@@ -24,6 +27,7 @@ AppController::AppController(QObject* p) : QObject(p), audio_(std::make_unique<Q
     }
     fullScreen_ = settings.value("display/fullScreen", false).toBool();
     rt_.setAudioSink(audio_.get());
+    rt_.setMultiplayerService(multiplayer_.get());
     rt_.setLEDCallback([this](prg32::RGBState v) {
         led_ = v;
         emit ledChanged();
@@ -54,6 +58,9 @@ AppController::AppController(QObject* p) : QObject(p), audio_(std::make_unique<Q
     connect(&ipTimer_, &QTimer::timeout, this, &AppController::refreshIp);
     ipTimer_.start();
     refreshIp();
+}
+void AppController::setMultiplayerStoreUrl(const QUrl& url) {
+    multiplayer_->setStoreUrl(url);
 }
 void AppController::setPreferredOrientation(const QString& orientation) {
     if (orientation != "auto" && orientation != "portrait" && orientation != "landscape")

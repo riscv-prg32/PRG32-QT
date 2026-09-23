@@ -1,5 +1,8 @@
 # Cartridge Store certification — mobile safe-area revision
 
+> This historical snapshot predates PRG32-QT multiplayer support. The later 2026-09-23 validation in
+> `docs/TESTING.md` executes NaCup-napoli97 successfully and supersedes its exclusion below.
+
 The default Store returned 25 entries on 2026-09-23. The current arm64 macOS headless runner executed every
 portable qemu package for 900 frames with the media/input sweep. Twenty-two packages passed and three known
 non-portable packages were explicitly excluded; no portable package failed.

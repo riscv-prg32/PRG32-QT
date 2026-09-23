@@ -24,6 +24,8 @@ int main() {
     static_assert(prg32qt::input::A == 16);
     static_assert(prg32qt::input::B == 32);
     static_assert(prg32qt::input::Select == 64);
+    static_assert((Runtime::ProvidedFeatures & Runtime::FeatureMultiplayer) != 0);
+    static_assert(sizeof(MultiplayerPeer) == 24);
     InputState input;
     input.set(InputState::Keyboard, 1, true);
     input.set(InputState::Ui, 16, true);

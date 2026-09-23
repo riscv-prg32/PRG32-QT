@@ -18,7 +18,18 @@ Downloaded cartridge bytes are never treated as host-native code.
 
 The runtime installs the PRG32 ABI 1.6 table in guest-visible memory and maps 139 ABI entries to synthetic host-call addresses. Current ABI hash `0x260f6136` and documented compatible hashes `0x006427c2` and `0x6be6e8d0` are accepted.
 
-The provided feature mask intentionally matches the public PRG32 ABI: audio, metrics, extended audio, tile maps, platform helpers, and sprites. Wi-Fi, multiplayer, and keyboard/text-input services keep the same safe unavailable/stub semantics as the public PRG32 implementation and are not falsely advertised.
+The provided feature mask intentionally includes only implemented public PRG32 services: audio, multiplayer,
+metrics, extended audio, tile maps, platform helpers, and sprites. Wi-Fi and keyboard/text-input services keep
+safe unavailable/stub semantics and are not advertised.
+
+### Multiplayer
+
+ABI calls #32 through #40 follow the public PRG32 `prg32_multiplayer` contract. `MultiplayerService` keeps the
+portable runtime independent of Qt and preserves the 24-byte guest snapshot layout. `QtMultiplayerService`
+connects every application target to the configured Store's `/api/multiplayer` WebSocket relay, validates
+1-47 character room signatures, publishes at most every 50 ms, masks input to the seven PRG32 buttons, caps
+the peer set at eight, and expires snapshots after three seconds. Headless execution exposes the ABI but
+reports transport availability as false when no service is installed.
 
 ### Graphics
 
@@ -40,7 +51,8 @@ Local scores and the public performance broker are implemented. The host also se
 
 `AppController` owns one runtime instance, a 60 Hz frame timer, local cartridge persistence, input multiplexing, RGB LED presentation state, and the Qt audio backend. `StoreClient` owns Store settings, catalog/discovery requests, architecture-aware downloads, and an in-memory icon cache. `FrameItem` renders the 320×200 image without smoothing. `RasterImageItem` paints bundled and data-URL raster artwork through `QPainter`, providing consistent image rendering on Qt's Android graphics path.
 
-`QtAudioEngine` uses Qt Multimedia and therefore shares one audio implementation across all Qt targets.
+`QtAudioEngine` uses Qt Multimedia and `QtMultiplayerService` uses Qt WebSockets; both implementations are
+shared across all Qt targets.
 
 ## Layer 3 — Input adapters
 

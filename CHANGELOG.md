@@ -4,6 +4,9 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Implemented the public PRG32 multiplayer ABI calls #32-#40 on every Qt target through the configured
+  Cartridge Store WebSocket relay, including room validation, snapshot exchange, input masking, peer expiry,
+  and the public 24-byte player-state layout; NaCup-napoli97 now passes headless execution.
 - Made iOS player/setup content follow native safe-area insets, removed fullscreen UI from iOS and Android,
   kept Setup touchable, and centered the combined Start/Select control below the landscape game surface.
 - Latched input press edges until the next emulated frame so short touch/controller taps reliably start games;
