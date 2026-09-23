@@ -4,6 +4,13 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Made iOS player/setup content follow native safe-area insets, removed fullscreen UI from iOS and Android,
+  kept Setup touchable, and centered the combined Start/Select control below the landscape game surface.
+- Latched input press edges until the next emulated frame so short touch/controller taps reliably start games;
+  Dukes of Duchesca now advances from its `PRESS START` title screen.
+- Fixed ABI dual-playfield calls #94/#95 to composite layer 1 with transparent tile zero and to wrap scrolled
+  map coordinates, restoring Spiriti! Napoli '97 background artwork.
+- Added frame-exact headless input injection and framebuffer capture options for cartridge regression evidence.
 - Fixed iOS window sizing across portrait/landscape rotation and preserved the 320:200 game-surface aspect ratio in both touch-player layouts.
 - Added automatic Git-derived application/package versioning with one source-archive fallback and consistent
   runtime, About, Android and Apple bundle metadata.

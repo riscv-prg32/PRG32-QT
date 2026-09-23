@@ -15,7 +15,10 @@ import urllib.request
 
 DEFAULT_STORE = "http://193.205.230.7:5080"
 PORTABLE_ARCHITECTURES = ("qt", "qemu", "ios")
-NONPORTABLE_ERROR = "PRG32-QT accepts portable ABI-table PRG32 cartridges only"
+NONPORTABLE_ERRORS = (
+    "PRG32-QT accepts portable ABI-table PRG32 cartridges only",
+    "cartridge requires unavailable features",
+)
 MEDIA_PATTERN = re.compile(
     r"MEDIA graphics_non_black=(\d+) unique_frame_hashes=(\d+) "
     r"audio_declared=(\d+) audio_events=(\d+) pcm_samples=(\d+)"
@@ -147,8 +150,9 @@ def certify(store: str, runner: str, frames: int) -> int:
                 )
                 if result.returncode:
                     detail = (result.stderr or result.stdout).strip()
-                    if NONPORTABLE_ERROR in detail:
-                        print(f"SKIP {label}: {NONPORTABLE_ERROR}")
+                    nonportable_reason = next((reason for reason in NONPORTABLE_ERRORS if reason in detail), None)
+                    if nonportable_reason:
+                        print(f"SKIP {label}: {detail}")
                         skipped += 1
                     else:
                         print(f"FAIL {label}: {detail}")

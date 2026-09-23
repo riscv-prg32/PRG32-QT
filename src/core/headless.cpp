@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <map>
 #include <set>
 
 namespace {
@@ -59,7 +60,8 @@ uint64_t framebufferHash(const std::vector<uint16_t>& pixels) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "usage: prg32qt-headless file.prg32 [frames] [--require-performance] [--verify-media]\n";
+        std::cerr << "usage: prg32qt-headless file.prg32 [frames] [--require-performance] [--verify-media] "
+                     "[--input frame:mask] [--dump-ppm path]\n";
         return 2;
     }
     std::ifstream f(argv[1], std::ios::binary);
@@ -80,15 +82,32 @@ int main(int argc, char** argv) {
     int frames = argc > 2 ? std::stoi(argv[2]) : 300;
     bool verifyMedia = false;
     bool requirePerformance = false;
+    std::map<int, uint32_t> scriptedInput;
+    std::string dumpPath;
     for (int argument = 3; argument < argc; ++argument) {
-        verifyMedia |= std::string(argv[argument]) == "--verify-media";
-        requirePerformance |= std::string(argv[argument]) == "--require-performance";
+        std::string option = argv[argument];
+        verifyMedia |= option == "--verify-media";
+        requirePerformance |= option == "--require-performance";
+        if (option == "--input" && argument + 1 < argc) {
+            std::string value = argv[++argument];
+            size_t separator = value.find(':');
+            if (separator == std::string::npos) {
+                std::cerr << "invalid --input value; expected frame:mask\n";
+                return 2;
+            }
+            scriptedInput[std::stoi(value.substr(0, separator))] =
+                uint32_t(std::stoul(value.substr(separator + 1), nullptr, 0));
+        }
+        if (option == "--dump-ppm" && argument + 1 < argc)
+            dumpPath = argv[++argument];
     }
     constexpr std::array<uint32_t, 10> inputSequence = {0, 1, 2, 4, 8, 16, 32, 64, 17, 34};
     std::set<uint64_t> frameHashes;
     size_t maximumNonBlackPixels = 0;
     for (int i = 0; i < frames; i++) {
         uint32_t input = verifyMedia ? inputSequence[size_t(i / 30) % inputSequence.size()] : 0;
+        if (auto scripted = scriptedInput.find(i); scripted != scriptedInput.end())
+            input = scripted->second;
         if (!r.frame(input, e)) {
             std::cerr << "frame " << i << ": " << e << "\n";
             return 5;
@@ -100,6 +119,16 @@ int main(int argc, char** argv) {
                 maximumNonBlackPixels, size_t(std::count_if(pixels.begin(), pixels.end(), [](uint16_t pixel) {
                     return pixel != 0;
                 })));
+        }
+    }
+    if (!dumpPath.empty()) {
+        std::ofstream output(dumpPath, std::ios::binary);
+        output << "P6\n" << prg32::Framebuffer::Width << " " << prg32::Framebuffer::Height << "\n255\n";
+        for (uint16_t pixel : r.framebuffer().rgb565Pixels()) {
+            const std::array<char, 3> rgb = {char(((pixel >> 11) & 31) * 255 / 31),
+                                             char(((pixel >> 5) & 63) * 255 / 63),
+                                             char((pixel & 31) * 255 / 31)};
+            output.write(rgb.data(), rgb.size());
         }
     }
     if (requirePerformance && r.performance().state != 2) {

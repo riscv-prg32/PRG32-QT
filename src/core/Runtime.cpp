@@ -38,18 +38,24 @@ void Runtime::drawTile(int px, int py, uint16_t id, bool transparentZero) {
     uint16_t bg = it->second.bg;
     fb_.draw1BPP(px, py, 8, 8, it->second.bits, it->second.fg, transparentZero ? nullptr : &bg);
 }
-void Runtime::drawPlayfield(int layer) {
+void Runtime::drawPlayfield(int layer, bool transparentZero) {
     if (layer < 0 || layer > 1)
         return;
-    int sx = cameraX_ * parallaxX_[layer] / 256 + scrollX_[layer],
-        sy = cameraY_ * parallaxY_[layer] / 256 + scrollY_[layer];
-    int startX = std::max(0, sx >> 3), startY = std::max(0, sy >> 3);
-    for (int vy = 0; vy <= 25; vy++)
-        for (int vx = 0; vx <= 40; vx++) {
-            int mx = startX + vx, my = startY + vy;
-            if (mx >= 64 || my >= 32)
-                continue;
-            drawTile(vx * 8 - (sx & 7), vy * 8 - (sy & 7), playfield_[layer][my * 64 + mx]);
+    int originX = cameraX_ * parallaxX_[layer] / 256 + scrollX_[layer];
+    int originY = cameraY_ * parallaxY_[layer] / 256 + scrollY_[layer];
+    int startX = originX >= 0 ? originX / 8 : (originX - 7) / 8;
+    int startY = originY >= 0 ? originY / 8 : (originY - 7) / 8;
+    int offsetX = originX - startX * 8;
+    int offsetY = originY - startY * 8;
+    for (int screenY = -offsetY, row = 0; screenY < Framebuffer::Height; screenY += 8, ++row)
+        for (int screenX = -offsetX, column = 0; screenX < Framebuffer::Width; screenX += 8, ++column) {
+            int mapX = (startX + column) % 64;
+            int mapY = (startY + row) % 32;
+            if (mapX < 0)
+                mapX += 64;
+            if (mapY < 0)
+                mapY += 32;
+            drawTile(screenX, screenY, playfield_[layer][mapY * 64 + mapX], transparentZero);
         }
 }
 uint16_t Runtime::tileAt(int l, int x, int y) const {
@@ -919,15 +925,16 @@ void Runtime::hostCall(uint32_t i) {
         ret(uint32_t(cameraY_));
         break;
     case 93:
-        drawPlayfield(si(a(0)));
+        // ABI #93 playfield_draw(layer, transparent_zero).
+        drawPlayfield(si(a(0)), a(1) != 0);
         break;
     case 94:
         drawPlayfield(0);
-        drawPlayfield(1);
+        drawPlayfield(1, true);
         break;
     case 95:
         drawPlayfield(0);
-        drawPlayfield(1);
+        drawPlayfield(1, true);
         if (present_)
             present_();
         break;

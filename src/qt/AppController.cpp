@@ -37,7 +37,7 @@ AppController::AppController(QObject* p) : QObject(p), audio_(std::make_unique<Q
     timer_.setInterval(33);
     connect(&timer_, &QTimer::timeout, this, [this] {
         std::string e;
-        if (!rt_.frame(input_.merged(), e)) {
+        if (!rt_.frame(input_.takeMerged(), e)) {
             timer_.stop();
             running_ = false;
             emit runningChanged();

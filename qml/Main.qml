@@ -22,6 +22,7 @@ ApplicationWindow {
                                                 (appController.preferredOrientation === "auto" && width > height)
     readonly property bool desktopPlatform: Qt.platform.os === "windows" || Qt.platform.os === "osx" ||
                                             Qt.platform.os === "linux"
+    readonly property bool mobilePlatform: Qt.platform.os === "ios" || Qt.platform.os === "android"
     readonly property bool gameOnlyFullScreen: page === 2 &&
                                                 (tvPlatform || (desktopPlatform && (appController.fullScreen || documentationFullScreen)))
     color: "#101216"
@@ -55,7 +56,7 @@ ApplicationWindow {
     function showSetup() { appController.pause(); page=0; if(tvPlatform) browseButton.forceActiveFocus() }
     function showStore() { page=1; if(tvPlatform) storeSearch.forceActiveFocus() }
     function applyFullScreen() {
-        if (tvPlatform || appController.fullScreen)
+        if (tvPlatform || (desktopPlatform && appController.fullScreen))
             root.showFullScreen()
         else
             root.showNormal()
@@ -79,8 +80,8 @@ ApplicationWindow {
     }
     onActiveChanged: if (!active) appController.clearKeyboard()
     Component.onCompleted: {
-        if (!desktopPlatform)
-            root.showMaximized()
+        if (mobilePlatform)
+            Qt.callLater(mobileSafeArea.refresh)
         storeClient.refresh()
         appController.playStartupTone()
         splashTimer.start()
@@ -97,10 +98,19 @@ ApplicationWindow {
             Qt.callLater(applyFullScreen)
         }
     }
+    onWidthChanged: if (mobilePlatform) Qt.callLater(mobileSafeArea.refresh)
+    onHeightChanged: if (mobilePlatform) Qt.callLater(mobileSafeArea.refresh)
 
-    Shortcut { sequence:"F11"; onActivated:root.toggleFullScreen() }
-    Shortcut { sequence:"Ctrl+Meta+F"; onActivated:root.toggleFullScreen() }
-    Shortcut { sequence:"Escape"; enabled:appController.fullScreen; onActivated:{appController.fullScreen=false;root.applyFullScreen()} }
+    Timer {
+        interval: 250
+        running: root.mobilePlatform
+        repeat: true
+        onTriggered: mobileSafeArea.refresh()
+    }
+
+    Shortcut { sequence:"F11"; enabled:root.desktopPlatform; onActivated:root.toggleFullScreen() }
+    Shortcut { sequence:"Ctrl+Meta+F"; enabled:root.desktopPlatform; onActivated:root.toggleFullScreen() }
+    Shortcut { sequence:"Escape"; enabled:root.desktopPlatform && appController.fullScreen; onActivated:{appController.fullScreen=false;root.applyFullScreen()} }
 
     Timer { id:splashTimer; interval:900; repeat:false; onTriggered:root.splashVisible=false }
     FileDialog { id:importDialog; title:"Import PRG32 cartridge"; nameFilters:["PRG32 cartridges (*.prg32)","All files (*)"]; onAccepted: if(appController.loadFile(selectedFile)) root.showPlayer() }
@@ -112,7 +122,7 @@ ApplicationWindow {
             ComboBox { id:orientationBox; Layout.fillWidth:true; model:["Auto","Portrait","Landscape"]
                 Component.onCompleted:currentIndex=Math.max(0,["auto","portrait","landscape"].indexOf(appController.preferredOrientation))
                 onActivated:appController.preferredOrientation=["auto","portrait","landscape"][currentIndex] }
-            CheckBox { visible:!tvPlatform; text:"Start and play in full screen"; checked:appController.fullScreen
+            CheckBox { visible:root.desktopPlatform; text:"Start and play in full screen"; checked:appController.fullScreen
                 onToggled:{appController.fullScreen=checked;root.applyFullScreen()} }
         }
     }
@@ -129,7 +139,13 @@ ApplicationWindow {
         }
     }
 
-    StackLayout { anchors.fill:parent; currentIndex:root.page
+    StackLayout {
+        anchors.fill:parent
+        anchors.leftMargin:root.mobilePlatform ? mobileSafeArea.left : 0
+        anchors.topMargin:root.mobilePlatform ? mobileSafeArea.top : 0
+        anchors.rightMargin:root.mobilePlatform ? mobileSafeArea.right : 0
+        anchors.bottomMargin:root.mobilePlatform ? mobileSafeArea.bottom : 0
+        currentIndex:root.page
         // Setup screen
         Rectangle { color:"black"
             ScrollView { id:setupScroll; anchors.fill:parent; contentWidth:availableWidth; ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
@@ -179,7 +195,7 @@ ApplicationWindow {
                 Button { text:"‹ Setup"; onClicked:root.showSetup() }
                 Label { Layout.fillWidth:true; text:appController.cartridgeName; elide:Text.ElideRight; font.bold:true; horizontalAlignment:Text.AlignHCenter }
                 Button { visible:appController.performanceAvailable; text:"Performance"; onClicked:appController.runPerformanceTest() }
-                Button { visible:!tvPlatform; text:appController.fullScreen?"Exit Full Screen":"Full Screen"; onClicked:root.toggleFullScreen() }
+                Button { visible:root.desktopPlatform; text:appController.fullScreen?"Exit Full Screen":"Full Screen"; onClicked:root.toggleFullScreen() }
             }
         }
     }
@@ -213,15 +229,15 @@ ApplicationWindow {
                 Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/200); height:width*200/320; sourceComponent:screenComponent }
             }
             RowLayout { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,Math.max(110,parent.height*.2)); Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(130,parent.width);height:Math.min(130,parent.height);sourceComponent:dpadComponent}} Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(150,parent.width);height:Math.min(120,parent.height);sourceComponent:actionsComponent}} }
-            Button { Layout.alignment:Qt.AlignHCenter; text:"SELECT"; onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false) }
+            Button { Layout.alignment:Qt.AlignHCenter; text:"START / SELECT"; onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false) }
             RowLayout { Layout.fillWidth:true; Label{text:"RV32IMAC · 30 FPS"} Item{Layout.fillWidth:true} Label{text:appController.deviceIp||"Offline"} }
             Label { Layout.alignment:Qt.AlignHCenter; visible:appController.controllerConnected; text:"Controller: "+appController.controllerName; opacity:.7 }
         }
     }
     Component { id:landscapePlayer
         RowLayout { anchors.fill:parent; anchors.margins:14; spacing:12
-            ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png"} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Button{Layout.alignment:Qt.AlignHCenter;text:"SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Item{Layout.fillHeight:true} }
-            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(parent.width,parent.height*320/200);height:width*200/320;sourceComponent:screenComponent}} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
+            ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png"} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Item{Layout.fillHeight:true} }
+            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(parent.width,parent.height*320/200);height:width*200/320;sourceComponent:screenComponent}} Button{Layout.alignment:Qt.AlignHCenter;text:"START / SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:150;Layout.preferredHeight:130;sourceComponent:actionsComponent} Label{Layout.alignment:Qt.AlignHCenter;text:"PRG32";font.bold:true} Item{Layout.fillHeight:true} }
         }
     }

@@ -124,7 +124,7 @@ class Runtime {
     std::array<int, 2> scrollX_{}, scrollY_{}, parallaxX_{256, 256}, parallaxY_{256, 256};
     int cameraX_ = 0, cameraY_ = 0;
     void drawTile(int, int, uint16_t, bool = false);
-    void drawPlayfield(int);
+    void drawPlayfield(int layer, bool transparentZero = false);
     uint16_t tileAt(int, int, int) const;
     bool solidAt(int, int, int, uint32_t) const;
     uint16_t actorMove(uint32_t, int, int);

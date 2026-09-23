@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "FrameItem.h"
+#include "MobileSafeArea.h"
 #include "RasterImageItem.h"
 #include "StoreClient.h"
 #include "WebApiServer.h"
@@ -20,6 +21,7 @@ int main(int argc, char** argv) {
     qmlRegisterType<RasterImageItem>("PRG32Qt", 1, 0, "PRG32Image");
     StoreClient store;
     AppController controller;
+    MobileSafeArea mobileSafeArea;
     QString screenshotPath;
     QString screenshotPage;
     QString screenshotCartridge;
@@ -38,6 +40,7 @@ int main(int argc, char** argv) {
     QQmlApplicationEngine e;
     e.rootContext()->setContextProperty("storeClient", &store);
     e.rootContext()->setContextProperty("appController", &controller);
+    e.rootContext()->setContextProperty("mobileSafeArea", &mobileSafeArea);
     e.rootContext()->setContextProperty("documentationPage", screenshotPage);
 #ifdef PRG32QT_TV_MODE
     e.rootContext()->setContextProperty("tvPlatform", true);

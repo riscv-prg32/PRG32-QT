@@ -34,6 +34,11 @@ int main() {
     assert(input.merged() == 82);
     input.clear(InputState::Ui);
     assert(input.merged() == 66);
+    assert(input.takeMerged() == 67);
+    input.set(InputState::Keyboard, 1, true);
+    input.set(InputState::Keyboard, 1, false);
+    assert(input.takeMerged() == 67);
+    assert(input.takeMerged() == 66);
     assert(crc32(std::span<const uint8_t>((const uint8_t*)"123456789", 9)) == 0xcbf43926u);
     Framebuffer f;
     f.clear(0);

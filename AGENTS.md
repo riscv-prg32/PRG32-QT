@@ -51,6 +51,11 @@ be named, with the reason and manual evidence, rather than silently skipped.
 - Desktop fullscreen and TV player presentation must contain only the aspect-correct game surface. Keep
   keyboard/controller focus active, keep `Escape` as a desktop exit path, and do not expose touch controls or
   navigation chrome in that state.
+- Mobile player pages must honor native safe-area insets in every orientation, keep Setup reachable by touch,
+  and never expose desktop fullscreen settings or controls. Keep the shared Start/Select control centered below
+  the landscape game surface.
+- Input tests must cover a complete press/release between two frame ticks; the next frame must still observe the
+  press. Dual-playfield tests must verify that layer 1 tile zero remains transparent in ABI calls #94 and #95.
 
 ## 5. Automated consistency checks
 

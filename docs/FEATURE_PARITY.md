@@ -19,8 +19,9 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | `AUD0` samples/instruments/tracks | `Audio`, `Runtime` |
 | Volume, channel volume, stereo pan, tempo | `Runtime`, `QtAudioEngine` |
 | RGB LED emulation driven by audio/runtime activity | `Runtime`, QML player |
-| Touch D-pad with diagonals, A, B, SELECT | `qml/Main.qml` |
+| Touch D-pad with diagonals, A, B, Start/Select and frame-edge latching | `qml/Main.qml`, `InputState` |
 | Adaptive portrait/landscape player | `qml/Main.qml` |
+| iOS/Android native safe-area integration | `MobileSafeArea_ios`, `MobileSafeArea_android`, QML player/setup container |
 | Startup splash and startup tone | QML + `QtAudioEngine` |
 | Store browser/downloader | `StoreClient`, QML |
 | Default Store `http://193.205.230.7:5080` | build definition / `StoreClient` |

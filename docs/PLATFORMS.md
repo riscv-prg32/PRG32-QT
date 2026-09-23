@@ -79,6 +79,10 @@ Set `IOS_TEAM_ID` to your Apple development team ID and `IOS_DESTINATION` to a c
 
 The helper selects an `arm64` device build or an `x86_64` simulator build from `IOS_DESTINATION`. Qt's binary iOS package provides x86_64 simulator libraries, so Apple Silicon hosts run the simulator build with Rosetta installed. `IOS_ARCHS` can override the selected architecture for a custom Qt kit.
 
+The handheld UI reads UIKit safe-area insets after launch and orientation changes. Setup and player chrome stay
+below the status/notch region and above the home indicator; desktop fullscreen controls and settings are hidden.
+Landscape keeps the combined Start/Select control centered beneath the 320:200 game surface.
+
 Build, install and launch an iPhone simulator app with:
 
 ```sh
@@ -139,6 +143,9 @@ ANDROID_NDK_ROOT=/path/to/android-ndk \
 ```
 
 The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The manifest enables Internet access and cleartext HTTP for the current default Store and retains Qt's required activity metadata and file provider.
+
+The Android player reads system-bar and display-cutout `WindowInsets`, keeps all setup/player controls inside
+that safe region, and hides the desktop fullscreen preference and button.
 
 ## Android TV
 

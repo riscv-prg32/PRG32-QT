@@ -77,6 +77,33 @@ non-portable ABI-table cartridges. An empty catalog, a catalog with no executed 
 error in a portable cartridge fails certification. CI preserves the combined report as an artifact even on failure.
 The live Store is an external dependency; its state can change independently of the repository.
 
+For a frame-exact cartridge regression, repeat `--input frame:mask` as needed and save the final framebuffer
+with `--dump-ppm path`. This is used to prove title-screen transitions and graphics-layer composition without
+depending on host event timing.
+
+## Mobile safe-area and cartridge regression validation (2026-09-23)
+
+- The arm64 iOS device target compiled with Qt 6.8.3 and Xcode/iPhoneOS SDK 27.0, was development-signed by
+  team `B57UXM7RWR`, installed, and launched on an iPhone 12 Pro Max (`iPhone13,4`, iOS 27.0). CoreDevice
+  screenshots at 1284×2778 and 2778×1284 verify that portrait content starts below the status/notch area,
+  landscape content stays inside the side insets, Setup remains visible, and no mobile fullscreen control is
+  present. See `docs/images/ios-device-safe-area-{portrait,landscape}.png`.
+- The native arm64 macOS Qt application compiled. A short UI click on the centered `START / SELECT` control
+  advanced Dukes of Duchesca 1.0.0 from `PRESS START` to gameplay, verifying frame-edge input latching.
+- Spiriti! Napoli '97 1.2.3 was run with a frame-exact A press. The repaired ABI #94 dual-playfield composition
+  produced the Naples map background instead of the opaque layer-1 tile-zero fill. Regression captures are
+  stored in `docs/images/macos-player-start-select.png` and `docs/images/spiriti-background-fixed.png`.
+- The live 25-entry Store sweep passed all 22 portable cartridges at 900 frames, with the three non-portable
+  exclusions named and no portable failures. The complete snapshot and per-cartridge media evidence are in
+  [the safe-area revision certification](STORE-CERTIFICATION-2026-09-22-SAFE-AREA.md).
+- Android ARM64 configuration reached Qt's target QML import scan, where the installed target-side scanner
+  aborted because it requires a different NEON host feature set. Windows, Linux, Raspberry Pi OS, Android TV,
+  and Apple TV were not locally executable on this macOS host; their checked-in platform scripts and distinct
+  CI jobs remain the required target verification.
+- Physical rotation was exercised. The Setup page was reached and its controls were visually confirmed inside
+  the safe area, but physical Setup-to-player touch actuation, external controller actuation, and speaker
+  listening were not completed for this revision.
+
 ## Physical-device checks
 
 Before signed releases verify startup, Store browsing/download, local import, graphics, audio and input on representative devices. On desktops also verify keyboard and controller connect/disconnect behavior; on mobile verify both portrait and landscape touch layouts.

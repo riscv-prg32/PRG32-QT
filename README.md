@@ -11,7 +11,7 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - PRG32 ABI 1.6 (`0x260f6136`) plus documented compatible hashes.
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
-- Touch handheld controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
+- Safe-area-aware touch controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
 - RGB LED emulation, local scores, metrics/performance ABI calls and safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL settings/test, architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
 - Gamer-selectable Auto, Portrait, or Landscape player layout plus persistent fullscreen TV mode (`F11`, `Control+Command+F`, or the player button; `Escape` exits).
@@ -55,8 +55,9 @@ as exclusions rather than silently treated as passes.
 
 ## Player display and controls
 
-Open **Store Settings** to choose Auto, Portrait, or Landscape independently of the window shape and to make
-fullscreen the persistent default. On Windows, macOS, Linux, Apple TV, and Android TV fullscreen shows only the letterboxed 320x200
+Open **Store Settings** to choose Auto, Portrait, or Landscape independently of the window shape and, on
+desktop, to make fullscreen the persistent default. iOS and Android reserve the native status/notch/home-indicator
+safe area and do not offer fullscreen. On Windows, macOS, Linux, Apple TV, and Android TV fullscreen shows only the letterboxed 320x200
 game area; use the keyboard or controller, and press `Escape` to return to windowed mode. Keyboard and
 USB/Bluetooth controller inputs share this mapping:
 
@@ -65,7 +66,7 @@ USB/Bluetooth controller inputs share this mapping:
 | Move | Arrow keys or W/A/S/D | D-pad, left stick, or HID X/Y/hat |
 | A | Z or J | Button 1 / A |
 | B | X or K | Button 2 / B |
-| Select | Return, Enter, or Space | Menu/Options or buttons 7–10 |
+| Start / Select | Return, Enter, or Space | Menu/Options or buttons 7–10 |
 
 ![macOS player display settings](docs/images/macos-display-settings.png)
 
@@ -76,6 +77,20 @@ Portrait and landscape are explicit player choices, not merely consequences of r
 | Portrait | Landscape |
 |---|---|
 | ![Asteroids in portrait mode](docs/images/macos-player-portrait.png) | ![Bach audio demo in landscape mode](docs/images/macos-player-landscape.png) |
+
+The shared Start/Select ABI control is centered below the game surface in landscape mode:
+
+![Dukes title with centered Start / Select control](docs/images/macos-player-start-select.png)
+
+Spiriti's two-layer Naples playfield is included as a graphics regression capture:
+
+![Spiriti background restored](docs/images/spiriti-background-fixed.png)
+
+Physical iPhone 12 Pro Max captures confirm the native safe area in both orientations:
+
+| Portrait Setup | Landscape Setup |
+|---|---|
+| ![iOS portrait safe area](docs/images/ios-device-safe-area-portrait.png) | ![iOS landscape safe area](docs/images/ios-device-safe-area-landscape.png) |
 
 Desktop fullscreen removes all player chrome and touch controls:
 
