@@ -15,21 +15,21 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
   cancel-in-progress: false
 
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
 jobs:
-  source-release:
-    name: Validate and publish source release
+  source:
+    name: Validate and package source
     runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-
       - name: Validate tag and derived project version
         shell: bash
         run: |
@@ -44,35 +44,222 @@ jobs:
             echo "Tag $RELEASE_TAG does not match Git-derived project version v$project_version" >&2
             exit 1
           fi
-
       - name: Run portable release tests
         run: |
           cmake -S . -B build-release -DPRG32QT_BUILD_APP=OFF -DCMAKE_BUILD_TYPE=Release
           cmake --build build-release --parallel
           ctest --test-dir build-release --output-on-failure
-
       - name: Create source archives and checksums
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
           prefix="PRG32-QT-${RELEASE_TAG#v}"
-          git archive --format=tar --prefix="$prefix/" "$RELEASE_TAG" | gzip -9 > "dist/$prefix.tar.gz"
-          git archive --format=zip --prefix="$prefix/" "$RELEASE_TAG" > "dist/$prefix.zip"
+          git archive --format=tar --prefix="$prefix/" "$RELEASE_TAG" | gzip -9 > "dist/$prefix-source.tar.gz"
+          git archive --format=zip --prefix="$prefix/" "$RELEASE_TAG" > "dist/$prefix-source.zip"
           cd dist
-          sha256sum "$prefix.tar.gz" "$prefix.zip" > SHA256SUMS.txt
-
-      - name: Upload release candidates
-        uses: actions/upload-artifact@v4
+          sha256sum "$prefix-source.tar.gz" "$prefix-source.zip" > SHA256SUMS-source.txt
+      - uses: actions/upload-artifact@v4
         with:
-          name: PRG32-QT-${{ env.RELEASE_TAG }}-source
+          name: release-source
           path: dist/*
           if-no-files-found: error
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+  desktop:
+    name: Package ${{ matrix.platform }}
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Linux
+            os: ubuntu-latest
+            command: ./scripts/build-linux.sh
+            package_path: build-linux/PRG32
+          - platform: Windows
+            os: windows-latest
+            command: pwsh -File scripts/build-windows.ps1
+            package_path: build-windows/PRG32.exe
+          - platform: macOS
+            os: macos-15
+            command: ./scripts/build-macos.sh
+            package_path: build-macos/PRG32.app
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          modules: 'qtmultimedia qtwebsockets'
+      - name: Install Ninja on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Build and test
+        shell: bash
+        run: ${{ matrix.command }}
+      - name: Package application
+        shell: bash
+        run: |
+          mkdir -p dist
+          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-${{ matrix.platform }}-${{ runner.arch }}.zip" --format=zip -- ${{ matrix.package_path }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-${{ runner.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  raspberry-pi:
+    name: Package Raspberry Pi OS compatibility build
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
+    steps:
+      - name: Install Qt and build tools
+        run: apt-get update && apt-get install -y ca-certificates git cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-multimedia-dev qt6-websockets-dev
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: Build and test
+        run: ./scripts/build-raspbian.sh
+      - name: Package application
+        shell: bash
+        run: |
+          mkdir -p dist
+          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Raspberry-Pi-OS-ARM64.zip" --format=zip -- build-raspbian/PRG32
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-Raspberry-Pi-OS-ARM64
+          path: dist/*
+          if-no-files-found: error
+
+  ios:
+    name: Package iOS simulator build
+    needs: source
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          target: ios
+          host: mac
+          modules: 'qtmultimedia qtwebsockets'
+      - name: Build unsigned simulator application
+        run: QT_ROOT="$QT_ROOT_DIR" QT_HOST_ROOT="$QT_HOST_PATH" IOS_DESTINATION='generic/platform=iOS Simulator' IOS_ARCHS=x86_64 ./scripts/build-ios.sh
+      - name: Package application
+        run: |
+          mkdir -p dist
+          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-iOS-Simulator-x86_64.zip" --format=zip -- build-ios-sim/Release-iphonesimulator/PRG32.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-iOS-Simulator-x86_64
+          path: dist/*
+          if-no-files-found: error
+
+  tvos:
+    name: Package Apple TV build
+    needs: source
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: Compile with configured Qt tvOS kit
+        if: ${{ vars.PRG32QT_TVOS_QT_ROOT != '' }}
+        env:
+          QT_ROOT: ${{ vars.PRG32QT_TVOS_QT_ROOT }}
+          QT_HOST_ROOT: ${{ vars.PRG32QT_TVOS_QT_HOST_ROOT }}
+          TVOS_DESTINATION: generic/platform=tvOS Simulator
+          TVOS_ARCHS: x86_64
+        run: ./scripts/build-tvos.sh
+      - name: Package application
+        if: ${{ vars.PRG32QT_TVOS_QT_ROOT != '' }}
+        run: |
+          mkdir -p dist
+          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Apple-TV-Simulator-x86_64.zip" --format=zip -- build-tvos-sim/Release-appletvsimulator/PRG32.app
+      - name: Record unavailable hosted build
+        if: ${{ vars.PRG32QT_TVOS_QT_ROOT == '' }}
+        run: |
+          mkdir -p dist
+          echo 'No Apple TV binary was produced because Qt does not publish an open-source tvOS binary kit. Configure PRG32QT_TVOS_QT_ROOT and PRG32QT_TVOS_QT_HOST_ROOT on a runner with a source-built Qt tvOS kit.' > "dist/PRG32-QT-${RELEASE_TAG#v}-Apple-TV-BUILD-LIMITATION.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-Apple-TV
+          path: dist/*
+          if-no-files-found: error
+
+  android:
+    name: Package ${{ matrix.platform }} ARM64
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Android
+            script: ./scripts/build-android.sh
+            build_dir: build-android
+          - platform: Android-TV
+            script: ./scripts/build-android-tv.sh
+            build_dir: build-android-tv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          target: android
+          arch: android_arm64_v8a
+          modules: 'qtmultimedia qtwebsockets'
+      - name: Build package
+        run: QT_ROOT="$QT_ROOT_DIR" QT_HOST_PATH="${QT_HOST_PATH:-${QT_ROOT_DIR%/*}/gcc_64}" ${{ matrix.script }}
+      - name: Stage APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk="$(find '${{ matrix.build_dir }}/android-build/build/outputs/apk' -type f -name '*.apk' -print -quit)"
+          test -n "$apk"
+          cp "$apk" "dist/PRG32-QT-${RELEASE_TAG#v}-${{ matrix.platform }}-ARM64.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-ARM64
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [source, desktop, raspberry-pi, ios, tvos, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create checksums for platform assets
+        working-directory: release-assets
+        run: sha256sum PRG32-QT-* > SHA256SUMS-platforms.txt
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: dist/*
+          files: release-assets/*

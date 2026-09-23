@@ -35,6 +35,11 @@ Versions are automatic. CMake derives a clean version from an exact `vX.Y.Z` Git
 `X.Y.Z-dev.N+gCOMMIT`, using `VERSION.txt` as the bootstrap/base version when no release tag is available. The same
 derived values drive the runtime, About dialog, Android packages and Apple bundle metadata.
 
+Pushing a `vX.Y.Z` tag runs the complete release workflow. The resulting GitHub Release contains checksummed
+source archives plus packaged Linux, Windows, macOS, Raspberry Pi OS compatibility, iOS simulator, Android,
+Android TV, and Apple TV builds. When the release runner has no configured Qt tvOS kit, the Apple TV asset is
+an explicit build-limitation report instead of a binary.
+
 For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 
 ```sh

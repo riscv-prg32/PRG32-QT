@@ -18,8 +18,22 @@ The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` inclu
 
 The same workflow runs a dedicated Qt-free Release build and uploads its Linux headless runner. Successful
 desktop jobs upload their application build as a short-lived Actions artifact. These CI artifacts are diagnostic
-outputs, not signed distributable packages; tag-driven source publication is handled separately by
-`.github/workflows/release.yml`.
+outputs. For a `vX.Y.Z` tag, `.github/workflows/release.yml` repeats the platform builds, packages each output,
+generates SHA-256 checksums, and publishes all assets together only after every required job succeeds. The iOS
+and Apple TV outputs are unsigned simulator builds, Android outputs are debug-signed APKs, and desktop archives
+are build artifacts rather than signed installer packages. Without a configured Qt tvOS kit, the release carries
+an explicit Apple TV limitation report and no Apple TV binary.
+
+### Release-asset automation validation (2026-09-24)
+
+- The release workflow parsed as YAML, the documentation-consistency check passed, and CMake created and
+  listed a ZIP containing the macOS `PRG32.app` bundle using the same command used by the release job.
+- The application rebuilt on an Apple Silicon arm64 macOS host with the Homebrew Qt 6.11.2 Core, Multimedia,
+  and WebSockets packages. All four CTest targets passed. The default local Qt 6.8.3 kit lacked Qt WebSockets,
+  so the available complete Homebrew kit was used instead.
+- Windows, Linux, Raspberry Pi OS, iOS, Android, Android TV, and Apple TV packaging could not be executed on
+  this macOS host. The release workflow uses the same platform scripts and hosted-runner configurations as CI;
+  the first tagged run remains the end-to-end validation for those release assets.
 
 To reproduce the Android ARM64 compilation and debug packaging locally after installing the dependencies in [Platform support](PLATFORMS.md):
 

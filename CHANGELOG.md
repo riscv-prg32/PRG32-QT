@@ -4,6 +4,8 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Expanded tag-driven GitHub Releases with checksummed build assets for every supported platform, including an
+  explicit Apple TV limitation report when a Qt tvOS kit is unavailable on the release runner.
 - Implemented the public PRG32 multiplayer ABI calls #32-#40 on every Qt target through the configured
   Cartridge Store WebSocket relay, including room validation, snapshot exchange, input masking, peer expiry,
   and the public 24-byte player-state layout; NaCup-napoli97 now passes headless execution.
