@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Fusion as Fusion
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import QtQuick.Window
@@ -26,6 +27,24 @@ ApplicationWindow {
     readonly property bool gameOnlyFullScreen: page === 2 &&
                                                 (tvPlatform || (desktopPlatform && (appController.fullScreen || documentationFullScreen)))
     color: "#101216"
+
+    component SetupButton: Fusion.Button {
+        Layout.fillWidth: true
+        Layout.minimumHeight: 40
+        contentItem: Label {
+            text: parent.text
+            color: parent.enabled ? "#f2f4f8" : "#737985"
+            font.bold: true
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: 14
+        }
+        background: Rectangle {
+            radius: 5
+            color: parent.down ? "#313743" : (parent.hovered ? "#282e38" : "#20252d")
+            border.color: parent.activeFocus ? "#45c9ff" : "#3b424e"
+            border.width: parent.activeFocus ? 2 : 1
+        }
+    }
 
     function keyboardMask(key) {
         if (key === Qt.Key_Left || key === Qt.Key_A) return 1
@@ -56,12 +75,17 @@ ApplicationWindow {
     function showSetup() { appController.pause(); page=0; if(tvPlatform) browseButton.forceActiveFocus() }
     function showStore() { page=1; if(tvPlatform) storeSearch.forceActiveFocus() }
     function applyFullScreen() {
-        if (tvPlatform || (desktopPlatform && appController.fullScreen))
+        if (tvPlatform || (desktopPlatform && page === 2 && appController.fullScreen))
             root.showFullScreen()
         else
             root.showNormal()
     }
     function toggleFullScreen() { appController.fullScreen=!appController.fullScreen; applyFullScreen() }
+    function exitFullScreen() {
+        documentationFullScreen=false
+        appController.fullScreen=false
+        root.showNormal()
+    }
 
     Item {
         id: keyboardHandler
@@ -100,6 +124,7 @@ ApplicationWindow {
     }
     onWidthChanged: if (mobilePlatform) Qt.callLater(mobileSafeArea.refresh)
     onHeightChanged: if (mobilePlatform) Qt.callLater(mobileSafeArea.refresh)
+    onPageChanged: Qt.callLater(applyFullScreen)
 
     Timer {
         interval: 250
@@ -110,7 +135,7 @@ ApplicationWindow {
 
     Shortcut { sequence:"F11"; enabled:root.desktopPlatform; onActivated:root.toggleFullScreen() }
     Shortcut { sequence:"Ctrl+Meta+F"; enabled:root.desktopPlatform; onActivated:root.toggleFullScreen() }
-    Shortcut { sequence:"Escape"; enabled:root.desktopPlatform && appController.fullScreen; onActivated:{appController.fullScreen=false;root.applyFullScreen()} }
+    Shortcut { sequence:"Escape"; enabled:root.desktopPlatform && root.visibility === Window.FullScreen; onActivated:root.exitFullScreen() }
 
     Timer { id:splashTimer; interval:900; repeat:false; onTriggered:root.splashVisible=false }
     FileDialog { id:importDialog; title:"Import PRG32 cartridge"; nameFilters:["PRG32 cartridges (*.prg32)","All files (*)"]; onAccepted: if(appController.loadFile(selectedFile)) root.showPlayer() }
@@ -148,18 +173,18 @@ ApplicationWindow {
         currentIndex:root.page
         // Setup screen
         Rectangle { color:"black"
-            ScrollView { id:setupScroll; anchors.fill:parent; contentWidth:availableWidth; ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-                ColumnLayout { width:Math.max(0,Math.min(setupScroll.availableWidth-48,560)); x:(setupScroll.availableWidth-width)/2; spacing:12
+            ScrollView { id:setupScroll; anchors.fill:parent; contentWidth:availableWidth; contentHeight:setupColumn.implicitHeight; ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                ColumnLayout { id:setupColumn; width:Math.max(0,Math.min(setupScroll.availableWidth-48,560)); height:implicitHeight; x:(setupScroll.availableWidth-width)/2; spacing:12
                 Item { Layout.preferredHeight:22 }
                 PRG32Image { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,setupScroll.availableHeight*.18); source:"qrc:/prg32qt/assets/prg32_logo.png" }
                 Label { text:"PRG32 SETUP"; color:"white"; font.family:"monospace"; font.pixelSize:18 }
                 Label { Layout.fillWidth:true; text:"PLATFORM: "+Qt.platform.os.toUpperCase()+"\nRUNTIME: RV32IMAC · 30 FPS\nCARTRIDGES: "+storeClient.cartridges.length+"\nIP: "+(appController.deviceIp||"No local IPv4 address")+"\nWEB API: "+(appController.webApiUrl||"Unavailable"); color:"#43d17b"; font.family:"monospace"; wrapMode:Text.WrapAnywhere }
-                Button { Layout.fillWidth:true; text:"›  RUN CARTRIDGE"; enabled:appController.running; onClicked:root.showPlayer() }
-                Button { Layout.fillWidth:true; visible:appController.performanceAvailable; text:"›  RUN PERFORMANCE TEST"; onClicked:{appController.runPerformanceTest();root.showPlayer()} }
-                Button { id:browseButton; Layout.fillWidth:true; focus:tvPlatform && root.page===0; text:"›  BROWSE STORE"; onClicked:root.showStore() }
-                Button { Layout.fillWidth:true; text:"›  IMPORT CARTRIDGE"; onClicked:importDialog.open() }
-                Button { Layout.fillWidth:true; text:"›  STORE SETTINGS"; onClicked:settingsDialog.open() }
-                Button { Layout.fillWidth:true; text:"›  ABOUT PRG32-QT"; onClicked:aboutDialog.open() }
+                SetupButton { text:"›  RUN CARTRIDGE"; enabled:appController.running; onClicked:root.showPlayer() }
+                SetupButton { visible:appController.performanceAvailable; text:"›  RUN PERFORMANCE TEST"; onClicked:{appController.runPerformanceTest();root.showPlayer()} }
+                SetupButton { id:browseButton; focus:tvPlatform && root.page===0; text:"›  BROWSE STORE"; onClicked:root.showStore() }
+                SetupButton { text:"›  IMPORT CARTRIDGE"; onClicked:importDialog.open() }
+                SetupButton { text:"›  STORE SETTINGS"; onClicked:settingsDialog.open() }
+                SetupButton { text:"›  ABOUT PRG32-QT"; onClicked:aboutDialog.open() }
                 Label { Layout.fillWidth:true; text:(storeClient.error.length?storeClient.error:appController.status).toUpperCase(); color:"#45c9ff"; wrapMode:Text.Wrap; font.family:"monospace" }
             } }
         }

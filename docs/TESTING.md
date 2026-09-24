@@ -147,6 +147,36 @@ depending on host event timing.
 
 Before signed releases verify startup, Store browsing/download, local import, graphics, audio and input on representative devices. On desktops also verify keyboard and controller connect/disconnect behavior; on mobile verify both portrait and landscape touch layouts.
 
+## 0.3.0 release validation (2026-09-24)
+
+- Apple Silicon arm64 macOS host with Xcode 27.0: the installed tvOS 27.0 runtime exposes Apple TV 4K
+  (3rd generation) simulators at 4K and 1080p, but no Qt 6.8.3 tvOS kit is installed. The Apple TV
+  application therefore could not be compiled, installed, or launched locally; the CI Apple TV job validates
+  the build contract and records the same missing-kit limitation until `PRG32QT_TVOS_QT_ROOT` is configured.
+- The Release portable build passed all four CTest targets: core, Asteroids, Bach, and the required
+  `PerformanceTest.prg32 --require-performance` contract.
+- Whole-Store certification executed 23 portable cartridges for 300 frames with media verification and
+  recorded per-cartridge non-black-pixel, distinct-framebuffer-hash, audio-event, and PCM-sample counts. Two
+  non-portable cartridges (`space_invaders` and `terraforge`) were explicitly excluded; no portable cartridge
+  failed. No physical listening check was performed.
+- Android and Android TV ARM64 packages built successfully with Qt 6.8.3, Android platform 34, and NDK
+  26.1.10909125. The macOS Qt build compiled all C++ and QML sources but could not link because Xcode 27 no
+  longer supplies AGL; CI remains pinned to macOS 15 for the Qt 6.8.3 AGL dependency.
+- C++ formatting, documentation consistency, and Store parser unit tests passed. Linux and Windows were not
+  locally executable; their CI jobs remain the release gate.
+
+## macOS Setup and fullscreen regression validation (2026-09-23)
+
+- Apple Silicon arm64 macOS host with the native Homebrew Qt kit: the application rebuilt successfully and
+  all four CTest targets passed.
+- The Setup page was captured through the application's documentation-screenshot path after a fullscreen
+  transition. Run, Store, Import, Settings, and About actions were visibly rendered with stable geometry.
+- The bundled Asteroids fixture was opened in the desktop player, entered game-only fullscreen, and returned
+  to the windowed player with `Escape`. The restored title bar, Setup action, player controls, and Full Screen
+  action were visually confirmed.
+- `scripts/check-docs.py` passed. Windows, Linux, Raspberry Pi OS, iOS, Android, Apple TV, and Android TV were
+  not locally executable during this macOS-specific UI regression check.
+
 ## macOS display, media, and input validation (2026-09-22)
 
 - Apple Silicon arm64 macOS host, native Homebrew Qt kit: application build and all four CTest targets passed.

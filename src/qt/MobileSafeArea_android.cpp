@@ -1,7 +1,7 @@
 #include "MobileSafeArea.h"
 
 #include <QJniObject>
-#include <QNativeInterface>
+#include <QtCore/qcoreapplication_platform.h>
 #include <cmath>
 
 MobileSafeArea::MobileSafeArea(QObject* parent) : QObject(parent) {

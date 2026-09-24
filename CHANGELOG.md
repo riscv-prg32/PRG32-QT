@@ -6,6 +6,11 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 - Expanded tag-driven GitHub Releases with checksummed build assets for every supported platform, including an
   explicit Apple TV limitation report when a Qt tvOS kit is unavailable on the release runner.
+- Kept Setup and Store windowed when the persistent desktop player-fullscreen preference is enabled, restored
+  all Setup actions after fullscreen transitions, and made Escape reliably return a fullscreen player to a
+  window.
+- Restored Android and Android TV builds by using Qt's case-sensitive public Android application interface
+  header, and refreshed GitHub Actions to their Node.js 24-compatible major releases.
 - Implemented the public PRG32 multiplayer ABI calls #32-#40 on every Qt target through the configured
   Cartridge Store WebSocket relay, including room validation, snapshot exchange, input masking, peer expiry,
   and the public 24-byte player-state layout; NaCup-napoli97 now passes headless execution.

@@ -34,7 +34,7 @@ class StoreSmokeTests(unittest.TestCase):
 
     def test_nonportable_package_is_reported_as_skipped(self):
         item = {"id": "org.example.legacy", "version": "1.0.0", "architectures": ["qemu"]}
-        rejection = subprocess.CompletedProcess([], 1, "", store_smoke.NONPORTABLE_ERROR)
+        rejection = subprocess.CompletedProcess([], 1, "", store_smoke.NONPORTABLE_ERRORS[0])
         with mock.patch.object(store_smoke, "catalog", return_value=[item]), mock.patch.object(
             store_smoke, "fetch", return_value=b"PRG2example"
         ), mock.patch.object(store_smoke.subprocess, "run", return_value=rejection):
