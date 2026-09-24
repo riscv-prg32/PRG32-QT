@@ -10,7 +10,8 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
   all Setup actions after fullscreen transitions, and made Escape reliably return a fullscreen player to a
   window.
 - Restored Android and Android TV builds by using Qt's case-sensitive public Android application interface
-  header, and refreshed GitHub Actions to their Node.js 24-compatible major releases.
+  header, moved Linux CI to a deterministic Debian Trixie Qt 6.8 environment, and refreshed GitHub Actions to
+  their Node.js 24-compatible major releases.
 - Implemented the public PRG32 multiplayer ABI calls #32-#40 on every Qt target through the configured
   Cartridge Store WebSocket relay, including room validation, snapshot exchange, input masking, peer expiry,
   and the public 24-byte player-state layout; NaCup-napoli97 now passes headless execution.

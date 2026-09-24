@@ -72,10 +72,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: Linux
-            os: ubuntu-latest
-            command: ./scripts/build-linux.sh
-            package_path: build-linux/PRG32
           - platform: Windows
             os: windows-latest
             command: pwsh -File scripts/build-windows.ps1
@@ -94,9 +90,6 @@ jobs:
         with:
           version: '6.8.3'
           modules: 'qtmultimedia qtwebsockets'
-      - name: Install Ninja on Linux
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Build and test
         shell: bash
         run: ${{ matrix.command }}
@@ -108,6 +101,30 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  linux:
+    name: Package Linux
+    needs: source
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Install Qt and build tools
+        run: apt-get update && apt-get install -y ca-certificates git cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-multimedia-dev qt6-websockets-dev
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: Build and test
+        run: ./scripts/build-linux.sh
+      - name: Package application
+        run: |
+          mkdir -p dist
+          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Linux-${{ runner.arch }}.zip" --format=zip -- build-linux/PRG32
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-Linux-${{ runner.arch }}
           path: dist/*
           if-no-files-found: error
 
@@ -246,7 +263,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [source, desktop, raspberry-pi, ios, tvos, android]
+    needs: [source, desktop, linux, raspberry-pi, ios, tvos, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8

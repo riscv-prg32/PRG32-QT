@@ -58,9 +58,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: Linux
-            os: ubuntu-latest
-            command: ./scripts/build-linux.sh
           - platform: Windows
             os: windows-latest
             command: pwsh -File scripts/build-windows.ps1
@@ -77,9 +74,6 @@ jobs:
         with:
           version: '6.8.3'
           modules: 'qtmultimedia qtwebsockets'
-      - name: Install Ninja on Linux
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Build and test
         shell: bash
         run: ${{ matrix.command }}
@@ -88,9 +82,27 @@ jobs:
         with:
           name: prg32qt-${{ matrix.platform }}-${{ runner.arch }}
           path: |
-            build-linux/PRG32*
             build-windows/PRG32*
             build-macos/PRG32.app
+          if-no-files-found: error
+
+  linux:
+    name: Linux Qt build
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Install Qt and build tools
+        run: apt-get update && apt-get install -y ca-certificates git cmake ninja-build g++ qt6-base-dev qt6-declarative-dev qt6-multimedia-dev qt6-websockets-dev
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build and test
+        run: ./scripts/build-linux.sh
+      - name: Upload Linux build
+        uses: actions/upload-artifact@v7
+        with:
+          name: prg32qt-Linux-${{ runner.arch }}
+          path: build-linux/PRG32
           if-no-files-found: error
 
   raspberry-pi:

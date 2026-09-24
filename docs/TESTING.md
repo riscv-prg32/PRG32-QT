@@ -162,8 +162,9 @@ Before signed releases verify startup, Store browsing/download, local import, gr
 - Android and Android TV ARM64 packages built successfully with Qt 6.8.3, Android platform 34, and NDK
   26.1.10909125. The macOS Qt build compiled all C++ and QML sources but could not link because Xcode 27 no
   longer supplies AGL; CI remains pinned to macOS 15 for the Qt 6.8.3 AGL dependency.
-- C++ formatting, documentation consistency, and Store parser unit tests passed. Linux and Windows were not
-  locally executable; their CI jobs remain the release gate.
+- An x86_64 Debian Trixie container with Qt 6.8 built the Linux application and passed all four CTest targets.
+  C++ formatting, documentation consistency, and Store parser unit tests passed. Windows was not locally
+  executable; its CI job remains the release gate.
 
 ## macOS Setup and fullscreen regression validation (2026-09-23)
 
