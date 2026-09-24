@@ -14,15 +14,18 @@ The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` inclu
 
 ## Platform compilation
 
-`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS, Android and Android TV. ARM64 Debian Trixie is the continuous architecture/build proxy for Raspberry Pi OS/Raspbian portability; release qualification should also be performed natively on the target Pi hardware/image. Apple TV is compiled when a source-built Qt tvOS kit is configured; otherwise its job uploads an explicit limitation artifact and release qualification requires a manual build.
+`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS, Android,
+Android TV, and Apple TV. ARM64 Debian Trixie is the continuous architecture/build proxy for Raspberry Pi
+OS/Raspbian portability; release qualification should also be performed natively on the target Pi
+hardware/image. The Apple TV job builds and caches a patched Qt 6.8.3 tvOS simulator kit from checksum-pinned
+source before compiling the application.
 
 The same workflow runs a dedicated Qt-free Release build and uploads its Linux headless runner. Successful
 desktop jobs upload their application build as a short-lived Actions artifact. These CI artifacts are diagnostic
 outputs. For a `vX.Y.Z` tag, `.github/workflows/release.yml` repeats the platform builds, packages each output,
 generates SHA-256 checksums, and publishes all assets together only after every required job succeeds. The iOS
 and Apple TV outputs are unsigned simulator builds, Android outputs are debug-signed APKs, and desktop archives
-are build artifacts rather than signed installer packages. Without a configured Qt tvOS kit, the release carries
-an explicit Apple TV limitation report and no Apple TV binary.
+are build artifacts rather than signed installer packages.
 
 ### Release-asset automation validation (2026-09-24)
 
@@ -147,12 +150,19 @@ depending on host event timing.
 
 Before signed releases verify startup, Store browsing/download, local import, graphics, audio and input on representative devices. On desktops also verify keyboard and controller connect/disconnect behavior; on mobile verify both portrait and landscape touch layouts.
 
-## 0.3.0 release validation (2026-09-24)
+## Apple TV source-kit and simulator validation (2026-09-24)
 
-- Apple Silicon arm64 macOS host with Xcode 27.0: the installed tvOS 27.0 runtime exposes Apple TV 4K
-  (3rd generation) simulators at 4K and 1080p, but no Qt 6.8.3 tvOS kit is installed. The Apple TV
-  application therefore could not be compiled, installed, or launched locally; the CI Apple TV job validates
-  the build contract and records the same missing-kit limitation until `PRG32QT_TVOS_QT_ROOT` is configured.
+- Apple Silicon arm64 macOS host with Xcode 27.0 and tvOS 27.0 SDK: Qt 6.8.3 was built from the official
+  checksum-pinned source archive with `patches/qt-6.8.3-tvos.patch`, then PRG32 was compiled for arm64 with
+  `scripts/build-tvos.sh`.
+- The unsigned application was installed and launched on an Apple TV 4K (3rd generation) tvOS 27 simulator,
+  UUID `AAFB9942-9888-4A57-9604-D2EEA2490D17`, at 3840x2160. The foreground Setup screen reported `TVOS`,
+  RV32IMAC at 30 FPS, 25 cartridges, local networking, and the Web API. Runtime logs confirmed a visible UIKit
+  scene, Metal shader compilation, GameController discovery, and CoreAudio startup.
+- No physical Apple TV, Siri Remote, or external Apple GameController was available; physical button
+  actuation, display overscan, signing, and listening checks remain required for device certification.
+
+## 0.3.0 release validation (2026-09-24)
 - The Release portable build passed all four CTest targets: core, Asteroids, Bach, and the required
   `PerformanceTest.prg32 --require-performance` contract.
 - Whole-Store certification executed 23 portable cartridges for 300 frames with media verification and

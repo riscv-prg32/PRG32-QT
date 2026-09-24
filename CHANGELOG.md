@@ -4,8 +4,11 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
-- Expanded tag-driven GitHub Releases with checksummed build assets for every supported platform, including an
-  explicit Apple TV limitation report when a Qt tvOS kit is unavailable on the release runner.
+## [0.3.1] - 2026-09-24
+
+- Added a reproducible, checksum-pinned Qt 6.8.3 tvOS simulator kit build, made Apple TV a required compiled
+  CI/release artifact, and fixed Xcode simulator SDK selection so Apple TV builds no longer publish a
+  missing-kit limitation report.
 - Kept Setup and Store windowed when the persistent desktop player-fullscreen preference is enabled, restored
   all Setup actions after fullscreen transitions, and made Escape reliably return a fullscreen player to a
   window.

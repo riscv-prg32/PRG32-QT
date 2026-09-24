@@ -145,30 +145,26 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Validate Apple TV build contract
-        shell: bash
-        run: |
-          test -x scripts/build-tvos.sh
-          test -f platform/tvos/Info.plist
-          grep -Fq 'CMAKE_SYSTEM_NAME=tvOS' scripts/build-tvos.sh
-          grep -Fq 'PRG32QT_TV_MODE=ON' scripts/build-tvos.sh
-      - name: Compile with configured Qt tvOS kit
-        if: ${{ vars.PRG32QT_TVOS_QT_ROOT != '' }}
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          modules: 'qtshadertools'
+      - uses: actions/cache@v5
+        with:
+          path: .qt-tvos-build/install
+          key: qt-6.8.3-tvos-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('patches/qt-6.8.3-tvos.patch', 'scripts/build-qt-tvos.sh') }}
+      - name: Build Qt tvOS simulator kit
+        run: QT_HOST_ROOT="$QT_ROOT_DIR" ./scripts/build-qt-tvos.sh
+      - name: Compile Apple TV simulator application
         env:
-          QT_ROOT: ${{ vars.PRG32QT_TVOS_QT_ROOT }}
-          QT_HOST_ROOT: ${{ vars.PRG32QT_TVOS_QT_HOST_ROOT }}
+          QT_ROOT: ${{ github.workspace }}/.qt-tvos-build/install
           TVOS_DESTINATION: generic/platform=tvOS Simulator
           TVOS_ARCHS: x86_64
-        run: ./scripts/build-tvos.sh
-      - name: Record hosted-runner limitation
-        if: ${{ vars.PRG32QT_TVOS_QT_ROOT == '' }}
-        run: |
-          echo 'Apple TV application compilation was not run: Qt does not publish an open-source tvOS binary kit through aqt/install-qt-action. Configure PRG32QT_TVOS_QT_ROOT and PRG32QT_TVOS_QT_HOST_ROOT on a runner with a source-built Qt tvOS kit.' | tee tvos-build-limitation.txt
+        run: QT_HOST_ROOT="$QT_ROOT_DIR" ./scripts/build-tvos.sh
       - uses: actions/upload-artifact@v7
-        if: ${{ vars.PRG32QT_TVOS_QT_ROOT == '' }}
         with:
-          name: tvos-build-limitation
-          path: tvos-build-limitation.txt
+          name: prg32qt-Apple-TV-Simulator-${{ runner.arch }}
+          path: build-tvos-sim/Release-appletvsimulator/PRG32.app
           if-no-files-found: error
 
   android:

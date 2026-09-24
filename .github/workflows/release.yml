@@ -197,24 +197,26 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - name: Compile with configured Qt tvOS kit
-        if: ${{ vars.PRG32QT_TVOS_QT_ROOT != '' }}
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          modules: 'qtshadertools'
+      - uses: actions/cache@v5
+        with:
+          path: .qt-tvos-build/install
+          key: qt-6.8.3-tvos-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('patches/qt-6.8.3-tvos.patch', 'scripts/build-qt-tvos.sh') }}
+      - name: Build Qt tvOS simulator kit
+        run: QT_HOST_ROOT="$QT_ROOT_DIR" ./scripts/build-qt-tvos.sh
+      - name: Compile Apple TV simulator application
         env:
-          QT_ROOT: ${{ vars.PRG32QT_TVOS_QT_ROOT }}
-          QT_HOST_ROOT: ${{ vars.PRG32QT_TVOS_QT_HOST_ROOT }}
+          QT_ROOT: ${{ github.workspace }}/.qt-tvos-build/install
           TVOS_DESTINATION: generic/platform=tvOS Simulator
           TVOS_ARCHS: x86_64
-        run: ./scripts/build-tvos.sh
+        run: QT_HOST_ROOT="$QT_ROOT_DIR" ./scripts/build-tvos.sh
       - name: Package application
-        if: ${{ vars.PRG32QT_TVOS_QT_ROOT != '' }}
         run: |
           mkdir -p dist
           cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Apple-TV-Simulator-x86_64.zip" --format=zip -- build-tvos-sim/Release-appletvsimulator/PRG32.app
-      - name: Record unavailable hosted build
-        if: ${{ vars.PRG32QT_TVOS_QT_ROOT == '' }}
-        run: |
-          mkdir -p dist
-          echo 'No Apple TV binary was produced because Qt does not publish an open-source tvOS binary kit. Configure PRG32QT_TVOS_QT_ROOT and PRG32QT_TVOS_QT_HOST_ROOT on a runner with a source-built Qt tvOS kit.' > "dist/PRG32-QT-${RELEASE_TAG#v}-Apple-TV-BUILD-LIMITATION.txt"
       - uses: actions/upload-artifact@v7
         with:
           name: release-Apple-TV

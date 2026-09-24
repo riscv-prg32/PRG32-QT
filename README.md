@@ -37,8 +37,8 @@ derived values drive the runtime, About dialog, Android packages and Apple bundl
 
 Pushing a `vX.Y.Z` tag runs the complete release workflow. The resulting GitHub Release contains checksummed
 source archives plus packaged Linux, Windows, macOS, Raspberry Pi OS compatibility, iOS simulator, Android,
-Android TV, and Apple TV builds. When the release runner has no configured Qt tvOS kit, the Apple TV asset is
-an explicit build-limitation report instead of a binary.
+Android TV, and Apple TV builds. CI builds the Qt 6.8.3 tvOS kit from checksum-pinned source before compiling
+the unsigned Apple TV simulator application.
 
 For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 

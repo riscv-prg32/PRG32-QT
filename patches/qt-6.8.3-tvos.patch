@@ -1,0 +1,336 @@
+--- a/qtbase/cmake/QtBaseGlobalTargets.cmake
++++ b/qtbase/cmake/QtBaseGlobalTargets.cmake
+@@ -342,7 +342,7 @@
+ if(APPLE)
+     if(MACOS)
+         set(platform_shortname "macos")
+-    elseif(IOS)
++    elseif(IOS OR TVOS)
+         set(platform_shortname "ios")
+     elseif(VISIONOS)
+         set(platform_shortname "visionos")
+--- a/qtbase/cmake/QtBuildPathsHelpers.cmake
++++ b/qtbase/cmake/QtBuildPathsHelpers.cmake
+@@ -230,7 +230,7 @@
+     if(APPLE)
+         if(NOT CMAKE_SYSTEM_NAME OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+             set(__qt_internal_cmake_apple_support_files_path "${QT_CMAKE_DIR}/macos")
+-        elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
++        elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+             set(__qt_internal_cmake_apple_support_files_path "${QT_CMAKE_DIR}/ios")
+         elseif(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+             set(__qt_internal_cmake_apple_support_files_path "${QT_CMAKE_DIR}/visionos")
+--- a/qtbase/cmake/QtConfig.cmake.in
++++ b/qtbase/cmake/QtConfig.cmake.in
+@@ -42,7 +42,7 @@
+ if(APPLE)
+     if(NOT CMAKE_SYSTEM_NAME OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+         set(__qt_internal_cmake_apple_support_files_path "${_qt_import_prefix}/macos")
+-    elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
++    elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+         set(__qt_internal_cmake_apple_support_files_path "${_qt_import_prefix}/ios")
+     elseif(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+         set(__qt_internal_cmake_apple_support_files_path "${_qt_import_prefix}/visionos")
+--- a/qtbase/mkspecs/unsupported/macx-tvos-clang/qplatformdefs.h
++++ b/qtbase/mkspecs/unsupported/macx-tvos-clang/qplatformdefs.h
+@@ -1,4 +1,4 @@
+ // Copyright (C) 2017 The Qt Company Ltd.
+ // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+
+-#include "../common/mac/qplatformdefs.h"
++#include "../../common/mac/qplatformdefs.h"
+--- a/qtbase/src/corelib/thread/qyieldcpu.h
++++ b/qtbase/src/corelib/thread/qyieldcpu.h
+@@ -9,6 +9,10 @@
+ #include <QtCore/qprocessordetection.h>
+ #include <QtCore/qtconfigmacros.h>
+
++#if defined(Q_PROCESSOR_ARM) && defined(Q_CC_CLANG)
++#  include <arm_acle.h>
++#endif
++
+ #ifdef Q_CC_MSVC_ONLY
+ // MSVC defines _YIELD_PROCESSOR() in <xatomic.h>, but as that is a private
+ // header, we include the public ones
+--- a/qtbase/src/gui/configure.cmake
++++ b/qtbase/src/gui/configure.cmake
+@@ -840,7 +840,7 @@
+ )
+ qt_feature("metal" PUBLIC
+     LABEL "Metal"
+-    CONDITION MACOS OR IOS OR VISIONOS
++    CONDITION MACOS OR IOS OR TVOS OR VISIONOS
+ )
+ qt_feature("vkkhrdisplay" PRIVATE
+     SECTION "Platform plugins"
+--- a/qtbase/src/gui/rhi/qrhimetal.mm
++++ b/qtbase/src/gui/rhi/qrhimetal.mm
+@@ -6286,12 +6286,16 @@
+     if (m_format == HDRExtendedSrgbLinear) {
+         if (@available(iOS 16.0, *)) {
+             d->layer.colorspace = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
++#ifndef Q_OS_TVOS
+             d->layer.wantsExtendedDynamicRangeContent = YES;
++#endif
+         }
+     } else if (m_format == HDRExtendedDisplayP3Linear) {
+         if (@available(iOS 16.0, *)) {
+             d->layer.colorspace = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearDisplayP3);
++#ifndef Q_OS_TVOS
+             d->layer.wantsExtendedDynamicRangeContent = YES;
++#endif
+         }
+     }
+
+--- a/qtbase/src/network/CMakeLists.txt
++++ b/qtbase/src/network/CMakeLists.txt
+@@ -278,7 +278,7 @@
+         kernel/qnetworkinterface_uikit_p.h
+ )
+
+-qt_internal_extend_target(Network CONDITION APPLE AND NOT VISIONOS
++qt_internal_extend_target(Network CONDITION APPLE AND NOT VISIONOS AND NOT TVOS
+     SOURCES
+         kernel/qnetworkproxy_darwin.cpp
+ )
+@@ -296,7 +296,7 @@
+         kernel/qnetworkproxy_android.cpp
+ )
+
+-qt_internal_extend_target(Network CONDITION UNIX AND NOT ANDROID AND NOT (APPLE AND NOT VISIONOS) AND NOT QT_FEATURE_libproxy AND (UNIX OR WINRT)
++qt_internal_extend_target(Network CONDITION UNIX AND NOT ANDROID AND NOT (APPLE AND NOT VISIONOS AND NOT TVOS) AND NOT QT_FEATURE_libproxy AND (UNIX OR WINRT)
+     SOURCES
+         kernel/qnetworkproxy_generic.cpp
+ )
+--- a/qtbase/src/plugins/platforms/ios/qiostheme.mm
++++ b/qtbase/src/plugins/platforms/ios/qiostheme.mm
+@@ -27,9 +27,10 @@
+ #include "qioscolordialog.h"
+ #include "qiosfontdialog.h"
+ #include "qiosmessagedialog.h"
++#endif
++
+ #include "qiosscreen.h"
+ #include "quiwindow.h"
+-#endif
+
+ QT_BEGIN_NAMESPACE
+
+@@ -57,16 +58,28 @@
+     Q_DECL_IMPORT QPalette qt_fusionPalette(void);
+     s_systemPalette = qt_fusionPalette();
+
++#ifdef Q_OS_TVOS
++    s_systemPalette.setBrush(QPalette::Window, qt_mac_toQBrush(UIColor.blackColor.CGColor));
++#else
+     s_systemPalette.setBrush(QPalette::Window, qt_mac_toQBrush(UIColor.systemGroupedBackgroundColor.CGColor));
++#endif
+     s_systemPalette.setBrush(QPalette::Active, QPalette::WindowText, qt_mac_toQBrush(UIColor.labelColor.CGColor));
+
++#ifdef Q_OS_TVOS
++    s_systemPalette.setBrush(QPalette::Base, qt_mac_toQBrush(UIColor.darkGrayColor.CGColor));
++#else
+     s_systemPalette.setBrush(QPalette::Base, qt_mac_toQBrush(UIColor.secondarySystemGroupedBackgroundColor.CGColor));
++#endif
+     s_systemPalette.setBrush(QPalette::Active, QPalette::Text, qt_mac_toQBrush(UIColor.labelColor.CGColor));
+
++#ifdef Q_OS_TVOS
++    s_systemPalette.setBrush(QPalette::Button, qt_mac_toQBrush(UIColor.darkGrayColor.CGColor));
++#else
+     s_systemPalette.setBrush(QPalette::Button, qt_mac_toQBrush(UIColor.secondarySystemBackgroundColor.CGColor));
++#endif
+     s_systemPalette.setBrush(QPalette::Active, QPalette::ButtonText, qt_mac_toQBrush(UIColor.labelColor.CGColor));
+
+-    s_systemPalette.setBrush(QPalette::Active, QPalette::BrightText, qt_mac_toQBrush(UIColor.lightTextColor.CGColor));
++    s_systemPalette.setBrush(QPalette::Active, QPalette::BrightText, qt_mac_toQBrush(UIColor.whiteColor.CGColor));
+     s_systemPalette.setBrush(QPalette::Active, QPalette::PlaceholderText, qt_mac_toQBrush(UIColor.placeholderTextColor.CGColor));
+
+     s_systemPalette.setBrush(QPalette::Active, QPalette::Link, qt_mac_toQBrush(UIColor.linkColor.CGColor));
+--- a/qtbase/src/plugins/platforms/ios/quiview.mm
++++ b/qtbase/src/plugins/platforms/ios/quiview.mm
+@@ -91,10 +91,12 @@
+         // handled by the UIView. Scroll gestures, even those coming from touch devices,
+         // such as trackpads will still be received as they are not touch events
+         m_scrollGestureRecognizer.allowedTouchTypes = [NSArray array];
++#ifndef Q_OS_TVOS
+         if (@available(ios 13.4, *)) {
+             m_scrollGestureRecognizer.allowedScrollTypesMask = UIScrollTypeMaskAll;
+         }
+         m_scrollGestureRecognizer.maximumNumberOfTouches = 0;
++#endif
+         m_lastScrollDelta = CGPointZero;
+         m_lastScrollCursorPos = CGPointZero;
+         [self addGestureRecognizer:m_scrollGestureRecognizer];
+@@ -732,8 +734,10 @@
+     ulong qt_timestamp = time_stamp * 1000;
+
+     Qt::KeyboardModifiers qt_modifierFlags = Qt::NoModifier;
++#ifndef Q_OS_TVOS
+     if (@available(ios 13.4, *))
+         qt_modifierFlags = QAppleKeyMapper::fromUIKitModifiers(recognizer.modifierFlags);
++#endif
+
+     if (recognizer.state == UIGestureRecognizerStateBegan)
+         // locationInView: doesn't return the cursor position at the time of the wheel event,
+--- a/qtdeclarative/src/qml/jsruntime/qv4sequenceobject.cpp
++++ b/qtdeclarative/src/qml/jsruntime/qv4sequenceobject.cpp
+@@ -50,17 +50,20 @@
+     /* non-const */ Heap::Sequence *p = sequence->d();
+
+     QSequentialIterable iterable(p->metaSequence(), p->listType(), p->storagePointer());
+-    if (iterable.canRandomAccessIterate()) {
+-        std::sort(QSequentialIterable::RandomAccessIterator(iterable.mutableBegin()),
+-                  QSequentialIterable::RandomAccessIterator(iterable.mutableEnd()),
+-                  compare);
+-    } else if (iterable.canReverseIterate()) {
+-        std::sort(QSequentialIterable::BidirectionalIterator(iterable.mutableBegin()),
+-                  QSequentialIterable::BidirectionalIterator(iterable.mutableEnd()),
+-                  compare);
+-    } else {
++    if (!iterable.canRandomAccessIterate() && !iterable.canReverseIterate()) {
+         qWarning() << "Container has no suitable iterator for sorting";
++        return;
+     }
++
++    QList<QVariant> values;
++    const qsizetype valueCount = iterable.size();
++    values.reserve(valueCount);
++    for (qsizetype index = 0; index < valueCount; ++index)
++        values.append(iterable.at(index));
++
++    std::sort(values.begin(), values.end(), compare);
++    for (qsizetype index = 0; index < valueCount; ++index)
++        iterable.set(index, values.at(index));
+ }
+
+ // helper function to generate valid warnings if errors occur during sequence operations.
+--- a/qtmultimedia/src/multimedia/darwin/qdarwinaudiodevices.mm
++++ b/qtmultimedia/src/multimedia/darwin/qdarwinaudiodevices.mm
+@@ -12,7 +12,7 @@
+
+ #include <qdebug.h>
+
+-#if defined(Q_OS_IOS)
++#if defined(Q_OS_IOS) || defined(Q_OS_TVOS)
+ #include "qcoreaudiosessionmanager_p.h"
+ #import <AVFoundation/AVFoundation.h>
+ #else
+@@ -157,7 +157,7 @@
+     }
+ }
+
+-#elif defined(Q_OS_IOS)
++#elif defined(Q_OS_IOS) || defined(Q_OS_TVOS)
+
+ static QList<QAudioDevice> availableAudioDevices(QAudioDevice::Mode mode)
+ {
+@@ -165,7 +165,9 @@
+
+     if (mode == QAudioDevice::Output) {
+         devices.append(createAudioDevice(true, "default", QAudioDevice::Output));
+-    } else {
++    }
++#if defined(Q_OS_IOS)
++    else {
+         AVCaptureDevice *defaultDevice =
+                 [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+
+@@ -185,6 +187,7 @@
+                                              QAudioDevice::Input));
+         }
+     }
++#endif
+
+     return devices;
+ }
+--- a/qtmultimedia/src/plugins/multimedia/darwin/CMakeLists.txt
++++ b/qtmultimedia/src/plugins/multimedia/darwin/CMakeLists.txt
+@@ -56,7 +56,7 @@
+         ${FWApplicationServices}
+ )
+
+-qt_internal_extend_target(QDarwinMediaPlugin CONDITION IOS
++qt_internal_extend_target(QDarwinMediaPlugin CONDITION IOS OR TVOS
+     LIBRARIES
+         ${FWCoreGraphics}
+         ${FWCoreVideo}
+--- a/qtmultimedia/src/plugins/multimedia/darwin/qdarwinintegration.mm
++++ b/qtmultimedia/src/plugins/multimedia/darwin/qdarwinintegration.mm
+@@ -3,17 +3,19 @@
+
+ #include "qdarwinintegration_p.h"
+ #include <avfmediaplayer_p.h>
++#ifndef Q_OS_TVOS
+ #include <avfcameraservice_p.h>
+ #include <avfcamera_p.h>
+ #include <avfimagecapture_p.h>
+ #include <avfmediaencoder_p.h>
++#include <qavfcamerabase_p.h>
++#endif
+ #include <qdarwinformatsinfo_p.h>
+ #include <avfvideosink_p.h>
+ #include <avfaudiodecoder_p.h>
+ #include <VideoToolbox/VideoToolbox.h>
+ #include <qdebug.h>
+ #include <private/qplatformmediaplugin_p.h>
+-#include <qavfcamerabase_p.h>
+
+ QT_BEGIN_NAMESPACE
+
+@@ -50,7 +52,11 @@
+
+ QPlatformVideoDevices *QDarwinIntegration::createVideoDevices()
+ {
++#ifdef Q_OS_TVOS
++    return nullptr;
++#else
+     return new QAVFVideoDevices(this);
++#endif
+ }
+
+ QMaybe<QPlatformAudioDecoder *> QDarwinIntegration::createAudioDecoder(QAudioDecoder *decoder)
+@@ -60,7 +66,11 @@
+
+ QMaybe<QPlatformMediaCaptureSession *> QDarwinIntegration::createCaptureSession()
+ {
++#ifdef Q_OS_TVOS
++    return nullptr;
++#else
+     return new AVFCameraService;
++#endif
+ }
+
+ QMaybe<QPlatformMediaPlayer *> QDarwinIntegration::createPlayer(QMediaPlayer *player)
+@@ -70,17 +80,32 @@
+
+ QMaybe<QPlatformCamera *> QDarwinIntegration::createCamera(QCamera *camera)
+ {
++#ifdef Q_OS_TVOS
++    Q_UNUSED(camera);
++    return nullptr;
++#else
+     return new AVFCamera(camera);
++#endif
+ }
+
+ QMaybe<QPlatformMediaRecorder *> QDarwinIntegration::createRecorder(QMediaRecorder *recorder)
+ {
++#ifdef Q_OS_TVOS
++    Q_UNUSED(recorder);
++    return nullptr;
++#else
+     return new AVFMediaEncoder(recorder);
++#endif
+ }
+
+ QMaybe<QPlatformImageCapture *> QDarwinIntegration::createImageCapture(QImageCapture *imageCapture)
+ {
++#ifdef Q_OS_TVOS
++    Q_UNUSED(imageCapture);
++    return nullptr;
++#else
+     return new AVFImageCapture(imageCapture);
++#endif
+ }
+
+ QMaybe<QPlatformVideoSink *> QDarwinIntegration::createVideoSink(QVideoSink *sink)

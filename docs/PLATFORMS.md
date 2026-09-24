@@ -120,10 +120,10 @@ TVOS_DESTINATION='generic/platform=tvOS Simulator' \
 ```
 
 For a signed device build, set `TVOS_TEAM_ID` and use `platform=tvOS,id=<device-udid>`. The helper selects
-`appletvsimulator`/`x86_64` or `appletvos`/`arm64`; `TVOS_ARCHS` can override the architecture. Qt's public
-online installer and `install-qt-action` do not currently publish an open-source tvOS binary kit, so CI records
-that limitation unless `PRG32QT_TVOS_QT_ROOT` and `PRG32QT_TVOS_QT_HOST_ROOT` identify a preinstalled kit. That
-limitation artifact is not a successful Apple TV compile; release qualification still requires one.
+`appletvsimulator` with the host architecture or `appletvos`/`arm64`; `TVOS_ARCHS` can override the
+architecture. Qt's public online installer does not publish a tvOS binary kit. Build the checksum-pinned Qt
+6.8.3 simulator kit with `QT_HOST_ROOT=/path/to/Qt/macos ./scripts/build-qt-tvos.sh`; the script prints the
+resulting `QT_ROOT`. CI caches that source-built kit and requires the Apple TV application to compile.
 
 ## Android
 

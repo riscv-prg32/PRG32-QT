@@ -2,7 +2,7 @@
 
 1. Update `CHANGELOG.md`; change `VERSION.txt` only when selecting a new semantic-version development line.
 2. Run the portable suite and both iOS-baseline cartridge fixtures.
-3. Confirm CI is green for Windows, Linux, ARM64 Linux/Raspberry-Pi-compatible, macOS, iOS, Android and Android TV. Confirm the Apple TV job compiled with the configured Qt tvOS kit, or attach the explicitly reported kit limitation and complete the build manually before release.
+3. Confirm CI is green for Windows, Linux, ARM64 Linux/Raspberry-Pi-compatible, macOS, iOS, Android, Android TV, and the source-built Qt Apple TV simulator job.
 4. Run the Store certification workflow against the default Store and review every cartridge result.
 5. Verify the canonical PRG32 artwork and platform packaging metadata.
 6. Tag `vX.Y.Z` and push the tag. `.github/workflows/release.yml` verifies that CMake derives exactly the tag version, reruns the portable release suite, creates `.tar.gz` and `.zip` source
