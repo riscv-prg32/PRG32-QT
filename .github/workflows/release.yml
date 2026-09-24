@@ -109,7 +109,7 @@ jobs:
         if: runner.os == 'Windows'
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
-          path: build-windows/PRG32.exe
+          path: build-windows/PRG32*
           if-no-files-found: error
 
   linux:
