@@ -14,8 +14,8 @@ The suite includes core unit tests plus `Asteroids.prg32` and `Bach.prg32` inclu
 
 ## Platform compilation
 
-`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, macOS, iOS, Android,
-Android TV, and Apple TV. ARM64 Debian Trixie is the continuous architecture/build proxy for Raspberry Pi
+`.github/workflows/ci.yml` builds the Qt application for Windows, Linux, ARM64 Linux, Apple Silicon macOS,
+Intel macOS, iOS, Android, Android TV, and Apple TV. ARM64 Debian Trixie is the continuous architecture/build proxy for Raspberry Pi
 OS/Raspbian portability; release qualification should also be performed natively on the target Pi
 hardware/image. The Apple TV job builds and caches a patched Qt 6.8.3 tvOS simulator kit from checksum-pinned
 source before compiling the application.

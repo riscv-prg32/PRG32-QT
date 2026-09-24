@@ -80,6 +80,10 @@ jobs:
             os: macos-15
             command: ./scripts/build-macos.sh
             package_path: build-macos/PRG32.app
+          - platform: macOS-Intel
+            os: macos-15-intel
+            command: ./scripts/build-macos.sh
+            package_path: build-macos/PRG32.app
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7

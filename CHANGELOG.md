@@ -9,6 +9,7 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 - Added a reproducible, checksum-pinned Qt 6.8.3 tvOS simulator kit build, made Apple TV a required compiled
   CI/release artifact, and fixed Xcode simulator SDK selection so Apple TV builds no longer publish a
   missing-kit limitation report.
+- Added an explicit macOS 15 Intel (`x86_64`) CI and release build alongside the Apple Silicon macOS build.
 - Kept Setup and Store windowed when the persistent desktop player-fullscreen preference is enabled, restored
   all Setup actions after fullscreen transitions, and made Escape reliably return a fullscreen player to a
   window.

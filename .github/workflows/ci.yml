@@ -65,6 +65,9 @@ jobs:
             # Qt 6.8.3 links AGL, which is absent from the Xcode 26 SDK on macos-latest.
             os: macos-15
             command: ./scripts/build-macos.sh
+          - platform: macOS-Intel
+            os: macos-15-intel
+            command: ./scripts/build-macos.sh
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
