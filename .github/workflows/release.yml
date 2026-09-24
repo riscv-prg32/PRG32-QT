@@ -99,17 +99,12 @@ jobs:
         run: |
           mkdir -p dist
           cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-${{ matrix.platform }}-${{ runner.arch }}.zip" --format=zip -- ${{ matrix.package_path }}
-      - name: Package Windows application
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          $releaseVersion = $env:RELEASE_TAG.Substring(1)
-          Copy-Item '${{ matrix.package_path }}' "dist/PRG32-QT-$releaseVersion-${{ matrix.platform }}-${{ runner.arch }}.exe"
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
-          path: dist/*
+          path: |
+            dist/*
+            build-windows/PRG32.exe
           if-no-files-found: error
 
   linux:
