@@ -94,10 +94,17 @@ jobs:
         shell: bash
         run: ${{ matrix.command }}
       - name: Package application
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           mkdir -p dist
           cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-${{ matrix.platform }}-${{ runner.arch }}.zip" --format=zip -- ${{ matrix.package_path }}
+      - name: Package Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path '${{ matrix.package_path }}' -DestinationPath "dist/PRG32-QT-$($env:RELEASE_TAG.TrimStart('v'))-${{ matrix.platform }}-${{ runner.arch }}.zip"
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
