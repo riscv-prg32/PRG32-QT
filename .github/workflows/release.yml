@@ -100,11 +100,16 @@ jobs:
           mkdir -p dist
           cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-${{ matrix.platform }}-${{ runner.arch }}.zip" --format=zip -- ${{ matrix.package_path }}
       - uses: actions/upload-artifact@v7
+        if: runner.os != 'Windows'
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
-          path: |
-            dist/*
-            build-windows/PRG32.exe
+          path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: release-${{ matrix.platform }}-${{ runner.arch }}
+          path: build-windows/PRG32.exe
           if-no-files-found: error
 
   linux:
