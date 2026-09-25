@@ -73,6 +73,17 @@ compile or physical-device certification.
 
 Use the build, install and launch commands in [Platform support](PLATFORMS.md). For both simulator and device, confirm that Setup renders in portrait and landscape, reports the device IP and API endpoint, and keeps its controls reachable. Load a cartridge, verify the 33 ms frame cadence, return to Setup and confirm execution pauses. Exercise Store browsing, local import, touch input, audio, `/api/runtime`, and the performance action when the selected cartridge declares performance contracts.
 
+Validated on 2026-09-25:
+
+- PRG32-QT 0.3.1 at Git commit `89de9b15f977fc3729d35be61df7a792114e491c` was development-signed,
+  installed, and launched on the wired iPhone 12 Pro Max (`iPhone13,4`, iOS 27.0). The portrait Setup screen
+  respected the safe area and `/api/runtime` reported `qt-0.3.1`, ABI 1.6, and feature mask 477.
+- The complete 27-entry Store snapshot produced 25 portable passes and two explicit non-portable exclusions
+  on both the 900-frame host media/input sweep and the iPhone upload/select/framebuffer run, with zero portable
+  failures. All four CTest targets passed. See the [complete catalog and device evidence](STORE-CERTIFICATION-2026-09-25-IPHONE.md).
+- Physical touch/controller actuation, visible Store browsing, and speaker listening were not performed in
+  the automated device session and remain open for hands-on release qualification.
+
 Validated on 2026-09-22:
 
 - iPhone 16 Pro Max simulator, iOS 18.1, x86_64 through Rosetta on Apple Silicon: Release build, install and launch succeeded; the Setup screen rendered in portrait; `GET /api/runtime` returned the active runtime state.
