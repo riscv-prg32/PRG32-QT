@@ -215,12 +215,12 @@ jobs:
         env:
           QT_ROOT: ${{ runner.temp }}/prg32-qt-tvos/install
           TVOS_DESTINATION: generic/platform=tvOS Simulator
-          TVOS_ARCHS: x86_64
+          TVOS_ARCHS: arm64
         run: QT_HOST_ROOT="$QT_ROOT_DIR" ./scripts/build-tvos.sh
       - name: Package application
         run: |
           mkdir -p dist
-          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Apple-TV-Simulator-x86_64.zip" --format=zip -- build-tvos-sim/Release-appletvsimulator/PRG32.app
+          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Apple-TV-Simulator-arm64.zip" --format=zip -- build-tvos-sim/Release-appletvsimulator/PRG32.app
       - uses: actions/upload-artifact@v7
         with:
           name: release-Apple-TV

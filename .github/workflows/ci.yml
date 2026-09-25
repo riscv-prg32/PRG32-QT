@@ -162,7 +162,7 @@ jobs:
         env:
           QT_ROOT: ${{ runner.temp }}/prg32-qt-tvos/install
           TVOS_DESTINATION: generic/platform=tvOS Simulator
-          TVOS_ARCHS: x86_64
+          TVOS_ARCHS: arm64
         run: QT_HOST_ROOT="$QT_ROOT_DIR" ./scripts/build-tvos.sh
       - uses: actions/upload-artifact@v7
         with:
