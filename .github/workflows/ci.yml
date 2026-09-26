@@ -80,9 +80,8 @@ jobs:
       - name: Build and test
         shell: bash
         run: ${{ matrix.command }}
-      - name: Run Windows Qt deployment helper
+      - name: Stage Windows executable
         if: runner.os == 'Windows'
-        continue-on-error: true
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build-windows-deploy | Out-Null
@@ -92,7 +91,16 @@ jobs:
           if (-not $builtExecutable) {
             throw 'The built PRG32 Windows executable was not found'
           }
-          Copy-Item $builtExecutable.FullName build-windows-deploy/PRG32.exe
+          $stagedExecutable = Join-Path (Resolve-Path build-windows-deploy).Path 'PRG32.exe'
+          Copy-Item -LiteralPath $builtExecutable.FullName -Destination $stagedExecutable -Force
+          if (-not (Test-Path $stagedExecutable -PathType Leaf)) {
+            throw 'The PRG32 Windows executable could not be staged'
+          }
+      - name: Run Windows Qt deployment helper
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
