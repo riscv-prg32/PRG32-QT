@@ -78,8 +78,21 @@ jobs:
           version: '6.8.3'
           modules: 'qtmultimedia qtwebsockets'
       - name: Build and test
+        if: runner.os != 'Windows'
         shell: bash
         run: ${{ matrix.command }}
+      - name: Build and test Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $buildOutput = & pwsh -NoProfile -File scripts/build-windows.ps1 2>&1
+          $buildStatus = $LASTEXITCODE
+          $buildOutput | ForEach-Object { Write-Host $_ }
+          if ($buildStatus -ne 0) {
+            $details = (($buildOutput | Select-Object -Last 40 | Out-String) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')
+            Write-Host "::error title=Windows build failed::$details"
+            exit $buildStatus
+          }
       - name: Stage Windows executable
         if: runner.os == 'Windows'
         shell: pwsh
