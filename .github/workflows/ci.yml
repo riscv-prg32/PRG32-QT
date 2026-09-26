@@ -101,6 +101,10 @@ jobs:
           if ($deployStatus -ne 0) {
             Write-Warning "windeployqt returned exit code $deployStatus; validating its output directly."
           }
+          Get-ChildItem (Join-Path $env:QT_ROOT_DIR 'bin') -Filter '*.dll' |
+            Copy-Item -Destination 'build-windows-deploy' -Force
+          Copy-Item (Join-Path $env:QT_ROOT_DIR 'plugins\*') 'build-windows-deploy' -Recurse -Force
+          Copy-Item (Join-Path $env:QT_ROOT_DIR 'qml') 'build-windows-deploy/qml' -Recurse -Force
           $requiredPaths = @(
             'PRG32.exe',
             'Qt6Core.dll',

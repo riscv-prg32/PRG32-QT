@@ -112,6 +112,10 @@ jobs:
           $executable = (Resolve-Path dist/package/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
           & $deployTool --release --no-compiler-runtime --qmldir $qmlDirectory $executable
+          Get-ChildItem (Join-Path $env:QT_ROOT_DIR 'bin') -Filter '*.dll' |
+            Copy-Item -Destination 'dist/package' -Force
+          Copy-Item (Join-Path $env:QT_ROOT_DIR 'plugins\*') 'dist/package' -Recurse -Force
+          Copy-Item (Join-Path $env:QT_ROOT_DIR 'qml') 'dist/package/qml' -Recurse -Force
           $requiredPaths = @(
             'PRG32.exe',
             'Qt6Core.dll',
