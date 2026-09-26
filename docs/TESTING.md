@@ -25,7 +25,7 @@ desktop jobs upload their application build as a short-lived Actions artifact. T
 outputs. For a `vX.Y.Z` tag, `.github/workflows/release.yml` repeats the platform builds, packages each output,
 generates SHA-256 checksums, and publishes all assets together only after every required job succeeds. The iOS
 and Apple TV outputs are unsigned simulator builds, Android outputs are debug-signed APKs, Windows is an NSIS
-installer containing the default compiler-runtime-inclusive `windeployqt` output, and both macOS architectures are
+installer containing `windeployqt` output and an explicitly staged MSVC runtime DLL set, and both macOS architectures are
 `macdeployqt` DMG installers. These installers are not code-signed or notarized by the public workflow.
 
 ### 0.3.2 upstream-alignment release validation (2026-09-26)

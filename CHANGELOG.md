@@ -10,8 +10,8 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
   `https://store.prg32.uniparthenope.it/`, the player uses the refreshed canonical logo and title, procedural
   synth IDs use the documented waveform/pulse/cutoff/resonance bit layout, and tracker delta-0 events execute
   in one tick with the firmware's 256-event malformed-loop guard. The cartridge ABI remains 1.6.
-- Added a dependency-complete Windows installer built from the default compiler-runtime-inclusive `windeployqt`
-  output with NSIS. Release
+- Added a dependency-complete Windows installer built from `windeployqt` output, an explicitly staged MSVC
+  runtime DLL set, and NSIS. Release
   macOS DMGs continue to use `macdeployqt` for both Apple Silicon and Intel, while Android and Android TV are
   published as APKs.
 - Expanded performance selection to Accurate (default), 30 FPS Optimal, and Unlimited modes, retaining
