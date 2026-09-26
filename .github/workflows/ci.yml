@@ -88,10 +88,11 @@ jobs:
           Copy-Item build-windows/PRG32.exe build-windows-deploy/
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
-          $ErrorActionPreference = 'Continue'
-          $PSNativeCommandUseErrorActionPreference = $false
-          $deployOutput = windeployqt --release --no-compiler-runtime --qmldir $qmlDirectory $executable 2>&1
-          $deployStatus = $LASTEXITCODE
+          $deployProcess = Start-Process windeployqt -ArgumentList @('--release', '--no-compiler-runtime', '--qmldir', $qmlDirectory, $executable) -NoNewWindow -Wait -PassThru -RedirectStandardOutput windeployqt.stdout.log -RedirectStandardError windeployqt.stderr.log
+          $deployOutput = @()
+          $deployOutput += Get-Content windeployqt.stdout.log
+          $deployOutput += Get-Content windeployqt.stderr.log
+          $deployStatus = $deployProcess.ExitCode
           $deployOutput | ForEach-Object { Write-Host $_ }
           if ($deployStatus -ne 0) {
             $annotation = (($deployOutput | Out-String) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')
