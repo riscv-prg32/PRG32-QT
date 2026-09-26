@@ -96,7 +96,13 @@ jobs:
           $buildStatus = $LASTEXITCODE
           $buildOutput | ForEach-Object { Write-Host $_ }
           if ($buildStatus -ne 0) {
-            $details = (($buildOutput | Select-Object -Last 40 | Out-String) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')
+            $diagnostics = $buildOutput | Where-Object {
+              $_ -match 'undefined reference|collect2:|ld\.exe:|error:' -and $_ -notmatch '^FAILED:'
+            } | Select-Object -Last 20
+            if (-not $diagnostics) {
+              $diagnostics = $buildOutput | Select-Object -Last 15
+            }
+            $details = (($diagnostics | Out-String) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')
             Write-Host "::error title=Windows build failed::$details"
             exit $buildStatus
           }
