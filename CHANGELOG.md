@@ -4,6 +4,11 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Expanded performance selection to Accurate (default), 30 FPS Optimal, and Unlimited modes, retaining
+  deterministic ESP32-C6-oriented cartridge timing only in Accurate mode.
+- Added persistent, cross-platform firmware-style top and bottom status bars. They are off by default, preserve
+  the 320×200 cartridge viewport, and remain hidden in game-only fullscreen presentation.
+
 ## [0.3.2] - 2026-09-26
 
 - Added default, persistent ESP32-C6 Accurate performance emulation with deterministic RV32IMAC instruction

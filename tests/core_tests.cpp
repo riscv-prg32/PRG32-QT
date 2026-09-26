@@ -101,6 +101,10 @@ int main() {
     assert(cpu.virtualCycles() > cyclesBeforeAbi);
     cpu.reset(0x1000, &m);
     assert(cpu.virtualCycles() == 0);
+    cpu.setPerformanceMode(PerformanceMode::Optimal);
+    assert(cpu.call(0x1000, 0, 10, e));
+    assert(cpu.virtualCycles() == cpu.retiredInstructions());
+    cpu.reset(0x1000, &m);
     cpu.setPerformanceMode(PerformanceMode::Unlimited);
     assert(cpu.call(0x1000, 0, 10, e));
     assert(cpu.virtualCycles() == cpu.retiredInstructions());

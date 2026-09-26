@@ -98,8 +98,15 @@ The Qt host follows the ESP32-C6 firmware frame loop at one update/draw cycle ev
 
 The default ESP32-C6 Accurate mode advances virtual time to each 33 ms boundary when work finishes early and
 preserves overruns when calibrated work crosses it. The host timer paces a fast host in real time; a slow host
-does not rewrite virtual counters. Unlimited removes host pacing and retains legacy one-count-per-retired-
-instruction counter behavior for developer workflows. The mode is re-anchored when changed or a cartridge loads.
+does not rewrite virtual counters. Optimal uses one-count-per-retired-instruction counters while retaining the
+33 ms host timer, ensuring a maximum presentation cadence of approximately 30 FPS without imposing modeled
+ESP32-C6 work costs. Unlimited removes host pacing and retains the same lightweight counter behavior for
+developer workflows. The mode is re-anchored when changed or a cartridge loads.
+
+The Qt renderer optionally composes the firmware's 320×240 panel layout from a 20-pixel FPS status band, the
+unaltered 320×200 cartridge framebuffer, and a 20-pixel game-information band. This presentation setting is
+off by default and does not alter screenshots or cartridge-visible framebuffer memory. Game-only desktop and
+TV fullscreen deliberately suppresses the bands.
 
 The host listens on TCP port 8080 and publishes the PRG32 device endpoints: `GET /api`, `/api/runtime`, `/api/games`, `/api/screenshot.bmp`, `/api/performance.json`, `/api/scores`, and `/api/memory`, plus `POST /api/games`, `/api/games/select`, and `/api/scores`. Cartridge uploads use the four `cart0` through `cart3` slots. The Setup and player screens show the active local IPv4 address and API URL.
 

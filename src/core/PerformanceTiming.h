@@ -7,6 +7,7 @@ namespace prg32 {
 /** Selects cartridge-visible execution timing behavior. */
 enum class PerformanceMode {
     Esp32C6Accurate,
+    Optimal,
     Unlimited,
 };
 

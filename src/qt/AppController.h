@@ -2,6 +2,7 @@
 #include "InputState.h"
 #include "Runtime.h"
 #include <QByteArray>
+#include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QObject>
@@ -34,6 +35,9 @@ class AppController : public QObject {
                    displayPreferencesChanged)
     Q_PROPERTY(bool fullScreen READ fullScreen WRITE setFullScreen NOTIFY displayPreferencesChanged)
     Q_PROPERTY(QString performanceMode READ performanceMode WRITE setPerformanceMode NOTIFY performanceModeChanged)
+    Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY frameStatsChanged)
+    Q_PROPERTY(bool statusBarsEnabled READ statusBarsEnabled WRITE setStatusBarsEnabled NOTIFY
+                   displayPreferencesChanged)
     // clang-format on
 
   public:
@@ -84,6 +88,12 @@ class AppController : public QObject {
     QString performanceMode() const {
         return performanceMode_;
     }
+    bool statusBarsEnabled() const {
+        return statusBarsEnabled_;
+    }
+    int framesPerSecond() const {
+        return framesPerSecond_;
+    }
     QJsonObject runtimeJson() const;
     QJsonArray gamesJson() const;
     QJsonObject performanceJson() const;
@@ -113,6 +123,8 @@ class AppController : public QObject {
     void setFullScreen(bool enabled);
     /** Persist and apply the cartridge-visible performance profile. */
     void setPerformanceMode(const QString& mode);
+    /** Persist whether the firmware-style top and bottom status bars are shown. */
+    void setStatusBarsEnabled(bool enabled);
   signals:
     void statusChanged();
     void controllerChanged();
@@ -124,6 +136,7 @@ class AppController : public QObject {
     void performanceChanged();
     void displayPreferencesChanged();
     void performanceModeChanged();
+    void frameStatsChanged();
 
   private:
     void setStatus(QString);
@@ -136,7 +149,7 @@ class AppController : public QObject {
     InputState input_;
     QString status_, deviceIp_, cartridgeName_;
     QString preferredOrientation_ = "auto";
-    QString performanceMode_ = "esp32-c6";
+    QString performanceMode_ = "accurate";
     QByteArray currentBytes_;
     QPointer<FrameItem> frame_;
     GamepadBackend* gamepad_ = nullptr;
@@ -145,5 +158,9 @@ class AppController : public QObject {
     prg32::RGBState led_{};
     bool running_ = false, paused_ = false, performanceAvailable_ = false;
     bool fullScreen_ = false;
+    bool statusBarsEnabled_ = false;
     uint64_t frameCount_ = 0;
+    QElapsedTimer frameRateTimer_;
+    int framesPerSecond_ = 0;
+    int frameRateCount_ = 0;
 };

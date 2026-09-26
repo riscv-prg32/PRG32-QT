@@ -254,14 +254,28 @@ The `prg32qt_performance_contract` test executes the public reference performanc
   Apple TV, and Android TV. Only the desktop-only fullscreen checkbox remains platform-gated; the performance
   control is not hidden on mobile or TV.
 - The connected iPhone 12 Pro Max (`iPhone13,4`, UDID ending `29001E`) was paired and available. The arm64 iOS
-  project configured against the iPhoneOS 27.0 SDK, but physical signing was blocked: team `9Z5X3KJ92U` has not
-  registered this device or provisioned `org.riscv-prg32.prg32qt`, while the locally installed development
-  identity belongs to team `LVM984EVW2`, for which Xcode has no signed-in account. Installation, launch, touch,
-  rotation, persistence, and on-device timing checks remain a hard release gate rather than being claimed.
-- The locally installed Qt 6.8.3 macOS/iOS/Android target kits still abort their QML import scanner with a NEON
-  host-feature mismatch. Homebrew Qt covers the native macOS build; iOS simulator, Android, Android TV, Linux,
-  Windows, Raspberry Pi OS, and Apple TV builds are assigned to their declared GitHub Actions runners. The tag
-  must not be created until every CI job is green and the physical iPhone gate above is resolved.
+  project built against the iPhoneOS 27.0 SDK. Because the production bundle identifier belongs to a different
+  Apple team, device validation used the development-only identifier `com.raffaelemontella.prg32qt` without
+  changing repository metadata. The signed app installed and launched successfully; touch, rotation,
+  persistence, and on-device timing were not fully certified.
+
+## Three performance modes and status bars (2026-09-26)
+
+- The Qt-free core build and all four CTest targets passed on Apple Silicon macOS, including the 605-frame
+  performance contract. Core tests now verify that Optimal uses lightweight retired-instruction counter
+  semantics separately from Accurate. Documentation consistency, Store-certification parser tests, and the
+  native macOS Qt application build passed.
+- The shared Settings UI was rendered from the macOS build and verified to expose Accurate (default), Optimal
+  (30 FPS), Unlimited, and the disabled-by-default top/bottom status-bar switch without clipping.
+- Unsigned iOS arm64, Android arm64, Android TV arm64, and Apple TV simulator builds passed. The signed iOS
+  build installed on the connected iPhone 12 Pro Max under the development-only bundle identifier
+  `com.raffaelemontella.prg32qt`; automated launch remained blocked while the device was locked.
+- No ESP32-C6 serial device or PRG32 HTTP endpoint was available on the local network. Accurate therefore
+  retains the source-verified 160 MHz clock and 33 ms firmware frame policy, but the physical instruction/ABI
+  coefficient calibration remains pending in `tests/performance/reference/esp32c6.json`; no unmeasured parity
+  claim is made.
+- Windows, Linux, and Raspberry Pi OS were not locally runnable on this macOS host. Their platform scripts and
+  CI jobs remain required before merge.
 
 ## Readability-pass validation (2026-09-22)
 

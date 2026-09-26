@@ -1,6 +1,6 @@
 # ESP32-C6 cartridge-visible performance emulation
 
-PRG32-QT defaults to **ESP32-C6 Accurate**. This mode models performance that a portable PRG32 cartridge can
+PRG32-QT defaults to **Accurate (ESP32-C6)**. This mode models performance that a portable PRG32 cartridge can
 observe; it does not emulate the ESP32-C6 SoC, FreeRTOS scheduler, radio, caches, buses, DMA, display registers,
 or peripherals. Downloaded cartridge code continues to run only in the portable RV32IMAC interpreter.
 
@@ -29,8 +29,12 @@ slow, execution falls behind without compressing or replacing virtual time. `/ap
 the selected mode, clock frequency, and late-frame count. Pausing Setup stops execution; loading a cartridge or
 changing modes re-anchors the frame schedule.
 
+**Optimal (30 FPS)** retains the precise 33 ms host timer but removes modeled ESP32-C6 instruction and ABI
+costs. Its counters use the lightweight one-count-per-retired-instruction behavior. It is intended for smooth,
+fixed-cadence play when physical-device performance matching is not required.
+
 **Unlimited** is persistent and selectable in Settings, or available to the headless runner as `--unlimited`.
-It removes the 33 ms host pacing and preserves the prior instruction-count counter behavior.
+It removes the 33 ms host pacing and uses the same lightweight counter behavior as Optimal.
 
 ## Calibration and acceptance
 

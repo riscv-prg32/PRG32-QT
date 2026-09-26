@@ -26,6 +26,8 @@ ApplicationWindow {
     readonly property bool mobilePlatform: Qt.platform.os === "ios" || Qt.platform.os === "android"
     readonly property bool gameOnlyFullScreen: page === 2 &&
                                                 (tvPlatform || (desktopPlatform && (appController.fullScreen || documentationFullScreen)))
+    readonly property bool statusBarsVisible: appController.statusBarsEnabled && !gameOnlyFullScreen
+    readonly property int playerHeightUnits: statusBarsVisible ? 240 : 200
     color: "#101216"
 
     component SetupButton: Fusion.Button {
@@ -149,11 +151,13 @@ ApplicationWindow {
                 onActivated:appController.preferredOrientation=["auto","portrait","landscape"][currentIndex] }
             CheckBox { visible:root.desktopPlatform; text:"Start and play in full screen"; checked:appController.fullScreen
                 onToggled:{appController.fullScreen=checked;root.applyFullScreen()} }
+            CheckBox { text:"Show top and bottom status bars"; checked:appController.statusBarsEnabled
+                onToggled:appController.statusBarsEnabled=checked }
             Label { Layout.fillWidth:true; font.bold:true; text:"Performance" }
-            ComboBox { id:performanceModeBox; Layout.fillWidth:true; model:["ESP32-C6 Accurate","Unlimited"]
-                Component.onCompleted:currentIndex=appController.performanceMode==="unlimited"?1:0
-                onActivated:appController.performanceMode=currentIndex===1?"unlimited":"esp32-c6" }
-            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"ESP32-C6 Accurate matches cartridge-visible PRG32 execution performance. Unlimited runs as fast as this host permits." }
+            ComboBox { id:performanceModeBox; Layout.fillWidth:true; model:["Accurate (ESP32-C6)","Optimal (30 FPS)","Unlimited"]
+                Component.onCompleted:currentIndex=Math.max(0,["accurate","optimal","unlimited"].indexOf(appController.performanceMode))
+                onActivated:appController.performanceMode=["accurate","optimal","unlimited"][currentIndex] }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"Accurate models cartridge-visible ESP32-C6 work and is the default. Optimal preserves 30 FPS pacing without ESP32-C6 work costs. Unlimited runs as fast as this host permits." }
         }
     }
     Dialog { id:aboutDialog; title:"About PRG32-QT"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-32,620); height:Math.min(parent.height-32,680)
@@ -232,12 +236,12 @@ ApplicationWindow {
 
     Component { id:screenComponent
         Rectangle { color:"black"; radius:10; border.color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.min(.5,appController.ledIntensity)); border.width:2
-            PRG32Frame { anchors.fill:parent; anchors.margins:10; Component.onCompleted:appController.attachFrame(this) }
+            PRG32Frame { anchors.fill:parent; anchors.margins:10; statusBarsEnabled:root.statusBarsVisible; statusText:appController.cartridgeName; framesPerSecond:appController.framesPerSecond; Component.onCompleted:appController.attachFrame(this) }
         }
     }
     Component { id:fullScreenPlayer
         Item {
-            Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/200); height:width*200/320; sourceComponent:screenComponent }
+            Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/root.playerHeightUnits); height:width*root.playerHeightUnits/320; sourceComponent:screenComponent }
         }
     }
     Component { id:dpadComponent
@@ -255,8 +259,8 @@ ApplicationWindow {
     Component { id:portraitPlayer
         ColumnLayout { anchors.fill:parent; anchors.margins:18; spacing:12
             RowLayout { Layout.fillWidth:true; PRG32Image{source:"qrc:/prg32qt/assets/prg32_logo.png";Layout.preferredWidth:150;Layout.preferredHeight:42} Item{Layout.fillWidth:true} Rectangle{width:9;height:9;radius:5;color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.max(.15,appController.ledIntensity))} }
-            Item { Layout.fillWidth:true; Layout.preferredHeight:Math.min(330,width*200/320+20); Layout.fillHeight:true
-                Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/200); height:width*200/320; sourceComponent:screenComponent }
+            Item { Layout.fillWidth:true; Layout.preferredHeight:Math.min(330,width*root.playerHeightUnits/320+20); Layout.fillHeight:true
+                Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/root.playerHeightUnits); height:width*root.playerHeightUnits/320; sourceComponent:screenComponent }
             }
             RowLayout { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,Math.max(110,parent.height*.2)); Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(130,parent.width);height:Math.min(130,parent.height);sourceComponent:dpadComponent}} Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(150,parent.width);height:Math.min(120,parent.height);sourceComponent:actionsComponent}} }
             Button { Layout.alignment:Qt.AlignHCenter; text:"START / SELECT"; onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false) }
@@ -267,7 +271,7 @@ ApplicationWindow {
     Component { id:landscapePlayer
         RowLayout { anchors.fill:parent; anchors.margins:14; spacing:12
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png"} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Item{Layout.fillHeight:true} }
-            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(parent.width,parent.height*320/200);height:width*200/320;sourceComponent:screenComponent}} Button{Layout.alignment:Qt.AlignHCenter;text:"START / SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
+            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(parent.width,parent.height*320/root.playerHeightUnits);height:width*root.playerHeightUnits/320;sourceComponent:screenComponent}} Button{Layout.alignment:Qt.AlignHCenter;text:"START / SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
             ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:150;Layout.preferredHeight:130;sourceComponent:actionsComponent} Label{Layout.alignment:Qt.AlignHCenter;text:"PRG32";font.bold:true} Item{Layout.fillHeight:true} }
         }
     }

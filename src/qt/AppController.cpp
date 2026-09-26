@@ -26,11 +26,19 @@ AppController::AppController(QObject* p)
         preferredOrientation_ = "auto";
     }
     fullScreen_ = settings.value("display/fullScreen", false).toBool();
-    performanceMode_ = settings.value("performance/mode", "esp32-c6").toString();
-    if (performanceMode_ != "esp32-c6" && performanceMode_ != "unlimited")
-        performanceMode_ = "esp32-c6";
-    rt_.setPerformanceMode(performanceMode_ == "unlimited" ? prg32::PerformanceMode::Unlimited
-                                                           : prg32::PerformanceMode::Esp32C6Accurate);
+    statusBarsEnabled_ = settings.value("display/statusBars", false).toBool();
+    performanceMode_ = settings.value("performance/mode", "accurate").toString();
+    if (performanceMode_ == "esp32-c6")
+        performanceMode_ = "accurate";
+    if (performanceMode_ != "accurate" && performanceMode_ != "optimal" && performanceMode_ != "unlimited") {
+        performanceMode_ = "accurate";
+    }
+    prg32::PerformanceMode runtimeMode = prg32::PerformanceMode::Esp32C6Accurate;
+    if (performanceMode_ == "optimal")
+        runtimeMode = prg32::PerformanceMode::Optimal;
+    else if (performanceMode_ == "unlimited")
+        runtimeMode = prg32::PerformanceMode::Unlimited;
+    rt_.setPerformanceMode(runtimeMode);
     rt_.setAudioSink(audio_.get());
     rt_.setMultiplayerService(multiplayer_.get());
     rt_.setLEDCallback([this](prg32::RGBState v) {
@@ -54,6 +62,14 @@ AppController::AppController(QObject* p)
             return;
         }
         ++frameCount_;
+        ++frameRateCount_;
+        const qint64 elapsedMilliseconds = frameRateTimer_.elapsed();
+        if (elapsedMilliseconds >= 1000) {
+            framesPerSecond_ = int(qint64(frameRateCount_) * 1000 / elapsedMilliseconds);
+            frameRateCount_ = 0;
+            frameRateTimer_.restart();
+            emit frameStatsChanged();
+        }
         led_.intensity *= .90;
         emit ledChanged();
         updateFrame();
@@ -65,14 +81,18 @@ AppController::AppController(QObject* p)
     refreshIp();
 }
 void AppController::setPerformanceMode(const QString& mode) {
-    if (mode != "esp32-c6" && mode != "unlimited")
+    if (mode != "accurate" && mode != "optimal" && mode != "unlimited")
         return;
     if (performanceMode_ == mode)
         return;
     performanceMode_ = mode;
     QSettings().setValue("performance/mode", mode);
-    rt_.setPerformanceMode(mode == "unlimited" ? prg32::PerformanceMode::Unlimited
-                                               : prg32::PerformanceMode::Esp32C6Accurate);
+    prg32::PerformanceMode runtimeMode = prg32::PerformanceMode::Esp32C6Accurate;
+    if (mode == "optimal")
+        runtimeMode = prg32::PerformanceMode::Optimal;
+    else if (mode == "unlimited")
+        runtimeMode = prg32::PerformanceMode::Unlimited;
+    rt_.setPerformanceMode(runtimeMode);
     timer_.setInterval(mode == "unlimited" ? 0 : 33);
     emit performanceModeChanged();
 }
@@ -93,6 +113,14 @@ void AppController::setFullScreen(bool enabled) {
         return;
     fullScreen_ = enabled;
     QSettings().setValue("display/fullScreen", enabled);
+    emit displayPreferencesChanged();
+}
+void AppController::setStatusBarsEnabled(bool enabled) {
+    if (statusBarsEnabled_ == enabled)
+        return;
+    statusBarsEnabled_ = enabled;
+    QSettings().setValue("display/statusBars", enabled);
+    updateFrame();
     emit displayPreferencesChanged();
 }
 AppController::~AppController() {
@@ -138,6 +166,10 @@ bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName)
                                        v.toString().compare("performance", Qt::CaseInsensitive) == 0;
                             });
     frameCount_ = 0;
+    frameRateCount_ = 0;
+    framesPerSecond_ = 0;
+    frameRateTimer_.restart();
+    emit frameStatsChanged();
     emit cartridgeChanged();
     emit performanceChanged();
     updateFrame();
