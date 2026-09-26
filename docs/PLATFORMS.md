@@ -27,8 +27,8 @@ Install Qt 6 desktop and Ninja, then from PowerShell:
 ```
 
 WinMM is used only for legacy/native joystick discovery and button polling; the emulator core has no Windows dependency.
-Tagged releases run `windeployqt` over the application and package the resulting Qt frameworks, QML modules,
-plugins, and the runner's MSVC runtime DLL set in an NSIS Setup executable.
+Tagged releases run `windeployqt` with its default compiler-runtime deployment enabled, then package the
+resulting Qt frameworks, QML modules, plugins, and compiler runtime in an NSIS Setup executable.
 
 ## Linux
 
