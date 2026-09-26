@@ -88,7 +88,11 @@ jobs:
           Copy-Item build-windows/PRG32.exe build-windows-deploy/
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
-          $deployProcess = Start-Process windeployqt -ArgumentList @('--release', '--no-compiler-runtime', '--qmldir', $qmlDirectory, $executable) -NoNewWindow -Wait -PassThru -RedirectStandardOutput windeployqt.stdout.log -RedirectStandardError windeployqt.stderr.log
+          $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
+          if (-not (Test-Path $deployTool)) {
+            throw "windeployqt was not found at $deployTool"
+          }
+          $deployProcess = Start-Process $deployTool -ArgumentList @('--release', '--no-compiler-runtime', '--qmldir', $qmlDirectory, $executable) -NoNewWindow -Wait -PassThru -RedirectStandardOutput windeployqt.stdout.log -RedirectStandardError windeployqt.stderr.log
           $deployOutput = @()
           $deployOutput += Get-Content windeployqt.stdout.log
           $deployOutput += Get-Content windeployqt.stderr.log

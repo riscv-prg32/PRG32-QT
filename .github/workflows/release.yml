@@ -110,7 +110,8 @@ jobs:
           Copy-Item build-windows/PRG32.exe dist/package/
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path dist/package/PRG32.exe).Path
-          windeployqt --release --no-compiler-runtime --qmldir $qmlDirectory $executable
+          $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
+          & $deployTool --release --no-compiler-runtime --qmldir $qmlDirectory $executable
           $runtimePatterns = @('concrt140.dll', 'msvcp140*.dll', 'vcruntime140*.dll')
           foreach ($pattern in $runtimePatterns) {
             $runtimeFiles = Get-ChildItem "$env:WINDIR\System32\$pattern" -ErrorAction SilentlyContinue
