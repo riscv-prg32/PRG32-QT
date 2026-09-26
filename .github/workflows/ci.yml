@@ -80,8 +80,9 @@ jobs:
       - name: Build and test
         shell: bash
         run: ${{ matrix.command }}
-      - name: Validate Windows Qt dependency deployment
+      - name: Run Windows Qt deployment helper
         if: runner.os == 'Windows'
+        continue-on-error: true
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build-windows-deploy | Out-Null
@@ -89,22 +90,19 @@ jobs:
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
-          if (-not (Test-Path $deployTool)) {
-            throw "windeployqt was not found at $deployTool"
-          }
-          $deployProcess = Start-Process $deployTool -ArgumentList @('--release', '--no-compiler-runtime', '--qmldir', $qmlDirectory, $executable) -NoNewWindow -Wait -PassThru -RedirectStandardOutput windeployqt.stdout.log -RedirectStandardError windeployqt.stderr.log
-          $deployOutput = @()
-          $deployOutput += Get-Content windeployqt.stdout.log
-          $deployOutput += Get-Content windeployqt.stderr.log
-          $deployStatus = $deployProcess.ExitCode
-          $deployOutput | ForEach-Object { Write-Host $_ }
-          if ($deployStatus -ne 0) {
-            Write-Warning "windeployqt returned exit code $deployStatus; validating its output directly."
-          }
+          & $deployTool --release --no-compiler-runtime --qmldir $qmlDirectory $executable
+      - name: Stage complete Windows Qt runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
           Get-ChildItem (Join-Path $env:QT_ROOT_DIR 'bin') -Filter '*.dll' |
             Copy-Item -Destination 'build-windows-deploy' -Force
           Copy-Item (Join-Path $env:QT_ROOT_DIR 'plugins\*') 'build-windows-deploy' -Recurse -Force
           Copy-Item (Join-Path $env:QT_ROOT_DIR 'qml') 'build-windows-deploy/qml' -Recurse -Force
+      - name: Validate Windows Qt dependency deployment
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
           $requiredPaths = @(
             'PRG32.exe',
             'Qt6Core.dll',
