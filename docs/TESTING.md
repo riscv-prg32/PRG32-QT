@@ -22,7 +22,8 @@ source before compiling the application.
 
 The same workflow runs a dedicated Qt-free Release build and uploads its Linux headless runner. Successful
 desktop jobs upload their application build as a short-lived Actions artifact. These CI artifacts are diagnostic
-outputs. For a `vX.Y.Z` tag, `.github/workflows/release.yml` repeats the platform builds, packages each output,
+outputs. The Windows CI job also runs `windeployqt` over a staging copy so dependency deployment is validated
+before tagging. For a `vX.Y.Z` tag, `.github/workflows/release.yml` repeats the platform builds, packages each output,
 generates SHA-256 checksums, and publishes all assets together only after every required job succeeds. The iOS
 and Apple TV outputs are unsigned simulator builds, Android outputs are debug-signed APKs, Windows is an NSIS
 installer containing `windeployqt` output and an explicitly staged MSVC runtime DLL set, and both macOS architectures are

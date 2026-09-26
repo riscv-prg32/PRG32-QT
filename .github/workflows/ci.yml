@@ -80,6 +80,15 @@ jobs:
       - name: Build and test
         shell: bash
         run: ${{ matrix.command }}
+      - name: Validate Windows Qt dependency deployment
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build-windows-deploy | Out-Null
+          Copy-Item build-windows/PRG32.exe build-windows-deploy/
+          $qmlDirectory = (Resolve-Path qml).Path
+          $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
+          windeployqt --release --no-compiler-runtime --qmldir $qmlDirectory $executable
       - name: Upload desktop build
         uses: actions/upload-artifact@v7
         with:
