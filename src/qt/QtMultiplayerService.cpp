@@ -31,8 +31,8 @@ void QtMultiplayerService::setStoreUrl(const QUrl& storeUrl) {
     if (!path.endsWith('/'))
         path += '/';
     endpoint.setPath(path + "api/multiplayer");
-    endpoint.setQuery({});
-    endpoint.setFragment({});
+    endpoint.setQuery(QString());
+    endpoint.setFragment(QString());
     if (endpoint_ == endpoint)
         return;
     leave();
