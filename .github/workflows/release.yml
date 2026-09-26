@@ -109,9 +109,8 @@ jobs:
           New-Item -ItemType Directory -Force dist/package | Out-Null
           $builtExecutable = Get-ChildItem build-windows -Recurse -File |
             Where-Object {
-              $_.Extension -eq '.exe' -and
               $_.FullName -notmatch 'CMakeFiles' -and
-              $_.Name -notmatch 'headless|tests'
+              $_.Name -in @('PRG32', 'PRG32.exe', 'PRG32_QT', 'PRG32_QT.exe')
             } |
             Select-Object -First 1
           if (-not $builtExecutable) {
