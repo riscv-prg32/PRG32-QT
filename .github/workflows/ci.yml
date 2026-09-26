@@ -85,12 +85,17 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build-windows-deploy | Out-Null
-          $builtExecutable = Get-ChildItem build-windows -Recurse -Filter 'PRG32*.exe' |
-            Where-Object { $_.Name -notmatch 'headless|tests' } |
+          $builtExecutable = Get-ChildItem build-windows -Recurse -File |
+            Where-Object {
+              $_.Extension -eq '.exe' -and
+              $_.FullName -notmatch 'CMakeFiles' -and
+              $_.Name -notmatch 'headless|tests'
+            } |
             Select-Object -First 1
           if (-not $builtExecutable) {
             throw 'The built PRG32 Windows executable was not found'
           }
+          Write-Host "::notice title=Windows executable::$($builtExecutable.FullName)"
           $stagedExecutable = Join-Path (Resolve-Path build-windows-deploy).Path 'PRG32.exe'
           Copy-Item -LiteralPath $builtExecutable.FullName -Destination $stagedExecutable -Force
           if (-not (Test-Path $stagedExecutable -PathType Leaf)) {

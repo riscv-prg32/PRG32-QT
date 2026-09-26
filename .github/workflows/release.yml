@@ -107,8 +107,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/package | Out-Null
-          $builtExecutable = Get-ChildItem build-windows -Recurse -Filter 'PRG32*.exe' |
-            Where-Object { $_.Name -notmatch 'headless|tests' } |
+          $builtExecutable = Get-ChildItem build-windows -Recurse -File |
+            Where-Object {
+              $_.Extension -eq '.exe' -and
+              $_.FullName -notmatch 'CMakeFiles' -and
+              $_.Name -notmatch 'headless|tests'
+            } |
             Select-Object -First 1
           if (-not $builtExecutable) {
             throw 'The built PRG32 Windows executable was not found'
