@@ -88,7 +88,14 @@ jobs:
           Copy-Item build-windows/PRG32.exe build-windows-deploy/
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
-          windeployqt --release --no-compiler-runtime --qmldir $qmlDirectory $executable
+          $deployOutput = windeployqt --release --no-compiler-runtime --qmldir $qmlDirectory $executable 2>&1
+          $deployStatus = $LASTEXITCODE
+          $deployOutput | ForEach-Object { Write-Host $_ }
+          if ($deployStatus -ne 0) {
+            $annotation = (($deployOutput | Out-String) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')
+            Write-Host "::error title=windeployqt failed::$annotation"
+            exit $deployStatus
+          }
       - name: Upload desktop build
         uses: actions/upload-artifact@v7
         with:
