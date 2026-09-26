@@ -125,18 +125,27 @@ jobs:
             'Qt6Qml.dll',
             'Qt6Quick.dll',
             'Qt6WebSockets.dll',
-            'platforms\qwindows.dll',
-            'qml\QtQml\qmldir',
-            'qml\QtQuick\qmldir',
-            'qml\QtQuick\Controls\qmldir',
-            'qml\QtQuick\Dialogs\qmldir',
-            'qml\QtQuick\Layouts\qmldir',
-            'qml\QtQuick\Window\qmldir'
+            'platforms\qwindows.dll'
+          )
+          $requiredDirectories = @(
+            'qml\QtQml',
+            'qml\QtQuick',
+            'qml\QtQuick\Controls',
+            'qml\QtQuick\Controls\Fusion',
+            'qml\QtQuick\Dialogs',
+            'qml\QtQuick\Layouts',
+            'qml\QtQuick\Window'
           )
           foreach ($requiredPath in $requiredPaths) {
             $deployedPath = Join-Path 'dist/package' $requiredPath
             if (-not (Test-Path $deployedPath)) {
               throw "Windows deployment is incomplete: $requiredPath is missing"
+            }
+          }
+          foreach ($requiredDirectory in $requiredDirectories) {
+            $deployedDirectory = Join-Path 'dist/package' $requiredDirectory
+            if (-not (Test-Path $deployedDirectory -PathType Container)) {
+              throw "Windows deployment is incomplete: $requiredDirectory is missing"
             }
           }
           $runtimePatterns = @('concrt140.dll', 'msvcp140*.dll', 'vcruntime140*.dll')
