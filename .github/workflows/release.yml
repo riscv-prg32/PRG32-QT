@@ -162,13 +162,17 @@ jobs:
         shell: pwsh
         run: |
           choco install nsis --no-progress -y
-          Get-Command makensis.exe
+          $nsisCompiler = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          if (-not (Test-Path $nsisCompiler -PathType Leaf)) {
+            throw "NSIS compiler was not installed at $nsisCompiler"
+          }
       - name: Build Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = $env:RELEASE_TAG.TrimStart('v')
-          makensis.exe /V4 "/DVERSION=$version" "/DSOURCE=$((Resolve-Path dist/package).Path)" "/DOUTPUT=$((Resolve-Path dist).Path)\PRG32-QT-$version-Windows-${{ runner.arch }}-Setup.exe" platform/windows/installer.nsi
+          $nsisCompiler = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          & $nsisCompiler /V4 "/DVERSION=$version" "/DSOURCE=$((Resolve-Path dist/package).Path)" "/DOUTPUT=$((Resolve-Path dist).Path)\PRG32-QT-$version-Windows-${{ runner.arch }}-Setup.exe" platform/windows/installer.nsi
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
