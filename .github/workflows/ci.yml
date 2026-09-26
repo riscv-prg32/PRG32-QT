@@ -74,6 +74,13 @@ jobs:
         with:
           fetch-depth: 0
       - uses: jurplel/install-qt-action@v4
+        if: runner.os == 'Windows'
+        with:
+          version: '6.8.3'
+          arch: 'win64_mingw'
+          modules: 'qtmultimedia qtwebsockets'
+      - uses: jurplel/install-qt-action@v4
+        if: runner.os != 'Windows'
         with:
           version: '6.8.3'
           modules: 'qtmultimedia qtwebsockets'
@@ -113,7 +120,7 @@ jobs:
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
-          & $deployTool --release --no-compiler-runtime --qmldir $qmlDirectory $executable
+          & $deployTool --release --qmldir $qmlDirectory $executable
       - name: Stage complete Windows Qt runtime
         if: runner.os == 'Windows'
         shell: pwsh

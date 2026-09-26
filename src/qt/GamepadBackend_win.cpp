@@ -1,7 +1,9 @@
 #include "GamepadBackend.h"
 #include <QTimer>
+// clang-format off: WinMM requires the Windows base types and aliases first.
 #include <windows.h>
 #include <mmsystem.h>
+// clang-format on
 class WinGamepadBackend final : public GamepadBackend {
   public:
     explicit WinGamepadBackend(QObject* p = nullptr) : GamepadBackend(p) {

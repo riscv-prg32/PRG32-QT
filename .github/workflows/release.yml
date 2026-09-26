@@ -88,6 +88,13 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
       - uses: jurplel/install-qt-action@v4
+        if: runner.os == 'Windows'
+        with:
+          version: '6.8.3'
+          arch: 'win64_mingw'
+          modules: 'qtmultimedia qtwebsockets'
+      - uses: jurplel/install-qt-action@v4
+        if: runner.os != 'Windows'
         with:
           version: '6.8.3'
           modules: 'qtmultimedia qtwebsockets'
@@ -112,7 +119,7 @@ jobs:
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path dist/package/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
-          & $deployTool --release --no-compiler-runtime --qmldir $qmlDirectory $executable
+          & $deployTool --release --qmldir $qmlDirectory $executable
           Get-ChildItem (Join-Path $env:QT_ROOT_DIR 'bin') -Filter '*.dll' |
             Copy-Item -Destination 'dist/package' -Force
           Copy-Item (Join-Path $env:QT_ROOT_DIR 'plugins\*') 'dist/package' -Recurse -Force
@@ -148,14 +155,6 @@ jobs:
             if (-not (Test-Path $deployedDirectory -PathType Container)) {
               throw "Windows deployment is incomplete: $requiredDirectory is missing"
             }
-          }
-          $runtimePatterns = @('concrt140.dll', 'msvcp140*.dll', 'vcruntime140*.dll')
-          foreach ($pattern in $runtimePatterns) {
-            $runtimeFiles = Get-ChildItem "$env:WINDIR\System32\$pattern" -ErrorAction SilentlyContinue
-            if (-not $runtimeFiles) {
-              throw "Required MSVC runtime pattern was not found: $pattern"
-            }
-            Copy-Item $runtimeFiles.FullName dist/package/
           }
       - name: Install NSIS
         if: runner.os == 'Windows'
