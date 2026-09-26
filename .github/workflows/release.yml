@@ -107,7 +107,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/package | Out-Null
-          Copy-Item build-windows/PRG32.exe dist/package/
+          $builtExecutable = Get-ChildItem build-windows -Recurse -Filter 'PRG32*.exe' |
+            Where-Object { $_.Name -notmatch 'headless|tests' } |
+            Select-Object -First 1
+          if (-not $builtExecutable) {
+            throw 'The built PRG32 Windows executable was not found'
+          }
+          Copy-Item $builtExecutable.FullName dist/package/PRG32.exe
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path dist/package/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
