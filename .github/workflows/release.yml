@@ -93,6 +93,7 @@ jobs:
           version: '6.8.3'
           arch: 'win64_mingw'
           modules: 'qtmultimedia qtwebsockets'
+          tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
       - uses: jurplel/install-qt-action@v4
         if: runner.os != 'Windows'
         with:
