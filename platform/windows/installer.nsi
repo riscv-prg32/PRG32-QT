@@ -24,7 +24,7 @@ UninstPage instfiles
 
 Section "PRG32-QT" SEC_MAIN
   SetOutPath "$INSTDIR"
-  File /r "${SOURCE}\*"
+  File /r "${SOURCE}\*.*"
   WriteRegStr HKLM "Software\PRG32-QT" "InstallDir" "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PRG32-QT" "DisplayName" "PRG32-QT"

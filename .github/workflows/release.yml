@@ -106,12 +106,21 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $version = $env:RELEASE_TAG.TrimStart('v')
           New-Item -ItemType Directory -Force dist/package | Out-Null
           Copy-Item build-windows/PRG32.exe dist/package/
           windeployqt --release --compiler-runtime --qmldir qml dist/package/PRG32.exe
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
           choco install nsis --no-progress -y
-          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/DVERSION=$version" "/DSOURCE=$((Resolve-Path dist/package).Path)" "/DOUTPUT=$((Resolve-Path dist).Path)\PRG32-QT-$version-Windows-${{ runner.arch }}-Setup.exe" platform/windows/installer.nsi
+          Get-Command makensis.exe
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          makensis.exe /V4 "/DVERSION=$version" "/DSOURCE=$((Resolve-Path dist/package).Path)" "/DOUTPUT=$((Resolve-Path dist).Path)\PRG32-QT-$version-Windows-${{ runner.arch }}-Setup.exe" platform/windows/installer.nsi
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
