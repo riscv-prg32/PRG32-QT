@@ -1,7 +1,7 @@
 #include "GamepadBackend.h"
 #include <QTimer>
-#include <mmsystem.h>
 #include <windows.h>
+#include <mmsystem.h>
 class WinGamepadBackend final : public GamepadBackend {
   public:
     explicit WinGamepadBackend(QObject* p = nullptr) : GamepadBackend(p) {
