@@ -24,6 +24,15 @@ struct AudioEvent {
 struct AudioTrack {
     std::vector<AudioEvent> events;
 };
+/** Decoded bit fields of a PRG32_AUDIO_SYNTH_ID procedural instrument. */
+struct SynthParameters {
+    uint8_t waveform = 0;
+    uint8_t pulseWidth = 0;
+    uint8_t cutoff = 0;
+    uint8_t resonance = 0;
+};
+/** Decode the documented PRG32_AUDIO_SYNTH_ID binary layout. */
+SynthParameters decodeSynthId(uint16_t sampleId);
 struct AudioBlock {
     std::vector<AudioSample> samples;
     std::vector<AudioInstrument> instruments;
@@ -41,6 +50,7 @@ class AudioSink {
     virtual void shutdown() = 0;
     virtual void tone(double, int, uint8_t) = 0;
     virtual void noteOn(int, int, uint8_t, int8_t) = 0;
+    virtual void synthNoteOn(int, int, uint8_t, int8_t, SynthParameters) = 0;
     virtual void noteOff(int) = 0;
     virtual void playPCM(int, const std::vector<float>&, double, double, uint8_t, int8_t, int, int) = 0;
     virtual void stop(int) = 0;
@@ -58,6 +68,8 @@ class NullAudioSink final : public AudioSink {
     void tone(double, int, uint8_t) override {
     }
     void noteOn(int, int, uint8_t, int8_t) override {
+    }
+    void synthNoteOn(int, int, uint8_t, int8_t, SynthParameters) override {
     }
     void noteOff(int) override {
     }

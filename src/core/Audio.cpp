@@ -1,5 +1,12 @@
 #include "Audio.h"
 namespace prg32 {
+SynthParameters decodeSynthId(uint16_t sampleId) {
+    // PRG32_AUDIO_SYNTH_ID: resonance 11:10, cutoff 9:6, pulse 5:2, waveform 1:0.
+    return {uint8_t(sampleId & 0x03u),
+            uint8_t((sampleId >> 2) & 0x0fu),
+            uint8_t((sampleId >> 6) & 0x0fu),
+            uint8_t((sampleId >> 10) & 0x03u)};
+}
 static uint16_t r16(const uint8_t* p) {
     return uint16_t(p[0]) | uint16_t(p[1]) << 8;
 }

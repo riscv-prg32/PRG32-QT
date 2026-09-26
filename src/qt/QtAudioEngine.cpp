@@ -60,6 +60,20 @@ void QtAudioEngine::noteOn(int ch, int note, uint8_t vel, int8_t pan) {
     std::erase_if(voices_, [&](auto& x) { return x.channel == v.channel; });
     voices_.push_back(std::move(v));
 }
+void QtAudioEngine::synthNoteOn(
+    int ch, int note, uint8_t vel, int8_t pan, prg32::SynthParameters parameters) {
+    ensureStarted();
+    Voice voice;
+    voice.kind = Kind::Synth;
+    voice.channel = ch & 7;
+    voice.frequency = 440.0 * std::pow(2.0, double(note - 69) / 12.0);
+    voice.volume = float(vel) / 255.f;
+    voice.pan = float(pan) / 64.f;
+    voice.synth = parameters;
+    QMutexLocker lock(&mutex_);
+    std::erase_if(voices_, [&](auto& existing) { return existing.channel == voice.channel; });
+    voices_.push_back(std::move(voice));
+}
 void QtAudioEngine::noteOff(int ch) {
     stop(ch);
 }
@@ -120,6 +134,54 @@ void QtAudioEngine::render(float* l, float* r, int frames) {
                     double p = std::fmod(v.phase, 1.0);
                     s = float(4 * std::abs(p - .5) - 1) * .45f;
                     v.phase += v.frequency / rate;
+                } else if (v.kind == Kind::Synth) {
+                    double phase = std::fmod(v.phase, 1.0);
+                    switch (v.synth.waveform & 0x03u) {
+                    case 0:
+                        s = float(phase < 0.5 ? phase * 4.0 - 1.0 : 3.0 - phase * 4.0) * 0.7f;
+                        break;
+                    case 1:
+                        s = float(phase * 2.0 - 1.0) * 0.7f;
+                        break;
+                    case 2: {
+                        double threshold = double((v.synth.pulseWidth & 0x0fu) + 1u) / 17.0;
+                        s = phase < threshold ? 0.7f : -0.7f;
+                        break;
+                    }
+                    default: {
+                        if (phase + v.frequency / rate >= 1.0) {
+                            uint32_t feedback = ((v.noiseState >> 22) ^ (v.noiseState >> 17)) & 1u;
+                            v.noiseState = ((v.noiseState << 1) | feedback) & 0x7fffffu;
+                            if (v.noiseState == 0)
+                                v.noiseState = 0x7ffff8u;
+                        }
+                        s = (float((v.noiseState >> 7) & 0xffffu) / 32767.5f - 1.f) * 0.7f;
+                        break;
+                    }
+                    }
+                    static constexpr std::array<float, 16> cutoff = {384.f,
+                                                                     512.f,
+                                                                     704.f,
+                                                                     960.f,
+                                                                     1280.f,
+                                                                     1696.f,
+                                                                     2208.f,
+                                                                     2848.f,
+                                                                     3616.f,
+                                                                     4512.f,
+                                                                     5536.f,
+                                                                     6688.f,
+                                                                     7936.f,
+                                                                     9280.f,
+                                                                     10752.f,
+                                                                     12288.f};
+                    static constexpr std::array<float, 4> damping = {32767.f / 32768.f, 0.75f, 0.5f, 0.25f};
+                    float coefficient = cutoff[v.synth.cutoff & 0x0fu] / 32768.f;
+                    v.filterLow += coefficient * v.filterBand;
+                    float high = s - v.filterLow - damping[v.synth.resonance & 0x03u] * v.filterBand;
+                    v.filterBand += coefficient * high;
+                    s = std::clamp(v.filterLow, -1.f, 1.f);
+                    v.phase = std::fmod(phase + v.frequency / rate, 1.0);
                 } else {
                     int pos = int(v.position);
                     if (pos >= int(v.samples.size())) {

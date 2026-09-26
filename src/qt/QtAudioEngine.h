@@ -16,6 +16,8 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
     void shutdown() override;
     void tone(double frequency, int durationMs, uint8_t volume) override;
     void noteOn(int channel, int note, uint8_t velocity, int8_t pan) override;
+    void synthNoteOn(
+        int channel, int note, uint8_t velocity, int8_t pan, prg32::SynthParameters parameters) override;
     void noteOff(int channel) override;
     void playPCM(int channel,
                  const std::vector<float>& samples,
@@ -39,11 +41,14 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
     }
 
   private:
-    enum class Kind { Oscillator, Pcm };
+    enum class Kind { Oscillator, Synth, Pcm };
     struct Voice {
         Kind kind = Kind::Pcm;
         int channel = 0;
         double phase = 0, frequency = 440, position = 0, increment = 1;
+        float filterLow = 0, filterBand = 0;
+        uint32_t noiseState = 0x7ffff8u;
+        prg32::SynthParameters synth;
         std::vector<float> samples;
         int loopStart = -1, loopEnd = -1;
         float volume = 1, pan = 0;

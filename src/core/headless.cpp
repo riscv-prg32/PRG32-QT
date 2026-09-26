@@ -22,6 +22,9 @@ class AuditAudioSink final : public prg32::AudioSink {
     void noteOn(int, int, uint8_t, int8_t) override {
         ++events;
     }
+    void synthNoteOn(int, int, uint8_t, int8_t, prg32::SynthParameters) override {
+        ++events;
+    }
     void noteOff(int) override {
         ++events;
     }

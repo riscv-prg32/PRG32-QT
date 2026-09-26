@@ -57,6 +57,11 @@ int main() {
     assert(input.takeMerged() == 67);
     assert(input.takeMerged() == 66);
     assert(crc32(std::span<const uint8_t>((const uint8_t*)"123456789", 9)) == 0xcbf43926u);
+    const SynthParameters synth = decodeSynthId(uint16_t(3u | (12u << 2) | (15u << 6) | (2u << 10)));
+    assert(synth.waveform == 3);
+    assert(synth.pulseWidth == 12);
+    assert(synth.cutoff == 15);
+    assert(synth.resonance == 2);
     Framebuffer f;
     f.clear(0);
     f.rect(2, 3, 4, 5, 0xffff);

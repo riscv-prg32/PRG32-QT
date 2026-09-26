@@ -2,7 +2,7 @@
 
 PRG32-QT is the portable C++20 / Qt 6 host for the PRG32 cartridge ecosystem. It uses the public PRG32 cartridge ABI as its compatibility contract while sharing one Qt-free runtime across desktop, mobile, Raspberry Pi, headless tests, and Store certification.
 
-Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, Android, Apple TV, and Android TV**. The default Cartridge Store is `http://193.205.230.7:5080`.
+Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, Android, Apple TV, and Android TV**. The default Cartridge Store is `https://store.prg32.uniparthenope.it/`.
 
 ## Highlights
 
@@ -38,9 +38,10 @@ Versions are automatic. CMake derives a clean version from an exact `vX.Y.Z` Git
 derived values drive the runtime, About dialog, Android packages and Apple bundle metadata.
 
 Pushing a `vX.Y.Z` tag runs the complete release workflow. The resulting GitHub Release contains checksummed
-source archives plus packaged Linux, Windows, macOS, Raspberry Pi OS compatibility, iOS simulator, Android,
-Android TV, and Apple TV builds. CI builds the Qt 6.8.3 tvOS kit from checksum-pinned source before compiling
-the unsigned Apple TV simulator application.
+source archives plus packaged Linux, a dependency-complete Windows installer, Apple Silicon and Intel macOS
+DMG installers, Raspberry Pi OS compatibility, iOS simulator, Android APK, Android TV APK, and Apple TV builds.
+CI builds the Qt 6.8.3 tvOS kit from checksum-pinned source before compiling the unsigned Apple TV simulator
+application.
 
 For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 
@@ -58,7 +59,7 @@ To exercise every discoverable Store cartridge after building the headless runne
 
 ```sh
 python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless \
-  --store http://193.205.230.7:5080 --frames 900
+  --store https://store.prg32.uniparthenope.it/ --frames 900
 ```
 
 The certification input-sweeps each cartridge and records non-black rendered pixels, distinct frame hashes,

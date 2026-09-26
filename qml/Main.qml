@@ -279,6 +279,6 @@ ApplicationWindow {
     Connections { target:storeClient; function onCartridgeDownloaded(id,data){ if(appController.loadBytes(data,id)) root.showPlayer() } }
 
     Rectangle { visible:root.splashVisible; anchors.fill:parent; color:"black"; z:100
-        ColumnLayout { anchors.centerIn:parent; width:Math.min(parent.width-50,560); PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:220;source:"qrc:/prg32qt/assets/prg32_logo.png"} Label{Layout.alignment:Qt.AlignHCenter;text:"RISC-V PLAYGROUND";color:"#45c9ff";font.family:"monospace";font.letterSpacing:3} }
+        ColumnLayout { anchors.centerIn:parent; width:Math.min(parent.width-50,560); PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:220;source:"qrc:/prg32qt/assets/prg32_logo.png"} PRG32Image{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:Math.min(246,parent.width);Layout.preferredHeight:46;source:"qrc:/prg32qt/assets/prg32_title.png"} Label{Layout.alignment:Qt.AlignHCenter;text:"RISC-V PLAYGROUND";color:"#45c9ff";font.family:"monospace";font.letterSpacing:3} }
     }
 }

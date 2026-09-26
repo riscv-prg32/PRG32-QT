@@ -16,7 +16,7 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | Tile screen, dual playfields, scrolling, parallax, camera | `Runtime` |
 | Platform tile flags, collision, actor move/step, camera follow | `Runtime` |
 | Tone/note/u8 PCM audio | `Runtime`, `QtAudioEngine` |
-| `AUD0` samples/instruments/tracks | `Audio`, `Runtime` |
+| `AUD0` samples/instruments/tracks, including documented procedural synth-ID decoding and delta-0 chords | `Audio`, `Runtime`, `QtAudioEngine` |
 | Volume, channel volume, stereo pan, tempo | `Runtime`, `QtAudioEngine` |
 | RGB LED emulation driven by audio/runtime activity | `Runtime`, QML player |
 | Touch D-pad with diagonals, A, B, Start/Select and frame-edge latching | `qml/Main.qml`, `InputState` |
@@ -24,7 +24,7 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | iOS/Android native safe-area integration | `MobileSafeArea_ios`, `MobileSafeArea_android`, QML player/setup container |
 | Startup splash and startup tone | QML + `QtAudioEngine` |
 | Store browser/downloader | `StoreClient`, QML |
-| Default Store `http://193.205.230.7:5080` | build definition / `StoreClient` |
+| Default Store `https://store.prg32.uniparthenope.it/` | build definition / `StoreClient` |
 | Store URL persistence, settings, test connection | `QSettings`, QML |
 | Search and tag filtering | QML |
 | Store cartridge icons | `StoreClient` image cache, `RasterImageItem`, QML |

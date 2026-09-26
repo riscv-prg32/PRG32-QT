@@ -24,8 +24,31 @@ The same workflow runs a dedicated Qt-free Release build and uploads its Linux h
 desktop jobs upload their application build as a short-lived Actions artifact. These CI artifacts are diagnostic
 outputs. For a `vX.Y.Z` tag, `.github/workflows/release.yml` repeats the platform builds, packages each output,
 generates SHA-256 checksums, and publishes all assets together only after every required job succeeds. The iOS
-and Apple TV outputs are unsigned simulator builds, Android outputs are debug-signed APKs, and desktop archives
-are build artifacts rather than signed installer packages.
+and Apple TV outputs are unsigned simulator builds, Android outputs are debug-signed APKs, Windows is an NSIS
+installer containing the `windeployqt` output and compiler runtime, and both macOS architectures are
+`macdeployqt` DMG installers. These installers are not code-signed or notarized by the public workflow.
+
+### 0.3.2 upstream-alignment release validation (2026-09-26)
+
+- Compared against upstream PRG32 commit `687251f7a09720e474d5c97fabdf2844271c7963`. ABI 1.6, its 139-entry
+  table, and hash `0x260f6136` are unchanged. Host-visible changes are the official HTTPS Store, refreshed
+  artwork, corrected procedural synth-ID decoding, and same-tick delta-0 tracker behavior.
+- The portable Release build and all four CTest targets passed on Apple Silicon macOS: core tests, Asteroids,
+  Bach, and the required 605-frame performance contract. The native arm64 Homebrew Qt 6.11.2 application also
+  built and passed the same four tests.
+- The official HTTPS Store returned 27 entries. In both Accurate and Unlimited 900-frame media/input sweeps,
+  all 25 portable cartridges passed and the two native-only cartridges (`Space Invaders` and `TerraForge`)
+  were explicitly excluded. Every pass recorded non-black pixels and distinct framebuffer hashes; audio event
+  and PCM counts were recorded by the runner. No physical speaker listening check was performed.
+- The local Qt 6.8.3 Android host-side QML scanner aborted because its arm64 slice requires an unavailable
+  processor feature. Android and Android TV APK completion, Windows Setup, Intel macOS DMG, Linux/Raspberry Pi
+  packages, iOS simulator, and Apple TV remain required release-workflow jobs rather than locally claimed
+  passes.
+- A local `macdeployqt` pass using the Homebrew Qt kit could not create a DMG: that installation omits optional
+  QML frameworks found during import scanning, and `hdiutil` reported `Device not configured`. The tagged
+  workflow packages from the complete Qt 6.8.3 binary kit on separate macOS runners.
+- Xcode device discovery returned only the Apple Silicon Mac and CoreDevice timed out while initializing; no
+  iPhone was available to install or launch this build during the recorded local validation.
 
 ### Release-asset automation validation (2026-09-24)
 
@@ -94,7 +117,7 @@ Validated on 2026-09-22:
 ## Whole-Store certification
 
 ```sh
-python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --store http://193.205.230.7:5080 --frames 900
+python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --store https://store.prg32.uniparthenope.it/ --frames 900
 ```
 
 This enumerates the Store, downloads PRG2 portable variants and executes each supported package headlessly.

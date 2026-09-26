@@ -246,6 +246,12 @@ void Runtime::noteOn(int ch, int inst, int note, uint8_t vol, int8_t pan) {
             pulseLED(note, vol);
             return;
         }
+        if (i.sampleId & 0x8000) {
+            if (audio_)
+                audio_->synthNoteOn(ch, note, vol, pan, decodeSynthId(i.sampleId));
+            pulseLED(note, vol);
+            return;
+        }
     }
     if (audio_)
         audio_->noteOn(ch, note, vol, pan);
@@ -278,7 +284,9 @@ void Runtime::processTrack() {
         track_.reset();
         return;
     }
-    for (int n = 0; track_ && track_->ticks == 0 && n < 1000; n++) {
+    // Match the firmware guard for malformed delta-0 JUMP loops.
+    constexpr int MaximumEventsPerStep = 256;
+    for (int n = 0; track_ && track_->ticks == 0 && n < MaximumEventsPerStep; n++) {
         auto& events = cart_.audio()->tracks[track_->id].events;
         if (track_->index < 0 || size_t(track_->index) >= events.size()) {
             track_.reset();

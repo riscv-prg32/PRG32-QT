@@ -13,7 +13,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 
-DEFAULT_STORE = "http://193.205.230.7:5080"
+DEFAULT_STORE = "https://store.prg32.uniparthenope.it/"
 PORTABLE_ARCHITECTURES = ("qt", "qemu", "ios")
 NONPORTABLE_ERRORS = (
     "PRG32-QT accepts portable ABI-table PRG32 cartridges only",

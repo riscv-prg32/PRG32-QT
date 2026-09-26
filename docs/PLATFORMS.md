@@ -27,6 +27,8 @@ Install Qt 6 desktop and Ninja, then from PowerShell:
 ```
 
 WinMM is used only for legacy/native joystick discovery and button polling; the emulator core has no Windows dependency.
+Tagged releases run `windeployqt --compiler-runtime` over the application and package the resulting Qt
+frameworks, QML modules, plugins, and compiler runtime in an NSIS Setup executable.
 
 ## Linux
 
@@ -62,6 +64,8 @@ fallback covers generic USB joysticks/gamepads that macOS exposes on Generic Des
 to A/B, and buttons 7–10 map to Select.
 CI uses the macOS 15 runner with Xcode 16 because the Qt 6.8.3 binary kit still links Apple's AGL framework,
 which is absent from the newer Xcode 26 SDK on `macos-latest`.
+Tagged releases run `macdeployqt` and publish DMG installers from separate Apple Silicon (`arm64`) and Intel
+(`x86_64`) runners; the application bundle contains its Qt frameworks, QML modules, and plugins.
 
 Settings exposes Accurate (default), Optimal (30 FPS), and Unlimited performance profiles on every target,
 together with Auto, Portrait, and Landscape player layouts and optional firmware-style status bars. Fullscreen can be toggled from the player,
@@ -106,7 +110,8 @@ xcrun devicectl device process launch --device <device-udid> \
   org.riscv-prg32.prg32qt
 ```
 
-The plain-HTTP default Store requires the included App Transport Security allowance. Prefer HTTPS for production distribution.
+The default Store uses HTTPS. The existing App Transport Security allowance remains only for user-configured
+development Stores that still use plain HTTP.
 
 ## Apple TV
 
@@ -145,7 +150,7 @@ ANDROID_NDK_ROOT=/path/to/android-ndk \
 ./scripts/build-android.sh
 ```
 
-The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The manifest enables Internet access and cleartext HTTP for the current default Store and retains Qt's required activity metadata and file provider.
+The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The APK contains the required Qt libraries and plugins. The manifest enables Internet access, permits cleartext HTTP only for user-configured development Stores, and retains Qt's required activity metadata and file provider.
 
 The Android player reads system-bar and display-cutout `WindowInsets`, keeps all setup/player controls inside
 that safe region, and hides the desktop fullscreen preference and button.

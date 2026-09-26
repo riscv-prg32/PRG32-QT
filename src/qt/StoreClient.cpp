@@ -9,7 +9,7 @@
 #include <QUrlQuery>
 #include <memory>
 #ifndef PRG32QT_DEFAULT_STORE
-#define PRG32QT_DEFAULT_STORE "http://193.205.230.7:5080"
+#define PRG32QT_DEFAULT_STORE "https://store.prg32.uniparthenope.it/"
 #endif
 StoreClient::StoreClient(QObject* p) : QObject(p) {
     QSettings s;
