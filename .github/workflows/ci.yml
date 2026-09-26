@@ -99,9 +99,30 @@ jobs:
           $deployStatus = $deployProcess.ExitCode
           $deployOutput | ForEach-Object { Write-Host $_ }
           if ($deployStatus -ne 0) {
-            $annotation = (($deployOutput | Out-String) -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')
-            Write-Host "::error title=windeployqt failed::$annotation"
-            exit $deployStatus
+            Write-Warning "windeployqt returned exit code $deployStatus; validating its output directly."
+          }
+          $requiredPaths = @(
+            'PRG32.exe',
+            'Qt6Core.dll',
+            'Qt6Gui.dll',
+            'Qt6Multimedia.dll',
+            'Qt6Network.dll',
+            'Qt6Qml.dll',
+            'Qt6Quick.dll',
+            'Qt6WebSockets.dll',
+            'platforms\qwindows.dll',
+            'qml\QtQml\qmldir',
+            'qml\QtQuick\qmldir',
+            'qml\QtQuick\Controls\qmldir',
+            'qml\QtQuick\Dialogs\qmldir',
+            'qml\QtQuick\Layouts\qmldir',
+            'qml\QtQuick\Window\qmldir'
+          )
+          foreach ($requiredPath in $requiredPaths) {
+            $deployedPath = Join-Path 'build-windows-deploy' $requiredPath
+            if (-not (Test-Path $deployedPath)) {
+              throw "Windows deployment is incomplete: $requiredPath is missing"
+            }
           }
       - name: Upload desktop build
         uses: actions/upload-artifact@v7

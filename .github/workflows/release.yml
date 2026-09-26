@@ -112,6 +112,29 @@ jobs:
           $executable = (Resolve-Path dist/package/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
           & $deployTool --release --no-compiler-runtime --qmldir $qmlDirectory $executable
+          $requiredPaths = @(
+            'PRG32.exe',
+            'Qt6Core.dll',
+            'Qt6Gui.dll',
+            'Qt6Multimedia.dll',
+            'Qt6Network.dll',
+            'Qt6Qml.dll',
+            'Qt6Quick.dll',
+            'Qt6WebSockets.dll',
+            'platforms\qwindows.dll',
+            'qml\QtQml\qmldir',
+            'qml\QtQuick\qmldir',
+            'qml\QtQuick\Controls\qmldir',
+            'qml\QtQuick\Dialogs\qmldir',
+            'qml\QtQuick\Layouts\qmldir',
+            'qml\QtQuick\Window\qmldir'
+          )
+          foreach ($requiredPath in $requiredPaths) {
+            $deployedPath = Join-Path 'dist/package' $requiredPath
+            if (-not (Test-Path $deployedPath)) {
+              throw "Windows deployment is incomplete: $requiredPath is missing"
+            }
+          }
           $runtimePatterns = @('concrt140.dll', 'msvcp140*.dll', 'vcruntime140*.dll')
           foreach ($pattern in $runtimePatterns) {
             $runtimeFiles = Get-ChildItem "$env:WINDIR\System32\$pattern" -ErrorAction SilentlyContinue
