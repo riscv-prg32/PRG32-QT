@@ -107,16 +107,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/package | Out-Null
-          $builtExecutable = Get-ChildItem build-windows -Recurse -File |
-            Where-Object {
-              $_.FullName -notmatch 'CMakeFiles' -and
-              $_.Name -in @('PRG32', 'PRG32.exe', 'PRG32_QT', 'PRG32_QT.exe')
-            } |
-            Select-Object -First 1
-          if (-not $builtExecutable) {
-            throw 'The built PRG32 Windows executable was not found'
-          }
-          Copy-Item $builtExecutable.FullName dist/package/PRG32.exe
+          cmake --install build-windows --prefix build-windows-install
+          Copy-Item build-windows-install/PRG32.exe dist/package/PRG32.exe
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path dist/package/PRG32.exe).Path
           $deployTool = Join-Path $env:QT_ROOT_DIR 'bin\windeployqt.exe'
