@@ -139,7 +139,7 @@ ApplicationWindow {
 
     Timer { id:splashTimer; interval:900; repeat:false; onTriggered:root.splashVisible=false }
     FileDialog { id:importDialog; title:"Import PRG32 cartridge"; nameFilters:["PRG32 cartridges (*.prg32)","All files (*)"]; onAccepted: if(appController.loadFile(selectedFile)) root.showPlayer() }
-    Dialog { id:settingsDialog; title:"Store Settings"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-40,600)
+    Dialog { id:settingsDialog; title:"Settings"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-40,600)
         ColumnLayout { anchors.fill:parent; TextField { id:storeField; Layout.fillWidth:true; text:storeClient.baseUrl; placeholderText:"Cartridge Store URL" }
             RowLayout { Button{text:"Test connection";onClicked:{storeClient.baseUrl=storeField.text;storeClient.refresh()}} Button{text:"Restore default";onClicked:{storeClient.resetDefault();storeField.text=storeClient.baseUrl;storeClient.refresh()}} }
             Label { Layout.fillWidth:true; text:storeClient.error.length?storeClient.error:(storeClient.cartridges.length+" cartridges"); wrapMode:Text.Wrap }
@@ -149,6 +149,11 @@ ApplicationWindow {
                 onActivated:appController.preferredOrientation=["auto","portrait","landscape"][currentIndex] }
             CheckBox { visible:root.desktopPlatform; text:"Start and play in full screen"; checked:appController.fullScreen
                 onToggled:{appController.fullScreen=checked;root.applyFullScreen()} }
+            Label { Layout.fillWidth:true; font.bold:true; text:"Performance" }
+            ComboBox { id:performanceModeBox; Layout.fillWidth:true; model:["ESP32-C6 Accurate","Unlimited"]
+                Component.onCompleted:currentIndex=appController.performanceMode==="unlimited"?1:0
+                onActivated:appController.performanceMode=currentIndex===1?"unlimited":"esp32-c6" }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"ESP32-C6 Accurate matches cartridge-visible PRG32 execution performance. Unlimited runs as fast as this host permits." }
         }
     }
     Dialog { id:aboutDialog; title:"About PRG32-QT"; modal:true; standardButtons:Dialog.Close; anchors.centerIn:parent; width:Math.min(parent.width-32,620); height:Math.min(parent.height-32,680)
@@ -183,7 +188,7 @@ ApplicationWindow {
                 SetupButton { visible:appController.performanceAvailable; text:"›  RUN PERFORMANCE TEST"; onClicked:{appController.runPerformanceTest();root.showPlayer()} }
                 SetupButton { id:browseButton; focus:tvPlatform && root.page===0; text:"›  BROWSE STORE"; onClicked:root.showStore() }
                 SetupButton { text:"›  IMPORT CARTRIDGE"; onClicked:importDialog.open() }
-                SetupButton { text:"›  STORE SETTINGS"; onClicked:settingsDialog.open() }
+                SetupButton { text:"›  SETTINGS"; onClicked:settingsDialog.open() }
                 SetupButton { text:"›  ABOUT PRG32-QT"; onClicked:aboutDialog.open() }
                 Label { Layout.fillWidth:true; text:(storeClient.error.length?storeClient.error:appController.status).toUpperCase(); color:"#45c9ff"; wrapMode:Text.Wrap; font.family:"monospace" }
             } }

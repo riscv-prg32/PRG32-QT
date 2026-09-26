@@ -2,6 +2,7 @@
 #include "Framebuffer.h"
 #include "InputButtons.h"
 #include "InputState.h"
+#include "PerformanceTiming.h"
 #include "Runtime.h"
 #include "Rv32Cpu.h"
 #include <cassert>
@@ -17,6 +18,20 @@ static void put32(std::vector<uint8_t>& b, size_t o, uint32_t v) {
         b[o + i] = v >> (8 * i);
 }
 int main() {
+    VirtualClock virtualClock;
+    virtualClock.addCycles(160'000'000);
+    assert(virtualClock.nanoseconds() == 1'000'000'000);
+    virtualClock.reset();
+    virtualClock.addCycles(1);
+    assert(virtualClock.nanoseconds() == 6);
+    assert(esp32C6InstructionCycles(InstructionTimingClass::BranchTaken) >
+           esp32C6InstructionCycles(InstructionTimingClass::BranchNotTaken));
+    assert(esp32C6InstructionCycles(InstructionTimingClass::Divide) >
+           esp32C6InstructionCycles(InstructionTimingClass::Multiply));
+    uint32_t abiArguments[8]{};
+    abiArguments[2] = 10;
+    abiArguments[3] = 20;
+    assert(esp32C6AbiCycles(56, abiArguments) > esp32C6AbiCycles(55, abiArguments));
     static_assert(prg32qt::input::Left == 1);
     static_assert(prg32qt::input::Right == 2);
     static_assert(prg32qt::input::Up == 4);
@@ -78,5 +93,16 @@ int main() {
     cpu.reset(0x1000, &m);
     assert(cpu.call(0x1000, 0, 10, e));
     assert(cpu.reg(10) == 42);
+    assert(cpu.retiredInstructions() == 2);
+    assert(cpu.virtualCycles() == esp32C6InstructionCycles(InstructionTimingClass::Alu) +
+                                      esp32C6InstructionCycles(InstructionTimingClass::Jump));
+    const uint64_t cyclesBeforeAbi = cpu.virtualCycles();
+    cpu.chargeAbi(55, abiArguments);
+    assert(cpu.virtualCycles() > cyclesBeforeAbi);
+    cpu.reset(0x1000, &m);
+    assert(cpu.virtualCycles() == 0);
+    cpu.setPerformanceMode(PerformanceMode::Unlimited);
+    assert(cpu.call(0x1000, 0, 10, e));
+    assert(cpu.virtualCycles() == cpu.retiredInstructions());
     std::cout << "PRG32-QT portable core tests passed\n";
 }

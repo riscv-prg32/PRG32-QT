@@ -26,6 +26,11 @@ AppController::AppController(QObject* p)
         preferredOrientation_ = "auto";
     }
     fullScreen_ = settings.value("display/fullScreen", false).toBool();
+    performanceMode_ = settings.value("performance/mode", "esp32-c6").toString();
+    if (performanceMode_ != "esp32-c6" && performanceMode_ != "unlimited")
+        performanceMode_ = "esp32-c6";
+    rt_.setPerformanceMode(performanceMode_ == "unlimited" ? prg32::PerformanceMode::Unlimited
+                                                           : prg32::PerformanceMode::Esp32C6Accurate);
     rt_.setAudioSink(audio_.get());
     rt_.setMultiplayerService(multiplayer_.get());
     rt_.setLEDCallback([this](prg32::RGBState v) {
@@ -38,7 +43,7 @@ AppController::AppController(QObject* p)
     });
     connect(gamepad_, &GamepadBackend::connectedChanged, this, &AppController::controllerChanged);
     timer_.setTimerType(Qt::PreciseTimer);
-    timer_.setInterval(33);
+    timer_.setInterval(performanceMode_ == "unlimited" ? 0 : 33);
     connect(&timer_, &QTimer::timeout, this, [this] {
         std::string e;
         if (!rt_.frame(input_.takeMerged(), e)) {
@@ -58,6 +63,18 @@ AppController::AppController(QObject* p)
     connect(&ipTimer_, &QTimer::timeout, this, &AppController::refreshIp);
     ipTimer_.start();
     refreshIp();
+}
+void AppController::setPerformanceMode(const QString& mode) {
+    if (mode != "esp32-c6" && mode != "unlimited")
+        return;
+    if (performanceMode_ == mode)
+        return;
+    performanceMode_ = mode;
+    QSettings().setValue("performance/mode", mode);
+    rt_.setPerformanceMode(mode == "unlimited" ? prg32::PerformanceMode::Unlimited
+                                               : prg32::PerformanceMode::Esp32C6Accurate);
+    timer_.setInterval(mode == "unlimited" ? 0 : 33);
+    emit performanceModeChanged();
 }
 void AppController::setMultiplayerStoreUrl(const QUrl& url) {
     multiplayer_->setStoreUrl(url);
@@ -420,7 +437,11 @@ QJsonObject AppController::performanceJson() const {
     if (s.state == 1)
         return {{"ok", false}, {"running", true}};
     if (s.state != 2)
-        return {{"ok", false}, {"error", "no performance test results"}};
+        return {{"ok", false},
+                {"error", "no performance test results"},
+                {"performance_mode", performanceMode_},
+                {"virtual_clock_hz", double(prg32::VirtualClock::FrequencyHz)},
+                {"late_frames", double(rt_.lateFrames())}};
     QJsonArray cases;
     uint64_t total = 0, updates = 0, draws = 0, presents = 0;
     uint32_t frames = 0, min = UINT32_MAX, max = 0, missed = 0, screenCount = 0;
@@ -471,6 +492,9 @@ QJsonObject AppController::performanceJson() const {
                         {"screen_count", int(screenCount)}};
     return {{"ok", true},
             {"schema_version", 2},
+            {"performance_mode", performanceMode_},
+            {"virtual_clock_hz", double(prg32::VirtualClock::FrequencyHz)},
+            {"late_frames", double(rt_.lateFrames())},
             {"run_id", QString("perf-%1-%2").arg(s.started).arg(s.sequence)},
             {"board_id", "qt-host"},
             {"target", "qt"},

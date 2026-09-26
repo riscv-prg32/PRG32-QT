@@ -114,7 +114,7 @@ def download_url(store: str, item: dict) -> str | None:
     return store_url(store, endpoint) + "?" + urllib.parse.urlencode(query)
 
 
-def certify(store: str, runner: str, frames: int) -> int:
+def certify(store: str, runner: str, frames: int, unlimited: bool = False) -> int:
     """Print an ID/version/result snapshot and fail for portable runtime errors."""
     items = catalog(store)
     if not items:
@@ -141,8 +141,11 @@ def certify(store: str, runner: str, frames: int) -> int:
                     raise ValueError("download is not a PRG2 package")
                 package_path = pathlib.Path(temporary_directory) / f"cartridge-{index}.prg32"
                 package_path.write_bytes(package)
+                command = [runner, str(package_path), str(frames), "--verify-media"]
+                if unlimited:
+                    command.append("--unlimited")
                 result = subprocess.run(
-                    [runner, str(package_path), str(frames), "--verify-media"],
+                    command,
                     capture_output=True,
                     text=True,
                     timeout=120,
@@ -183,9 +186,10 @@ def main() -> int:
     parser.add_argument("--store", default=DEFAULT_STORE)
     parser.add_argument("--runner", default="./build-core/prg32qt-headless")
     parser.add_argument("--frames", type=int, default=300)
+    parser.add_argument("--unlimited", action="store_true", help="certify the runner's Unlimited mode")
     arguments = parser.parse_args()
     try:
-        return certify(arguments.store, arguments.runner, arguments.frames)
+        return certify(arguments.store, arguments.runner, arguments.frames, arguments.unlimited)
     except (OSError, ValueError, RuntimeError) as error:
         print(f"FAIL: Store certification could not start: {error}", file=sys.stderr)
         return 1

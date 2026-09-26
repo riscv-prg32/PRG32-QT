@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "status": "physical-microbenchmark-calibration-pending",
+  "hardware": "ESP32-C6",
+  "prg32_commit": "596bcf954a77a296db20f5b69756f078721232f3",
+  "clock_hz": 160000000,
+  "frame_period_ms": 33,
+  "source_evidence": [
+    "sdkconfig: CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=160",
+    "main/main.c: PRG32_FRAME_MS=33"
+  ],
+  "acceptance_percent": {
+    "instruction": 5,
+    "deterministic_abi": 5,
+    "mixed_frame": 10
+  },
+  "benchmarks": {}
+}

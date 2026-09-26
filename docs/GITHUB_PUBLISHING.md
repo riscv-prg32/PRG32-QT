@@ -42,4 +42,8 @@ git tag -a v0.3.0 -m "PRG32-QT 0.3.0"
 git push origin v0.3.0
 ```
 
-The release workflow will create source archives and a GitHub Release for the tag.
+The release workflow creates reproducible source archives and native installation packages: a Qt-deployed
+Windows ZIP, macOS DMGs for Apple Silicon and Intel, Debian packages for Linux x86-64 and Raspberry Pi OS
+ARM64, iOS and Apple TV simulator application bundles, and Android/Android TV APKs. It verifies the expected
+asset count and publishes SHA-256 manifests with the GitHub Release. Development-signed iPhone applications
+remain device/team-specific and are validated before tagging rather than published as a reusable binary.

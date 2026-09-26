@@ -9,7 +9,12 @@ void Rv32Cpu::reset(uint32_t b, std::vector<uint8_t>* m) {
     x_.fill(0);
     pc_ = b;
     retired_ = 0;
+    clock_.reset();
     hasReservation_ = false;
+}
+void Rv32Cpu::chargeAbi(uint32_t call, const uint32_t arguments[8]) {
+    if (performanceMode_ == PerformanceMode::Esp32C6Accurate)
+        clock_.addCycles(esp32C6AbiCycles(call, arguments));
 }
 uint32_t Rv32Cpu::sext(uint32_t v, unsigned n) const {
     uint32_t m = 1u << (n - 1);
@@ -103,6 +108,7 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
             x_[rd] = v;
     };
     bool ok = true;
+    InstructionTimingClass timingClass = InstructionTimingClass::Alu;
     switch (op) {
     case 0x37:
         // LUI: place the U-type immediate in rd[31:12].
@@ -113,6 +119,7 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
         wr(pc_ + (i & 0xfffff000));
         break;
     case 0x6f: {
+        timingClass = InstructionTimingClass::Jump;
         // JAL J-immediate layout: inst[31] -> imm[20], inst[19:12] -> imm[19:12],
         // inst[20] -> imm[11], inst[30:21] -> imm[10:1]; imm[0] is zero.
         uint32_t im = ((i >> 31) << 20) | (((i >> 12) & 0xff) << 12) | (((i >> 20) & 1) << 11) |
@@ -122,6 +129,7 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
         break;
     }
     case 0x67: {
+        timingClass = InstructionTimingClass::Jump;
         // JALR: write the sequential PC and jump to rs1 + signed I-immediate, clearing target bit zero.
         int32_t im = int32_t(i) >> 20;
         uint32_t t = (a + im) & ~1u;
@@ -166,9 +174,11 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
         }
         if (t)
             npc = pc_ + sext(im, 13);
+        timingClass = t ? InstructionTimingClass::BranchTaken : InstructionTimingClass::BranchNotTaken;
         break;
     }
     case 0x03: {
+        timingClass = InstructionTimingClass::Load;
         // LOAD: funct3 selects LB, LH, LW, LBU, or LHU from rs1 + signed I-immediate.
         int32_t im = int32_t(i) >> 20;
         uint32_t ad = a + im, v = 0;
@@ -194,6 +204,7 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
         break;
     }
     case 0x23: {
+        timingClass = InstructionTimingClass::Store;
         // S-immediate layout: inst[31:25] -> imm[11:5], inst[11:7] -> imm[4:0].
         // funct3 selects SB, SH, or SW.
         uint32_t im = ((i >> 25) << 5) | ((i >> 7) & 31), ad = a + sext(im, 12);
@@ -236,9 +247,11 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
             wr(a & sext(im, 12));
             break;
         case 1:
+            timingClass = InstructionTimingClass::Shift;
             wr(a << (im & 31));
             break;
         case 5:
+            timingClass = InstructionTimingClass::Shift;
             wr((im & 0x400) ? uint32_t(int32_t(a) >> (im & 31)) : a >> (im & 31));
             break;
         default:
@@ -250,6 +263,7 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
     case 0x33: {
         // OP: the base integer register operations and the funct7=1 M-extension operations.
         if (f7 == 1) {
+            timingClass = f3 <= 3 ? InstructionTimingClass::Multiply : InstructionTimingClass::Divide;
             switch (f3) {
             case 0:
                 wr(uint32_t(uint64_t(a) * b));
@@ -281,7 +295,9 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
                 wr(b ? a % b : a);
                 break;
             }
-        } else
+        } else {
+            if (f3 == 1 || f3 == 5)
+                timingClass = InstructionTimingClass::Shift;
             switch (f3) {
             case 0:
                 wr(f7 == 0x20 ? a - b : a + b);
@@ -308,9 +324,11 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
                 wr(a & b);
                 break;
             }
+        }
         break;
     }
     case 0x2f: {
+        timingClass = InstructionTimingClass::Atomic;
         // AMO: RV32A word-width LR/SC and atomic read-modify-write operations.
         if (f3 != 2) {
             e = "illegal atomic";
@@ -399,8 +417,10 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
         break;
     }
     case 0x0f:
+        timingClass = InstructionTimingClass::Fence;
         break;
     case 0x73: {
+        timingClass = InstructionTimingClass::Csr;
         if (i == 0x00000073) {
             npc = ReturnSentinel;
             break;
@@ -410,10 +430,17 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
             return false;
         }
         uint32_t csr = (i >> 20) & 0xfff, v = 0;
+        uint64_t counter = retired_;
+        if (performanceMode_ == PerformanceMode::Esp32C6Accurate) {
+            if (csr == 0xC00 || csr == 0xC80)
+                counter = clock_.cycles();
+            else if (csr == 0xC01 || csr == 0xC81)
+                counter = clock_.nanoseconds();
+        }
         if (csr == 0xC00 || csr == 0xC01 || csr == 0xC02)
-            v = uint32_t(retired_);
+            v = uint32_t(counter);
         else if (csr == 0xC80 || csr == 0xC81 || csr == 0xC82)
-            v = uint32_t(retired_ >> 32);
+            v = uint32_t(counter >> 32);
         else {
             e = "unsupported CSR";
             return false;
@@ -433,6 +460,8 @@ bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
     pc_ = npc;
     x_[0] = 0;
     retired_++;
+    clock_.addCycles(
+        performanceMode_ == PerformanceMode::Esp32C6Accurate ? esp32C6InstructionCycles(timingClass) : 1);
     return true;
 }
 // RV32C decoder covering the integer C extension emitted by normal RV32IMAC toolchains.
@@ -444,6 +473,7 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
             x_[d] = v;
     };
     bool ok = true;
+    InstructionTimingClass timingClass = InstructionTimingClass::Alu;
     if (q == 0) {
         unsigned rd = 8 + ((c >> 2) & 7), rs1 = 8 + ((c >> 7) & 7);
         if (f3 == 0) {
@@ -455,11 +485,13 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
             }
             wr(rd, x_[2] + im);
         } else if (f3 == 2) {
+            timingClass = InstructionTimingClass::Load;
             uint32_t im = ((c >> 5) & 1) << 6 | ((c >> 10) & 7) << 3 | ((c >> 6) & 1) << 2;
             wr(rd, load32(r((c >> 7) & 7) + im, ok));
             if (!ok)
                 return false;
         } else if (f3 == 6) {
+            timingClass = InstructionTimingClass::Store;
             uint32_t im = ((c >> 5) & 1) << 6 | ((c >> 10) & 7) << 3 | ((c >> 6) & 1) << 2;
             store32(r((c >> 7) & 7) + im, r((c >> 2) & 7), ok);
             if (!ok)
@@ -474,6 +506,7 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
             uint32_t im = ((c >> 12) & 1) << 5 | ((c >> 2) & 31);
             wr(rd, x_[rd] + sext(im, 6));
         } else if (f3 == 1 || f3 == 5) {
+            timingClass = InstructionTimingClass::Jump;
             uint32_t im = ((c >> 12) & 1) << 11 | ((c >> 8) & 1) << 10 | ((c >> 9) & 3) << 8 |
                           ((c >> 6) & 1) << 7 | ((c >> 7) & 1) << 6 | ((c >> 2) & 1) << 5 |
                           ((c >> 11) & 1) << 4 | ((c >> 3) & 7) << 1;
@@ -494,6 +527,7 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
         } else if (f3 == 4) {
             unsigned d = 8 + ((c >> 7) & 7), sub = (c >> 10) & 3;
             if (sub < 2) {
+                timingClass = InstructionTimingClass::Shift;
                 uint32_t sh = ((c >> 12) & 1) << 5 | ((c >> 2) & 31);
                 wr(d, sub == 0 ? r((c >> 7) & 7) >> sh : uint32_t(int32_t(r((c >> 7) & 7)) >> sh));
             } else if (sub == 2) {
@@ -523,8 +557,11 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
             uint32_t im = ((c >> 12) & 1) << 8 | ((c >> 5) & 3) << 6 | ((c >> 2) & 1) << 5 |
                           ((c >> 10) & 3) << 3 | ((c >> 3) & 3) << 1;
             bool t = (r((c >> 7) & 7) == 0);
-            if ((f3 == 7) ? !t : t)
+            const bool taken = (f3 == 7) ? !t : t;
+            if (taken)
                 npc = pc_ + sext(im, 9);
+            timingClass =
+                taken ? InstructionTimingClass::BranchTaken : InstructionTimingClass::BranchNotTaken;
         } else {
             e = "unsupported C q1";
             return false;
@@ -532,15 +569,19 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
     } else {
         unsigned rd = (c >> 7) & 31, rs2 = (c >> 2) & 31;
         if (f3 == 0) {
+            timingClass = InstructionTimingClass::Shift;
             uint32_t sh = ((c >> 12) & 1) << 5 | ((c >> 2) & 31);
             wr(rd, x_[rd] << sh);
         } else if (f3 == 2) {
+            timingClass = InstructionTimingClass::Load;
             uint32_t im = ((c >> 2) & 3) << 6 | ((c >> 12) & 1) << 5 | ((c >> 4) & 7) << 2;
             wr(rd, load32(x_[2] + im, ok));
             if (!ok)
                 return false;
         } else if (f3 == 4) {
             if (((c >> 12) & 1) == 0) {
+                if (rs2 == 0)
+                    timingClass = InstructionTimingClass::Jump;
                 if (rs2 == 0)
                     npc = x_[rd] & ~1u;
                 else
@@ -551,12 +592,14 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
                     return false;
                 }
                 if (rs2 == 0) {
+                    timingClass = InstructionTimingClass::Jump;
                     wr(1, npc);
                     npc = x_[rd] & ~1u;
                 } else
                     wr(rd, x_[rd] + x_[rs2]);
             }
         } else if (f3 == 6) {
+            timingClass = InstructionTimingClass::Store;
             uint32_t im = ((c >> 7) & 3) << 6 | ((c >> 9) & 15) << 2;
             store32(x_[2] + im, x_[rs2], ok);
             if (!ok)
@@ -569,6 +612,8 @@ bool Rv32Cpu::exec16(uint16_t c, std::string& e) {
     pc_ = npc;
     x_[0] = 0;
     retired_++;
+    clock_.addCycles(
+        performanceMode_ == PerformanceMode::Esp32C6Accurate ? esp32C6InstructionCycles(timingClass) : 1);
     return true;
 }
 } // namespace prg32

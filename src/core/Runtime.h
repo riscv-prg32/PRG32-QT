@@ -102,6 +102,27 @@ class Runtime {
     void setMultiplayerService(MultiplayerService* service) {
         multiplayer_ = service;
     }
+    /** Select the cartridge-visible performance profile. Accurate ESP32-C6 timing is the default. */
+    void setPerformanceMode(PerformanceMode mode) {
+        performanceMode_ = mode;
+        cpu_.setPerformanceMode(mode);
+        nextFrameCycles_ = cpu_.virtualCycles() + VirtualClock::FramePeriodCycles;
+    }
+    PerformanceMode performanceMode() const {
+        return performanceMode_;
+    }
+    uint64_t virtualCycles() const {
+        return cpu_.virtualCycles();
+    }
+    uint64_t virtualNanoseconds() const {
+        return cpu_.virtualNanoseconds();
+    }
+    uint64_t retiredInstructions() const {
+        return cpu_.retiredInstructions();
+    }
+    uint64_t lateFrames() const {
+        return lateFrames_;
+    }
 
   private:
     void hostCall(uint32_t);
@@ -165,6 +186,9 @@ class Runtime {
     std::optional<TrackState> track_;
     double trackElapsedMs_ = 0;
     uint64_t lastAudioUs_ = 0, perfStart_ = 0;
+    uint64_t nextFrameCycles_ = VirtualClock::FramePeriodCycles;
+    uint64_t lateFrames_ = 0;
+    PerformanceMode performanceMode_ = PerformanceMode::Esp32C6Accurate;
     PerfSnapshot perf_;
     int activePerfCase_ = -1;
 };

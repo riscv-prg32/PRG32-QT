@@ -12,6 +12,11 @@ PRG32-QT is deliberately split into a Qt-free portable guest runtime and a thin 
 
 `Rv32Cpu` interprets RV32I plus the M, A, and C extensions used by portable PRG32 cartridges. It includes integer multiplication/division corner cases, LR/SC and AMO word operations, compressed instructions, FENCE/FENCE.I no-op semantics for the single-threaded interpreter, and read-only cycle/time/instret-style counters used by optimized code.
 
+`VirtualClock` and the ESP32-C6 timing profile separate guest execution time from host wall time. In the default
+accurate mode, `cycle` is accumulated effective ESP32-C6 work, `time` is virtual nanoseconds derived from that
+clock, and `instret` remains the retired guest instruction count. Instruction classes and ABI #0-#138 local work
+receive deterministic charges. Network latency and host rendering latency never alter guest virtual time.
+
 Downloaded cartridge bytes are never treated as host-native code.
 
 ### Synthetic ABI
@@ -49,7 +54,9 @@ Local scores and the public performance broker are implemented. The host also se
 
 ## Layer 2 — Qt host (`src/qt`)
 
-`AppController` owns one runtime instance, a 60 Hz frame timer, local cartridge persistence, input multiplexing, RGB LED presentation state, and the Qt audio backend. `StoreClient` owns Store settings, catalog/discovery requests, architecture-aware downloads, and an in-memory icon cache. `FrameItem` renders the 320×200 image without smoothing. `RasterImageItem` paints bundled and data-URL raster artwork through `QPainter`, providing consistent image rendering on Qt's Android graphics path.
+`AppController` owns one runtime instance, the reference firmware's 33 ms frame timer, persistent performance and
+display settings, local cartridge persistence, input multiplexing, RGB LED presentation state, and the Qt audio
+backend. `StoreClient` owns Store settings, catalog/discovery requests, architecture-aware downloads, and an in-memory icon cache. `FrameItem` renders the 320×200 image without smoothing. `RasterImageItem` paints bundled and data-URL raster artwork through `QPainter`, providing consistent image rendering on Qt's Android graphics path.
 
 `QtAudioEngine` uses Qt Multimedia and `QtMultiplayerService` uses Qt WebSockets; both implementations are
 shared across all Qt targets.
@@ -88,6 +95,11 @@ The UI provides: startup splash/tone, a viewport-constrained setup menu, Store b
 ## Frame pacing, pause, and local API
 
 The Qt host follows the ESP32-C6 firmware frame loop at one update/draw cycle every 33 ms. `QTimer` uses precise timing, and it does not schedule catch-up frames after a delay. Opening Setup from a cartridge stops the frame timer, clears input, and pauses audio. Returning to the player resumes the existing runtime state.
+
+The default ESP32-C6 Accurate mode advances virtual time to each 33 ms boundary when work finishes early and
+preserves overruns when calibrated work crosses it. The host timer paces a fast host in real time; a slow host
+does not rewrite virtual counters. Unlimited removes host pacing and retains legacy one-count-per-retired-
+instruction counter behavior for developer workflows. The mode is re-anchored when changed or a cartridge loads.
 
 The host listens on TCP port 8080 and publishes the PRG32 device endpoints: `GET /api`, `/api/runtime`, `/api/games`, `/api/screenshot.bmp`, `/api/performance.json`, `/api/scores`, and `/api/memory`, plus `POST /api/games`, `/api/games/select`, and `/api/scores`. Cartridge uploads use the four `cart0` through `cart3` slots. The Setup and player screens show the active local IPv4 address and API URL.
 

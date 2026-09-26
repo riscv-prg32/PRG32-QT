@@ -101,11 +101,14 @@ bool Runtime::load(const Cartridge& c, std::string& e) {
     }
     std::copy(c.payload().begin(), c.payload().end(), mem_.begin());
     cpu_.reset(base_, &mem_);
+    cpu_.setPerformanceMode(performanceMode_);
     cpu_.setHostRange(HostBase, 139);
     cpu_.setHostCall([this](uint32_t i) { hostCall(i); });
     writeAbiTable();
     loaded_ = true;
     started_ = std::chrono::steady_clock::now();
+    nextFrameCycles_ = VirtualClock::FramePeriodCycles;
+    lateFrames_ = 0;
     channelVolumes_.fill(255);
     channelPans_.fill(0);
     return true;
@@ -135,7 +138,15 @@ bool Runtime::frame(uint32_t in, std::string& e) {
     lastAudioUs_ = n;
     if (!cpu_.call(base_ + cart_.header().updateOffset, guestPtr(abiOffset_), 10'000'000, e))
         return false;
-    return cpu_.call(base_ + cart_.header().drawOffset, guestPtr(abiOffset_), 10'000'000, e);
+    if (!cpu_.call(base_ + cart_.header().drawOffset, guestPtr(abiOffset_), 10'000'000, e))
+        return false;
+    if (performanceMode_ == PerformanceMode::Esp32C6Accurate) {
+        if (cpu_.virtualCycles() > nextFrameCycles_)
+            ++lateFrames_;
+        cpu_.advanceVirtualClockTo(nextFrameCycles_);
+        nextFrameCycles_ += VirtualClock::FramePeriodCycles;
+    }
+    return true;
 }
 void Runtime::stop() {
     track_.reset();
@@ -169,6 +180,8 @@ bool Runtime::writeCString(uint32_t p, const std::string& s, size_t cap) {
     return ok;
 }
 uint64_t Runtime::nowUs() const {
+    if (performanceMode_ == PerformanceMode::Esp32C6Accurate)
+        return cpu_.virtualNanoseconds() / 1000;
     return uint64_t(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started_)
             .count());
@@ -605,6 +618,9 @@ void Runtime::hostCall(uint32_t i) {
     // PRG32 ABI arguments follow the RISC-V integer calling convention: a0-a7 are x10-x17 and the
     // scalar result is returned in a0. Every numeric case below is a stable public table index.
     auto a = [&](int n) { return cpu_.reg(10 + n); };
+    uint32_t timingArguments[8];
+    for (int argument = 0; argument < 8; ++argument)
+        timingArguments[argument] = a(argument);
     auto ret = [&](uint32_t v) { cpu_.setReg(10, v); };
     bool ok = true;
     auto i8 = [&](uint32_t v) { return int8_t(uint8_t(v)); };
@@ -1163,5 +1179,7 @@ void Runtime::hostCall(uint32_t i) {
         ret(uint32_t(-1));
         break;
     }
+    // All synthetic ABI #0-#138 operations consume deterministic local ESP32-C6 profile time.
+    cpu_.chargeAbi(i, timingArguments);
 }
 } // namespace prg32

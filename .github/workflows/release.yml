@@ -75,15 +75,12 @@ jobs:
           - platform: Windows
             os: windows-latest
             command: pwsh -File scripts/build-windows.ps1
-            package_path: build-windows/PRG32.exe
           - platform: macOS
             os: macos-15
             command: ./scripts/build-macos.sh
-            package_path: build-macos/PRG32.app
           - platform: macOS-Intel
             os: macos-15-intel
             command: ./scripts/build-macos.sh
-            package_path: build-macos/PRG32.app
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -97,23 +94,27 @@ jobs:
       - name: Build and test
         shell: bash
         run: ${{ matrix.command }}
-      - name: Package application
-        if: runner.os != 'Windows'
+      - name: Package macOS application as DMG
+        if: runner.os == 'macOS'
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist
-          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-${{ matrix.platform }}-${{ runner.arch }}.zip" --format=zip -- ${{ matrix.package_path }}
+          macdeployqt build-macos/PRG32.app -qmldir=qml -dmg
+          mv build-macos/PRG32.dmg "dist/PRG32-QT-${RELEASE_TAG#v}-${{ matrix.platform }}-${{ runner.arch }}.dmg"
+      - name: Package Windows application with Qt runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          New-Item -ItemType Directory -Force dist/package | Out-Null
+          Copy-Item build-windows/PRG32.exe dist/package/
+          windeployqt --release --qmldir qml dist/package/PRG32.exe
+          Compress-Archive -Path dist/package/* -DestinationPath "dist/PRG32-QT-$version-Windows-${{ runner.arch }}.zip"
       - uses: actions/upload-artifact@v7
-        if: runner.os != 'Windows'
         with:
           name: release-${{ matrix.platform }}-${{ runner.arch }}
           path: dist/*
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v7
-        if: runner.os == 'Windows'
-        with:
-          name: release-${{ matrix.platform }}-${{ runner.arch }}
-          path: build-windows/PRG32*
           if-no-files-found: error
 
   linux:
@@ -132,8 +133,13 @@ jobs:
         run: ./scripts/build-linux.sh
       - name: Package application
         run: |
-          mkdir -p dist
-          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Linux-${{ runner.arch }}.zip" --format=zip -- build-linux/PRG32
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          root="dist/pkg/usr/bin"
+          mkdir -p "$root" dist/pkg/DEBIAN
+          install -m 0755 build-linux/PRG32 "$root/PRG32"
+          printf 'Package: prg32-qt\nVersion: %s\nArchitecture: amd64\nMaintainer: PRG32-QT contributors\nDepends: qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-dialogs, libqt6multimedia6, libqt6websockets6\nDescription: Portable PRG32 cartridge runtime\n' "$version" > dist/pkg/DEBIAN/control
+          dpkg-deb --build --root-owner-group dist/pkg "dist/PRG32-QT-$version-Linux-${{ runner.arch }}.deb"
       - uses: actions/upload-artifact@v7
         with:
           name: release-Linux-${{ runner.arch }}
@@ -157,8 +163,13 @@ jobs:
       - name: Package application
         shell: bash
         run: |
-          mkdir -p dist
-          cmake -E tar cf "dist/PRG32-QT-${RELEASE_TAG#v}-Raspberry-Pi-OS-ARM64.zip" --format=zip -- build-raspbian/PRG32
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          root="dist/pkg/usr/bin"
+          mkdir -p "$root" dist/pkg/DEBIAN
+          install -m 0755 build-raspbian/PRG32 "$root/PRG32"
+          printf 'Package: prg32-qt\nVersion: %s\nArchitecture: arm64\nMaintainer: PRG32-QT contributors\nDepends: qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-dialogs, libqt6multimedia6, libqt6websockets6\nDescription: Portable PRG32 cartridge runtime\n' "$version" > dist/pkg/DEBIAN/control
+          dpkg-deb --build --root-owner-group dist/pkg "dist/PRG32-QT-$version-Raspberry-Pi-OS-ARM64.deb"
       - uses: actions/upload-artifact@v7
         with:
           name: release-Raspberry-Pi-OS-ARM64
@@ -287,7 +298,10 @@ jobs:
           merge-multiple: true
       - name: Create checksums for platform assets
         working-directory: release-assets
-        run: sha256sum PRG32-QT-* > SHA256SUMS-platforms.txt
+        run: |
+          set -euo pipefail
+          test "$(find . -maxdepth 1 -type f -name 'PRG32-QT-*' | wc -l)" -eq 11
+          sha256sum PRG32-QT-* > SHA256SUMS-platforms.txt
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}

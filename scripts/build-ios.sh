@@ -9,7 +9,7 @@ case "$DESTINATION" in
 esac
 "$QT/bin/qt-cmake" -S . -B "$BUILD_DIR" -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT="$SDK" -DCMAKE_OSX_ARCHITECTURES="$ARCHS" -DQT_HOST_PATH="$QT_HOST" -DPRG32QT_BUILD_APP=ON -DPRG32QT_BUILD_TESTS=OFF
 if [ -n "${IOS_TEAM_ID:-}" ]; then
-  xcodebuild -project "$BUILD_DIR/PRG32_QT.xcodeproj" -scheme PRG32_QT -configuration Release -destination "$DESTINATION" -allowProvisioningUpdates DEVELOPMENT_TEAM="$IOS_TEAM_ID" CODE_SIGN_STYLE=Automatic build
+  xcodebuild -project "$BUILD_DIR/PRG32_QT.xcodeproj" -scheme PRG32_QT -configuration Release -destination "$DESTINATION" -allowProvisioningUpdates -allowProvisioningDeviceRegistration DEVELOPMENT_TEAM="$IOS_TEAM_ID" CODE_SIGN_STYLE=Automatic build
 else
   xcodebuild -project "$BUILD_DIR/PRG32_QT.xcodeproj" -scheme PRG32_QT -configuration Release -destination "$DESTINATION" CODE_SIGNING_ALLOWED=NO build
 fi

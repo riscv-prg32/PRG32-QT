@@ -8,13 +8,14 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 
 - PRG2 validation, CRC, ABI/import-model and feature checks.
 - RV32IMAC guest execution including compressed instructions, atomics and counters used by portable cartridges.
+- Default ESP32-C6 Accurate cartridge-visible timing, with a persistent Unlimited developer/test mode.
 - PRG32 ABI 1.6 (`0x260f6136`) plus documented compatible hashes.
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
 - Safe-area-aware touch controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
 - Store-relayed multiplayer snapshots, RGB LED emulation, local scores, metrics/performance ABI calls, and
   safe unavailable-service stubs.
-- Store browser, search/tag filtering, Store URL settings/test, architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
+- Store browser, search/tag filtering, Store URL and performance settings, architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
 - Gamer-selectable Auto, Portrait, or Landscape player layout plus persistent fullscreen TV mode (`F11`, `Control+Command+F`, or the player button; `Escape` exits).
 - Canonical PRG32 artwork used by the PRG32 project.
 - Headless regression fixtures included for compatibility testing and live whole-Store certification tooling.
@@ -65,11 +66,17 @@ as exclusions rather than silently treated as passes.
 
 ## Player display and controls
 
-Open **Store Settings** to choose Auto, Portrait, or Landscape independently of the window shape and, on
+Open **Settings** to choose ESP32-C6 Accurate (the default) or Unlimited performance, and Auto, Portrait, or
+Landscape independently of the window shape and, on
 desktop, to make fullscreen the persistent default. iOS and Android reserve the native status/notch/home-indicator
 safe area and do not offer fullscreen. On Windows, macOS, Linux, Apple TV, and Android TV fullscreen shows only the letterboxed 320x200
 game area; use the keyboard or controller, and press `Escape` to return to windowed mode. Keyboard and
 USB/Bluetooth controller inputs share this mapping:
+
+ESP32-C6 Accurate uses deterministic instruction-class and PRG32 ABI work charges at the reference firmware's
+160 MHz clock and 33 ms frame cadence. It models only behavior visible to portable cartridges; it is not a full
+ESP32-C6 SoC or cycle-exact microarchitecture simulation. See
+[performance emulation](docs/PERFORMANCE-EMULATION.md) for counter semantics, calibration status, and limits.
 
 | PRG32 control | Keyboard | Controller |
 |---|---|---|

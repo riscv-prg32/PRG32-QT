@@ -61,7 +61,7 @@ uint64_t framebufferHash(const std::vector<uint16_t>& pixels) {
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: prg32qt-headless file.prg32 [frames] [--require-performance] [--verify-media] "
-                     "[--input frame:mask] [--dump-ppm path]\n";
+                     "[--unlimited] [--input frame:mask] [--dump-ppm path]\n";
         return 2;
     }
     std::ifstream f(argv[1], std::ios::binary);
@@ -82,12 +82,14 @@ int main(int argc, char** argv) {
     int frames = argc > 2 ? std::stoi(argv[2]) : 300;
     bool verifyMedia = false;
     bool requirePerformance = false;
+    bool unlimited = false;
     std::map<int, uint32_t> scriptedInput;
     std::string dumpPath;
     for (int argument = 3; argument < argc; ++argument) {
         std::string option = argv[argument];
         verifyMedia |= option == "--verify-media";
         requirePerformance |= option == "--require-performance";
+        unlimited |= option == "--unlimited";
         if (option == "--input" && argument + 1 < argc) {
             std::string value = argv[++argument];
             size_t separator = value.find(':');
@@ -101,6 +103,8 @@ int main(int argc, char** argv) {
         if (option == "--dump-ppm" && argument + 1 < argc)
             dumpPath = argv[++argument];
     }
+    if (unlimited)
+        r.setPerformanceMode(prg32::PerformanceMode::Unlimited);
     constexpr std::array<uint32_t, 10> inputSequence = {0, 1, 2, 4, 8, 16, 32, 64, 17, 34};
     std::set<uint64_t> frameHashes;
     size_t maximumNonBlackPixels = 0;

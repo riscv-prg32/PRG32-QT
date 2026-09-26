@@ -229,10 +229,11 @@ jobs:
       - name: Certify current catalog
         run: |
           set -o pipefail
-          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 300 2>&1 | tee store-certification.txt
+          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 900 2>&1 | tee store-certification-accurate.txt
+          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 900 --unlimited 2>&1 | tee store-certification-unlimited.txt
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cartridge-store-certification
-          path: store-certification.txt
+          path: store-certification-*.txt
           if-no-files-found: error

@@ -33,6 +33,7 @@ class AppController : public QObject {
     Q_PROPERTY(QString preferredOrientation READ preferredOrientation WRITE setPreferredOrientation NOTIFY
                    displayPreferencesChanged)
     Q_PROPERTY(bool fullScreen READ fullScreen WRITE setFullScreen NOTIFY displayPreferencesChanged)
+    Q_PROPERTY(QString performanceMode READ performanceMode WRITE setPerformanceMode NOTIFY performanceModeChanged)
     // clang-format on
 
   public:
@@ -80,6 +81,9 @@ class AppController : public QObject {
     bool fullScreen() const {
         return fullScreen_;
     }
+    QString performanceMode() const {
+        return performanceMode_;
+    }
     QJsonObject runtimeJson() const;
     QJsonArray gamesJson() const;
     QJsonObject performanceJson() const;
@@ -107,6 +111,8 @@ class AppController : public QObject {
     void setPreferredOrientation(const QString& orientation);
     /** Persist whether the desktop player should occupy the full screen. */
     void setFullScreen(bool enabled);
+    /** Persist and apply the cartridge-visible performance profile. */
+    void setPerformanceMode(const QString& mode);
   signals:
     void statusChanged();
     void controllerChanged();
@@ -117,6 +123,7 @@ class AppController : public QObject {
     void cartridgeChanged();
     void performanceChanged();
     void displayPreferencesChanged();
+    void performanceModeChanged();
 
   private:
     void setStatus(QString);
@@ -129,6 +136,7 @@ class AppController : public QObject {
     InputState input_;
     QString status_, deviceIp_, cartridgeName_;
     QString preferredOrientation_ = "auto";
+    QString performanceMode_ = "esp32-c6";
     QByteArray currentBytes_;
     QPointer<FrameItem> frame_;
     GamepadBackend* gamepad_ = nullptr;

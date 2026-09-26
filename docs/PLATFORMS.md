@@ -63,7 +63,8 @@ to A/B, and buttons 7–10 map to Select.
 CI uses the macOS 15 runner with Xcode 16 because the Qt 6.8.3 binary kit still links Apple's AGL framework,
 which is absent from the newer Xcode 26 SDK on `macos-latest`.
 
-Store Settings exposes Auto, Portrait, and Landscape player layouts. Fullscreen can be toggled from the player,
+Settings exposes the default ESP32-C6 Accurate performance profile and the optional Unlimited profile on every
+target, together with Auto, Portrait, and Landscape player layouts. Fullscreen can be toggled from the player,
 with `F11`, or with `Control+Command+F`; `Escape` returns to a window. On desktop, fullscreen deliberately hides
 all chrome and touch controls and displays only the aspect-correct game surface for keyboard/controller play.
 Both choices persist through `QSettings`.

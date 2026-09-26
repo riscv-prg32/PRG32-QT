@@ -223,6 +223,46 @@ Before signed releases verify startup, Store browsing/download, local import, gr
 
 The `prg32qt_performance_contract` test executes the public reference performance cartridge for 605 frames and requires its broker state to be complete. This covers descriptor validation, case lifecycle, sample recording, aggregate calculation, and performance ABI return values.
 
+## ESP32-C6 performance-emulation validation (2026-09-25)
+
+- Apple Silicon (`arm64`) macOS built the Qt-free core and native Homebrew Qt application. All four CTest
+  targets passed: core timing/counter tests, Asteroids and Bach at 300 frames, and the 605-frame
+  `PerformanceTest.prg32 --require-performance` contract. The documentation consistency check and Store smoke
+  Python unit tests passed. The separate `$HOME/Qt/6.8.3/macos` kit still fails QML import scanning with its
+  existing NEON processor mismatch; the native Homebrew Qt build succeeded.
+- The live 27-entry default Store was certified for 900 frames in both default ESP32-C6 Accurate and explicit
+  Unlimited modes with the input/media sweep. Each mode passed all 25 portable cartridges with non-black
+  graphics and multiple framebuffer hashes where the workload changes; Space Invaders 1.0.0 and Terraforge
+  1.0.0 were the two explicit non-portable exclusions. No portable cartridge failed.
+- Accurate mode produced instrumented audio events for 17 cartridges and 157,008 PCM samples for Space Belt
+  Madness. Unlimited mode produced instrumented audio events for the same declared workloads and 111,184 PCM
+  samples for Space Belt Madness. These are engine instrumentation results, not an acoustic listening check.
+  Mode-dependent time progression intentionally changes audio event counts and some framebuffer-hash counts.
+- The reference PRG32 firmware checkout at commit `596bcf954a77a296db20f5b69756f078721232f3`
+  supplied the verified 160 MHz CPU configuration and exact 33 ms frame policy. No physical ESP32-C6 board was
+  connected for instruction/ABI microbenchmark calibration, so `tests/performance/reference/esp32c6.json`
+  records calibration as pending and no 5%/10% physical-parity claim is made.
+- Windows, Linux, Raspberry Pi OS, iOS, Android, Apple TV, and Android TV were unavailable for local compilation
+  in this macOS session. Their source paths share the compiled portable core; their platform scripts and CI jobs
+  remain required before merge. No physical controller, touch surface, speaker, TV, or mobile device was tested.
+
+## 0.3.2 release qualification (2026-09-26)
+
+- Portable core CTest, formatting, documentation consistency, workflow YAML parsing, and Store certification
+  parser tests passed locally on Apple Silicon macOS. The native Homebrew Qt macOS application compiled.
+- The shared Settings dialog exposes ESP32-C6 Accurate by default and Unlimited on desktop, iOS, Android,
+  Apple TV, and Android TV. Only the desktop-only fullscreen checkbox remains platform-gated; the performance
+  control is not hidden on mobile or TV.
+- The connected iPhone 12 Pro Max (`iPhone13,4`, UDID ending `29001E`) was paired and available. The arm64 iOS
+  project configured against the iPhoneOS 27.0 SDK, but physical signing was blocked: team `9Z5X3KJ92U` has not
+  registered this device or provisioned `org.riscv-prg32.prg32qt`, while the locally installed development
+  identity belongs to team `LVM984EVW2`, for which Xcode has no signed-in account. Installation, launch, touch,
+  rotation, persistence, and on-device timing checks remain a hard release gate rather than being claimed.
+- The locally installed Qt 6.8.3 macOS/iOS/Android target kits still abort their QML import scanner with a NEON
+  host-feature mismatch. Homebrew Qt covers the native macOS build; iOS simulator, Android, Android TV, Linux,
+  Windows, Raspberry Pi OS, and Apple TV builds are assigned to their declared GitHub Actions runners. The tag
+  must not be created until every CI job is green and the physical iPhone gate above is resolved.
+
 ## Readability-pass validation (2026-09-22)
 
 - Portable core: Apple Silicon (`arm64`) macOS host, Ninja build in `build-core`; all four CTest targets

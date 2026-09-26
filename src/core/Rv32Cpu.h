@@ -1,5 +1,6 @@
 // Portable RV32IMAC interpreter interface for the architecture's Qt-free guest-execution layer.
 #pragma once
+#include "PerformanceTiming.h"
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -61,6 +62,29 @@ class Rv32Cpu {
     uint32_t base() const {
         return base_;
     }
+    /** Select counter/timing semantics; accurate cartridge-visible timing is the default. */
+    void setPerformanceMode(PerformanceMode mode) {
+        performanceMode_ = mode;
+    }
+    /** Charge deterministic host-side work performed by a synthetic PRG32 ABI call. */
+    void chargeAbi(uint32_t call, const uint32_t arguments[8]);
+    /** Return the number of guest instructions retired since reset. */
+    uint64_t retiredInstructions() const {
+        return retired_;
+    }
+    /** Return accumulated cartridge-visible effective ESP32-C6 cycles. */
+    uint64_t virtualCycles() const {
+        return clock_.cycles();
+    }
+    /** Return deterministic virtual elapsed nanoseconds. */
+    uint64_t virtualNanoseconds() const {
+        return clock_.nanoseconds();
+    }
+    /** Advance an accurate-mode clock to a frame boundary without altering retired instructions. */
+    void advanceVirtualClockTo(uint64_t cycles) {
+        if (performanceMode_ == PerformanceMode::Esp32C6Accurate)
+            clock_.advanceTo(cycles);
+    }
 
   private:
     uint32_t sext(uint32_t v, unsigned bits) const;
@@ -69,6 +93,8 @@ class Rv32Cpu {
     std::array<uint32_t, 32> x_{};
     uint32_t pc_ = 0, base_ = 0, hostBase_ = 0, hostCount_ = 0;
     uint64_t retired_ = 0;
+    VirtualClock clock_;
+    PerformanceMode performanceMode_ = PerformanceMode::Esp32C6Accurate;
     uint32_t reservation_ = 0;
     bool hasReservation_ = false;
     std::vector<uint8_t>* mem_ = nullptr;

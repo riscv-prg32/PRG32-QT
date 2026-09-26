@@ -4,6 +4,12 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-26
+
+- Added default, persistent ESP32-C6 Accurate performance emulation with deterministic RV32IMAC instruction
+  classes, PRG32 ABI work charges, coherent cycle/time/instret counters, 160 MHz virtual timing, 33 ms frame
+  boundaries, late-frame diagnostics, and an explicit Unlimited mode for development and certification.
+
 ## [0.3.1] - 2026-09-24
 
 - Added a reproducible, checksum-pinned Qt 6.8.3 tvOS simulator kit build, made Apple TV a required compiled
