@@ -88,6 +88,8 @@ jobs:
           Copy-Item build-windows/PRG32.exe build-windows-deploy/
           $qmlDirectory = (Resolve-Path qml).Path
           $executable = (Resolve-Path build-windows-deploy/PRG32.exe).Path
+          $ErrorActionPreference = 'Continue'
+          $PSNativeCommandUseErrorActionPreference = $false
           $deployOutput = windeployqt --release --no-compiler-runtime --qmldir $qmlDirectory $executable 2>&1
           $deployStatus = $LASTEXITCODE
           $deployOutput | ForEach-Object { Write-Host $_ }
