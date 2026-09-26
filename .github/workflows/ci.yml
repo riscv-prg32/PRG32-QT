@@ -121,7 +121,8 @@ jobs:
           foreach ($requiredPath in $requiredPaths) {
             $deployedPath = Join-Path 'build-windows-deploy' $requiredPath
             if (-not (Test-Path $deployedPath)) {
-              throw "Windows deployment is incomplete: $requiredPath is missing"
+              Write-Host "::error title=Windows deployment incomplete::$requiredPath is missing"
+              exit 1
             }
           }
       - name: Upload desktop build
