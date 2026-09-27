@@ -97,6 +97,14 @@ compile or physical-device certification.
 
 Use the build, install and launch commands in [Platform support](PLATFORMS.md). For both simulator and device, confirm that Setup renders in portrait and landscape, reports the device IP and API endpoint, and keeps its controls reachable. Load a cartridge, verify the 33 ms frame cadence, return to Setup and confirm execution pauses. Exercise Store browsing, local import, touch input, audio, `/api/runtime`, and the performance action when the selected cartridge declares performance contracts.
 
+Validated on 2026-09-27:
+
+- PRG32-QT 0.3.2 at Git commit `c618c67de68a6da43654bec62c2f15b3c76b624e` was built for arm64 with
+  Xcode 27.0 and Qt 6.8.3, development-signed, installed over the existing application, and launched on the
+  wired iPhone 12 Pro Max (`iPhone13,4`, iOS 27.0) with `devicectl`.
+- The automated session verified successful installation and process launch. Physical touch/controller
+  actuation, orientation changes, Store browsing, and speaker listening were not repeated for this build.
+
 Validated on 2026-09-25:
 
 - PRG32-QT 0.3.1 at Git commit `89de9b15f977fc3729d35be61df7a792114e491c` was development-signed,
