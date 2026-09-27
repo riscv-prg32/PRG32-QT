@@ -35,6 +35,15 @@ endif()
 if(PRG32QT_BUILD_APP)
   find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Network Multimedia WebSockets)
   qt_standard_project_setup(REQUIRES 6.5)
+  if(ANDROID)
+    include(FetchContent)
+    FetchContent_Declare(android_openssl
+        URL https://github.com/KDAB/android_openssl/archive/b71f1470962019bd89534a2919f5925f93bc5779.tar.gz
+        URL_HASH SHA256=6c1dfff0af367bba2f2c2a27f1c2061019537524dc7892ee8efbdc8e1c6224fa
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    FetchContent_MakeAvailable(android_openssl)
+    include("${android_openssl_SOURCE_DIR}/android_openssl.cmake")
+  endif()
   set(PRG32QT_APP_SOURCES
       src/qt/main.cpp src/qt/AppController.cpp src/qt/StoreClient.cpp src/qt/FrameItem.cpp src/qt/WebApiServer.cpp
       src/qt/QtAudioEngine.cpp src/qt/QtMultiplayerService.cpp src/qt/QtMultiplayerService.h
@@ -75,6 +84,7 @@ if(PRG32QT_BUILD_APP)
       LIBRARY DESTINATION .
       ARCHIVE DESTINATION lib)
   if(ANDROID)
+    add_android_openssl_libraries(PRG32_QT)
     set_target_properties(PRG32_QT PROPERTIES
       QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/platform/android"
       QT_ANDROID_PACKAGE_NAME "org.riscvprg32.prg32qt"

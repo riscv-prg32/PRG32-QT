@@ -12,3 +12,10 @@ ANDROID_NDK="${ANDROID_NDK_ROOT:-$ANDROID_SDK/ndk/26.1.10909125}"
   -DPRG32QT_TV_MODE=ON \
   -DPRG32QT_BUILD_APP=ON
 cmake --build build-android-tv
+APK="$(find build-android-tv/android-build/build/outputs/apk -type f -name '*.apk' -print -quit)"
+for LIBRARY in libcrypto_3.so libssl_3.so; do
+  if ! unzip -Z1 "$APK" | grep -q "^lib/arm64-v8a/$LIBRARY$"; then
+    echo "Android TV APK is missing required HTTPS runtime library: $LIBRARY" >&2
+    exit 1
+  fi
+done

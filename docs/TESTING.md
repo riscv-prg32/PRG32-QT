@@ -26,7 +26,7 @@ outputs. The Windows CI job also runs `windeployqt` over a staging copy so depen
 before tagging. For a `vX.Y.Z` tag, `.github/workflows/release.yml` repeats the platform builds, packages each output,
 generates SHA-256 checksums, and publishes all assets together only after every required job succeeds. The iOS
 and Apple TV outputs are unsigned simulator builds, Android outputs are debug-signed APKs, Windows is an NSIS
-installer containing `windeployqt` output and an explicitly staged MSVC runtime DLL set, and both macOS architectures are
+installer containing `windeployqt` output and the matching MinGW runtime, and both macOS architectures are
 `macdeployqt` DMG installers. These installers are not code-signed or notarized by the public workflow.
 
 ### 0.3.2 upstream-alignment release validation (2026-09-26)
@@ -41,13 +41,13 @@ installer containing `windeployqt` output and an explicitly staged MSVC runtime 
   all 25 portable cartridges passed and the two native-only cartridges (`Space Invaders` and `TerraForge`)
   were explicitly excluded. Every pass recorded non-black pixels and distinct framebuffer hashes; audio event
   and PCM counts were recorded by the runner. No physical speaker listening check was performed.
-- The local Qt 6.8.3 Android host-side QML scanner aborted because its arm64 slice requires an unavailable
-  processor feature. Android and Android TV APK completion, Windows Setup, Intel macOS DMG, Linux/Raspberry Pi
-  packages, iOS simulator, and Apple TV remain required release-workflow jobs rather than locally claimed
-  passes.
-- A local `macdeployqt` pass using the Homebrew Qt kit could not create a DMG: that installation omits optional
-  QML frameworks found during import scanning, and `hdiutil` reported `Device not configured`. The tagged
-  workflow packages from the complete Qt 6.8.3 binary kit on separate macOS runners.
+- On 2026-09-27, the Android and Android TV ARM64 debug APKs built locally with Qt 6.8.3, NDK
+  26.1.10909125, and Gradle. Archive inspection confirmed that both APKs contain `libcrypto_3.so` and
+  `libssl_3.so` alongside Qt's OpenSSL backend. No Android device or emulator was connected for an HTTPS
+  request in this session.
+- The `build-macos` application was rebuilt with Homebrew Qt 6.11.2 after clearing stale Qt package locations
+  and deployed frameworks. All four CTests passed; the application started, rendered the Setup screenshot,
+  and exited cleanly without loading duplicate Qt frameworks.
 - Xcode device discovery returned only the Apple Silicon Mac and CoreDevice timed out while initializing; no
   iPhone was available to install or launch this build during the recorded local validation.
 

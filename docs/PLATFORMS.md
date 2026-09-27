@@ -27,8 +27,8 @@ Install Qt 6 desktop and Ninja, then from PowerShell:
 ```
 
 WinMM is used only for legacy/native joystick discovery and button polling; the emulator core has no Windows dependency.
-Tagged releases run `windeployqt` for Qt frameworks, QML modules, and plugins, explicitly stage the matching
-MSVC runtime DLL set from the Windows runner, and package the result in an NSIS Setup executable.
+Tagged releases run `windeployqt` for Qt frameworks, QML modules, and plugins, include the matching MinGW
+runtime from the Windows runner, and package the result in an NSIS Setup executable.
 
 ## Linux
 
@@ -150,7 +150,7 @@ ANDROID_NDK_ROOT=/path/to/android-ndk \
 ./scripts/build-android.sh
 ```
 
-The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The APK contains the required Qt libraries and plugins. The manifest enables Internet access, permits cleartext HTTP only for user-configured development Stores, and retains Qt's required activity metadata and file provider.
+The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The APK contains the required Qt libraries and plugins, plus checksum-pinned OpenSSL 3 libraries for Qt Network HTTPS on Android. The manifest enables Internet access, permits cleartext HTTP only for user-configured development Stores, and retains Qt's required activity metadata and file provider.
 
 The Android player reads system-bar and display-cutout `WindowInsets`, keeps all setup/player controls inside
 that safe region, and hides the desktop fullscreen preference and button.

@@ -4,14 +4,21 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-09-27
+
+- Bundled the pinned OpenSSL 3 runtime in Android and Android TV APKs so HTTPS Cartridge Store requests work
+  on devices that do not provide a compatible OpenSSL library, and report pre-HTTP network failures clearly.
+- Made the macOS build helper discard stale deployed frameworks and cached Qt package locations before
+  rebuilding, preventing startup crashes caused by loading plugins and frameworks from different Qt kits.
+
 ## [0.3.2] - 2026-09-26
 
 - Aligned with upstream PRG32 commit `687251f7a09720e474d5c97fabdf2844271c7963`: the default Store now uses
   `https://store.prg32.uniparthenope.it/`, the player uses the refreshed canonical logo and title, procedural
   synth IDs use the documented waveform/pulse/cutoff/resonance bit layout, and tracker delta-0 events execute
   in one tick with the firmware's 256-event malformed-loop guard. The cartridge ABI remains 1.6.
-- Added a dependency-complete Windows installer built from `windeployqt` output, an explicitly staged MSVC
-  runtime DLL set, and NSIS. Release
+- Added a dependency-complete Windows installer built from `windeployqt` output, its matching MinGW runtime,
+  and NSIS. Release
   macOS DMGs continue to use `macdeployqt` for both Apple Silicon and Intel, while Android and Android TV are
   published as APKs.
 - Expanded performance selection to Accurate (default), 30 FPS Optimal, and Unlimited modes, retaining

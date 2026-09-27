@@ -103,10 +103,14 @@ void StoreClient::fetchDiscovery() {
     connect(r, &QNetworkReply::finished, this, [this, r] {
         auto data = r->readAll();
         int status = r->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QString networkError = r->errorString();
         r->deleteLater();
         if (status < 200 || status >= 300) {
             setLoading(false);
-            setError(QString("Store discovery failed (HTTP %1)").arg(status));
+            if (status == 0)
+                setError(QString("Store discovery failed before HTTP: %1").arg(networkError));
+            else
+                setError(QString("Store discovery failed (HTTP %1): %2").arg(status).arg(networkError));
             return;
         }
         auto o = QJsonDocument::fromJson(data).object();
