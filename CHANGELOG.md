@@ -4,6 +4,13 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Add an optional desktop RV32IMAC debugger with a live, syntax-highlighted disassembly view, integer
+  registers, bounded memory inspection, and pause/single-instruction-step/resume controls. The same debugger
+  state and commands are available through `GET` and `POST /api/debug` for SDK and Python clients.
+- Add one-click disassembly navigation to the cartridge `init`, `update`, and `draw` entry points, plus a PC
+  button for returning to live instruction-following mode.
+- Add persistent debugger playback rates from 0.1x slow motion through 4x fast forward, controllable from the
+  debugger panel or the device HTTP API.
 - Advertise the HTTP device API as `_prg32._tcp.local.` with Bonjour/mDNS metadata so PRG32 SDK tooling can
   discover PRG32-QT for cartridge deployment, execution, and debugging without a manually entered IP address.
 - Report the available guest RAM and default load address before a cartridge is loaded so the SDK can validate

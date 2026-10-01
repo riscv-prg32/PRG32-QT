@@ -66,18 +66,27 @@ void Rv32Cpu::store32(uint32_t a, uint32_t v, bool& ok) {
     hasReservation_ = false;
 }
 bool Rv32Cpu::call(uint32_t entry, uint32_t a0, uint64_t budget, std::string& e) {
+    if (!beginCall(entry, a0, e))
+        return false;
+    while (callActive() && budget--) {
+        if (!step(e))
+            return false;
+    }
+    if (callActive()) {
+        e = "instruction budget exhausted";
+        return false;
+    }
+    return true;
+}
+bool Rv32Cpu::beginCall(uint32_t entry, uint32_t a0, std::string& e) {
+    if (!mem_) {
+        e = "guest memory is not attached";
+        return false;
+    }
     pc_ = entry;
     x_[1] = ReturnSentinel;
     x_[10] = a0;
     x_[2] = base_ + uint32_t(mem_->size() & ~15u);
-    while (pc_ != ReturnSentinel && budget--) {
-        if (!step(e))
-            return false;
-    }
-    if (pc_ != ReturnSentinel) {
-        e = "instruction budget exhausted";
-        return false;
-    }
     return true;
 }
 bool Rv32Cpu::step(std::string& e) {

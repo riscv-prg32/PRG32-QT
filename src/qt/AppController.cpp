@@ -4,6 +4,7 @@
 #include "InputButtons.h"
 #include "QtAudioEngine.h"
 #include "QtMultiplayerService.h"
+#include "RiscVDisassembler.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -14,8 +15,10 @@
 #include <QSaveFile>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QStringList>
 #include <QSysInfo>
 #include <algorithm>
+#include <cmath>
 AppController::AppController(QObject* p)
     : QObject(p), audio_(std::make_unique<QtAudioEngine>()),
       multiplayer_(std::make_unique<QtMultiplayerService>()) {
@@ -27,6 +30,11 @@ AppController::AppController(QObject* p)
     }
     fullScreen_ = settings.value("display/fullScreen", false).toBool();
     statusBarsEnabled_ = settings.value("display/statusBars", false).toBool();
+    debugEnabled_ = settings.value("debug/enabled", false).toBool();
+    debugSpeed_ = settings.value("debug/speed", 1.0).toDouble();
+    if (debugSpeed_ != 0.1 && debugSpeed_ != 0.25 && debugSpeed_ != 0.5 && debugSpeed_ != 1.0 &&
+        debugSpeed_ != 2.0 && debugSpeed_ != 4.0)
+        debugSpeed_ = 1.0;
     performanceMode_ = settings.value("performance/mode", "accurate").toString();
     if (performanceMode_ == "esp32-c6")
         performanceMode_ = "accurate";
@@ -51,7 +59,7 @@ AppController::AppController(QObject* p)
     });
     connect(gamepad_, &GamepadBackend::connectedChanged, this, &AppController::controllerChanged);
     timer_.setTimerType(Qt::PreciseTimer);
-    timer_.setInterval(performanceMode_ == "unlimited" ? 0 : 33);
+    updateTimerInterval();
     connect(&timer_, &QTimer::timeout, this, [this] {
         std::string e;
         if (!rt_.frame(input_.takeMerged(), e)) {
@@ -74,6 +82,8 @@ AppController::AppController(QObject* p)
         emit ledChanged();
         updateFrame();
         emit performanceChanged();
+        if (debugEnabled_)
+            emit debugChanged();
     });
     ipTimer_.setInterval(5000);
     connect(&ipTimer_, &QTimer::timeout, this, &AppController::refreshIp);
@@ -93,7 +103,7 @@ void AppController::setPerformanceMode(const QString& mode) {
     else if (mode == "unlimited")
         runtimeMode = prg32::PerformanceMode::Unlimited;
     rt_.setPerformanceMode(runtimeMode);
-    timer_.setInterval(mode == "unlimited" ? 0 : 33);
+    updateTimerInterval();
     emit performanceModeChanged();
 }
 void AppController::setMultiplayerStoreUrl(const QUrl& url) {
@@ -166,6 +176,8 @@ bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName)
                                        v.toString().compare("performance", Qt::CaseInsensitive) == 0;
                             });
     frameCount_ = 0;
+    debugViewAddress_ = 0;
+    debugView_ = "pc";
     frameRateCount_ = 0;
     framesPerSecond_ = 0;
     frameRateTimer_.restart();
@@ -173,6 +185,8 @@ bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName)
     emit cartridgeChanged();
     emit performanceChanged();
     updateFrame();
+    if (debugEnabled_)
+        inspectMemory(QString("0x%1").arg(rt_.guestBase(), 8, 16, QChar('0')), 128);
     timer_.start();
     running_ = true;
     paused_ = false;
@@ -232,6 +246,156 @@ void AppController::resume() {
     timer_.start();
     emit pausedChanged();
     setStatus(QString("Running %1").arg(cartridgeName_));
+}
+void AppController::setDebugEnabled(bool enabled) {
+    if (debugEnabled_ == enabled)
+        return;
+    debugEnabled_ = enabled;
+    QSettings().setValue("debug/enabled", enabled);
+    updateTimerInterval();
+    if (enabled && rt_.loaded())
+        inspectMemory(QString("0x%1").arg(rt_.guestBase(), 8, 16, QChar('0')), 128);
+    emit debugChanged();
+}
+void AppController::setDebugSpeed(double speed) {
+    static constexpr double SupportedSpeeds[] = {0.1, 0.25, 0.5, 1.0, 2.0, 4.0};
+    const auto supported = std::find(std::begin(SupportedSpeeds), std::end(SupportedSpeeds), speed);
+    if (supported == std::end(SupportedSpeeds) || debugSpeed_ == speed)
+        return;
+    debugSpeed_ = speed;
+    QSettings().setValue("debug/speed", speed);
+    updateTimerInterval();
+    emit debugChanged();
+}
+void AppController::updateTimerInterval() {
+    if (debugEnabled_) {
+        timer_.setInterval(std::max(1, int(std::lround(33.0 / debugSpeed_))));
+        return;
+    }
+    timer_.setInterval(performanceMode_ == "unlimited" ? 0 : 33);
+}
+bool AppController::debugStep() {
+    if (!debugEnabled_ || !running_)
+        return false;
+    if (!paused_)
+        pause();
+    debugViewAddress_ = 0;
+    debugView_ = "pc";
+    std::string error;
+    if (!rt_.debugStep(input_.takeMerged(), error)) {
+        setStatus(QString::fromStdString(error));
+        return false;
+    }
+    updateFrame();
+    emit debugChanged();
+    return true;
+}
+void AppController::showDebugEntry(const QString& entry) {
+    if (!rt_.loaded())
+        return;
+    const auto& header = rt_.cartridge().header();
+    if (entry == "init")
+        debugViewAddress_ = rt_.guestBase() + header.initOffset;
+    else if (entry == "update")
+        debugViewAddress_ = rt_.guestBase() + header.updateOffset;
+    else if (entry == "draw")
+        debugViewAddress_ = rt_.guestBase() + header.drawOffset;
+    else {
+        debugViewAddress_ = 0;
+        debugView_ = "pc";
+        emit debugChanged();
+        return;
+    }
+    debugView_ = entry;
+    emit debugChanged();
+}
+void AppController::inspectMemory(const QString& addressText, int length) {
+    bool ok = false;
+    QString normalized = addressText.trimmed();
+    int base = 10;
+    if (normalized.startsWith("0x", Qt::CaseInsensitive)) {
+        normalized.remove(0, 2);
+        base = 16;
+    }
+    const uint32_t address = normalized.toUInt(&ok, base);
+    if (!ok) {
+        debugMemory_ = "Invalid address";
+        emit debugChanged();
+        return;
+    }
+    const auto bytes = rt_.debugMemory(address, size_t(std::clamp(length, 1, 1024)));
+    QStringList lines;
+    for (size_t offset = 0; offset < bytes.size(); offset += 16) {
+        QString line = QString("%1  ").arg(uint64_t(address) + offset, 8, 16, QChar('0'));
+        QString ascii;
+        for (size_t column = 0; column < 16; ++column) {
+            if (offset + column < bytes.size()) {
+                const uint8_t value = bytes[offset + column];
+                line += QString("%1 ").arg(value, 2, 16, QChar('0'));
+                ascii += value >= 32 && value < 127 ? QChar(value) : QChar('.');
+            } else {
+                line += "   ";
+                ascii += ' ';
+            }
+        }
+        lines.append(line + " |" + ascii + '|');
+    }
+    debugMemory_ = lines.isEmpty() ? "Address outside guest memory" : lines.join('\n');
+    emit debugChanged();
+}
+QString AppController::debugPhase() const {
+    return QString::fromStdString(rt_.debugPhase());
+}
+QString AppController::debugRegisters() const {
+    static const char* names[] = {"zero", "ra", "sp", "gp", "tp",  "t0",  "t1", "t2", "s0", "s1", "a0",
+                                  "a1",   "a2", "a3", "a4", "a5",  "a6",  "a7", "s2", "s3", "s4", "s5",
+                                  "s6",   "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"};
+    QStringList lines;
+    for (unsigned index = 0; index < 32; index += 4) {
+        QStringList row;
+        for (unsigned column = 0; column < 4; ++column) {
+            const unsigned reg = index + column;
+            row.append(QString("%1 %2").arg(names[reg], -4).arg(rt_.registerValue(reg), 8, 16, QChar('0')));
+        }
+        lines.append(row.join("  "));
+    }
+    return lines.join('\n');
+}
+QString AppController::debugAssembly() const {
+    if (!rt_.loaded())
+        return "<span style='color:#77808d'>No cartridge loaded</span>";
+    uint32_t address = debugViewAddress_ ? debugViewAddress_ : rt_.programCounter();
+    if (address < rt_.guestBase() || uint64_t(address) >= uint64_t(rt_.guestBase()) + rt_.guestMemorySize())
+        address = rt_.guestBase() + rt_.cartridge().header().updateOffset;
+    QStringList lines;
+    uint32_t cursor = address;
+    for (int line = 0; line < 15; ++line) {
+        const auto first = rt_.debugMemory(cursor, 2);
+        if (first.size() != 2)
+            break;
+        const uint16_t low = uint16_t(first[0]) | uint16_t(first[1]) << 8;
+        const unsigned width = (low & 3u) == 3u ? 4u : 2u;
+        const auto bytes = rt_.debugMemory(cursor, width);
+        if (bytes.size() != width)
+            break;
+        uint32_t instruction = low;
+        if (width == 4)
+            instruction |= uint32_t(bytes[2]) << 16 | uint32_t(bytes[3]) << 24;
+        QString assembly =
+            QString::fromStdString(prg32::disassembleRv32(cursor, instruction, width)).toHtmlEscaped();
+        const int separator = assembly.indexOf(' ');
+        const QString operation = separator < 0 ? assembly : assembly.left(separator);
+        const QString operands = separator < 0 ? QString() : assembly.mid(separator);
+        const QString marker = cursor == address ? "▶" : " ";
+        const QString background = cursor == address ? "background-color:#26384a;" : "";
+        lines.append(
+            QString(
+                "<div style='%1'><span style='color:#45c9ff'>%2 %3</span>  <span "
+                "style='color:#d987ff;font-weight:600'>%4</span><span style='color:#d6dbe3'>%5</span></div>")
+                .arg(background, marker, QString("%1").arg(cursor, 8, 16, QChar('0')), operation, operands));
+        cursor += width;
+    }
+    return lines.join(QString());
 }
 void AppController::setButton(int m, bool down) {
     input_.set(InputState::Ui, uint32_t(m), down);
@@ -413,6 +577,74 @@ QJsonObject AppController::memoryJson() const {
             {"heap_allocated_bytes", double(m)},
             {"heap_largest_free_block", 0},
             {"host", "qt"}};
+}
+QJsonObject AppController::debugJson(uint32_t address, int length) const {
+    QJsonArray registers;
+    for (unsigned index = 0; index < 32; ++index)
+        registers.append(double(rt_.registerValue(index)));
+    uint32_t pc = rt_.programCounter();
+    if (address == 0)
+        address = pc >= rt_.guestBase() && uint64_t(pc) < uint64_t(rt_.guestBase()) + rt_.guestMemorySize()
+                      ? pc
+                      : rt_.guestBase();
+    const auto bytes = rt_.debugMemory(address, size_t(std::clamp(length, 1, 1024)));
+    QByteArray raw(reinterpret_cast<const char*>(bytes.data()), qsizetype(bytes.size()));
+    return {{"ok", true},
+            {"enabled", debugEnabled_},
+            {"running", running_ && !paused_},
+            {"paused", paused_},
+            {"phase", debugPhase()},
+            {"speed", debugSpeed_},
+            {"pc", double(pc)},
+            {"assembly_html", debugAssembly()},
+            {"registers", registers},
+            {"memory_address", double(address)},
+            {"memory_hex", QString::fromLatin1(raw.toHex())}};
+}
+bool AppController::debugCommand(const QJsonObject& command, QString& error) {
+    const QString operation = command.value("command").toString().toLower();
+    if (operation == "enable") {
+        setDebugEnabled(command.value("enabled").toBool(true));
+        return true;
+    }
+    if (operation == "speed") {
+        const double requestedSpeed = command.value("speed").toDouble(-1.0);
+        const double previousSpeed = debugSpeed_;
+        setDebugSpeed(requestedSpeed);
+        if (debugSpeed_ != requestedSpeed && previousSpeed != requestedSpeed) {
+            error = "supported speeds are 0.1, 0.25, 0.5, 1, 2, and 4";
+            return false;
+        }
+        return true;
+    }
+    if (!debugEnabled_) {
+        error = "debug mode is disabled";
+        return false;
+    }
+    if (operation == "pause") {
+        if (!running_) {
+            error = "no cartridge is running";
+            return false;
+        }
+        pause();
+        return true;
+    }
+    if (operation == "resume") {
+        if (!running_) {
+            error = "no cartridge is running";
+            return false;
+        }
+        resume();
+        return true;
+    }
+    if (operation == "step") {
+        if (debugStep())
+            return true;
+        error = status_.isEmpty() ? "unable to step guest execution" : status_;
+        return false;
+    }
+    error = "expected command enable, pause, step, or resume";
+    return false;
 }
 QJsonArray AppController::scoresJson() const {
     QJsonArray a;

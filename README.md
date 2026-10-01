@@ -21,6 +21,8 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - Canonical PRG32 artwork used by the PRG32 project.
 - Headless regression fixtures included for compatibility testing and live whole-Store certification tooling.
 - Bonjour/mDNS advertisement of the HTTP device API for SDK deployment, execution, and debugging workflows.
+- Optional desktop debugger with highlighted RV32IMAC assembly, registers, guest-memory monitor, and
+  pause/instruction-step/resume controls; the controls are also available to SDK/Python clients over HTTP.
 
 ## Build and test
 
@@ -69,6 +71,12 @@ python3 -m prg32 esp32c6 upload-and-run game.prg32 \
 
 See [network discovery and SDK access](docs/NETWORKING.md) for the DNS-SD/TXT contract, endpoint table,
 platform behavior, security boundary, and troubleshooting steps.
+
+On desktop, enable **RISC-V debugger** in Settings or choose **Debug Cartridge**. The player and debugger run
+side by side; Pause, Step, and Resume operate on the same runtime used by the game. Fullscreen remains a
+game-only presentation and therefore hides the debugger panel. The Init, Update, and Draw buttons jump directly
+to those cartridge entry points without executing code; PC returns to live instruction-following mode. Playback
+speed can be selected from 0.1x, 0.25x, 0.5x, 1x, 2x, or 4x while the debugger is enabled.
 
 To exercise every discoverable Store cartridge after building the headless runner:
 

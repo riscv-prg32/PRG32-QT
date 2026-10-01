@@ -2,6 +2,20 @@
 
 PRG32-QT uses layered validation.
 
+## Debugger validation (2026-10-01)
+
+- Apple Silicon macOS, arm64: the Qt application compiled with the locally installed Qt kit. The portable core
+  suite, Asteroids and Bach headless fixtures, and required PerformanceTest contract all passed.
+- Core tests cover resumable call preparation, one-instruction stepping, call completion, and representative
+  RV32 disassembly. The desktop debugger UI and HTTP API compiled; interactive panel inspection and live API
+  actuation verified that Step advances the PC/register state and Resume returns to continuous execution. The
+  panel distinguishes a paused frame boundary (`READY`) from continuous execution (`RUNNING`) and a partially
+  stepped update/draw call. Debugger playback-rate selection covers the supported 0.1x, 0.25x, 0.5x, 1x, 2x,
+  and 4x timer intervals; physical timing observation remains a manual UI check.
+- Windows, Linux, Raspberry Pi OS, iOS, Android, Apple TV, and Android TV were not locally built because their
+  toolchains/runners are unavailable on this macOS host; the shared C++/Qt sources remain in their build graph
+  and require the normal eight-target CI matrix before merge.
+
 ## Bonjour/mDNS device discovery validation (2026-10-01)
 
 - The native arm64 macOS application built with Qt 6.11.2 and passed all four CTest targets. With the application

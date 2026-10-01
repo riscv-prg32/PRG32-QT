@@ -74,6 +74,13 @@ ApplicationWindow {
         out.sort((a,b)=>gameTitle(a).localeCompare(gameTitle(b))); return out
     }
     function showPlayer() { appController.resume(); page=2; requestActivate(); keyboardHandler.forceActiveFocus() }
+    function showDebugger() {
+        appController.debugEnabled=true
+        appController.pause()
+        page=2
+        requestActivate()
+        keyboardHandler.forceActiveFocus()
+    }
     function showSetup() { appController.pause(); page=0; if(tvPlatform) browseButton.forceActiveFocus() }
     function showStore() { page=1; if(tvPlatform) storeSearch.forceActiveFocus() }
     function applyFullScreen() {
@@ -153,6 +160,8 @@ ApplicationWindow {
                 onToggled:{appController.fullScreen=checked;root.applyFullScreen()} }
             CheckBox { text:"Show top and bottom status bars"; checked:appController.statusBarsEnabled
                 onToggled:appController.statusBarsEnabled=checked }
+            CheckBox { visible:root.desktopPlatform; text:"Enable RISC-V debugger"; checked:appController.debugEnabled
+                onToggled:appController.debugEnabled=checked }
             Label { Layout.fillWidth:true; font.bold:true; text:"Performance" }
             ComboBox { id:performanceModeBox; Layout.fillWidth:true; model:["Accurate (ESP32-C6)","Optimal (30 FPS)","Unlimited"]
                 Component.onCompleted:currentIndex=Math.max(0,["accurate","optimal","unlimited"].indexOf(appController.performanceMode))
@@ -189,6 +198,7 @@ ApplicationWindow {
                 Label { text:"PRG32 SETUP"; color:"white"; font.family:"monospace"; font.pixelSize:18 }
                 Label { Layout.fillWidth:true; text:"PLATFORM: "+Qt.platform.os.toUpperCase()+"\nRUNTIME: RV32IMAC · 30 FPS\nCARTRIDGES: "+storeClient.cartridges.length+"\nIP: "+(appController.deviceIp||"No local IPv4 address")+"\nWEB API: "+(appController.webApiUrl||"Unavailable"); color:"#43d17b"; font.family:"monospace"; wrapMode:Text.WrapAnywhere }
                 SetupButton { text:"›  RUN CARTRIDGE"; enabled:appController.running; onClicked:root.showPlayer() }
+                SetupButton { visible:root.desktopPlatform; text:"›  DEBUG CARTRIDGE"; enabled:appController.running; onClicked:root.showDebugger() }
                 SetupButton { visible:appController.performanceAvailable; text:"›  RUN PERFORMANCE TEST"; onClicked:{appController.runPerformanceTest();root.showPlayer()} }
                 SetupButton { id:browseButton; focus:tvPlatform && root.page===0; text:"›  BROWSE STORE"; onClicked:root.showStore() }
                 SetupButton { text:"›  IMPORT CARTRIDGE"; onClicked:importDialog.open() }
@@ -224,12 +234,50 @@ ApplicationWindow {
         // Player
         Item { id:playerPage
             Rectangle { anchors.fill:parent; color:"#0d1015" }
-            Loader { anchors.fill:parent; anchors.topMargin:root.gameOnlyFullScreen?0:48; sourceComponent:root.gameOnlyFullScreen?fullScreenPlayer:(root.useLandscapePlayer?landscapePlayer:portraitPlayer) }
+            Loader { anchors.fill:parent; anchors.topMargin:root.gameOnlyFullScreen?0:48; anchors.rightMargin:debugPanel.visible?debugPanel.width:0; sourceComponent:root.gameOnlyFullScreen?fullScreenPlayer:(root.useLandscapePlayer?landscapePlayer:portraitPlayer) }
             RowLayout { visible:!root.gameOnlyFullScreen; anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:6; height:42; z:3
                 Button { text:"‹ Setup"; onClicked:root.showSetup() }
                 Label { Layout.fillWidth:true; text:appController.cartridgeName; elide:Text.ElideRight; font.bold:true; horizontalAlignment:Text.AlignHCenter }
+                Button { visible:root.desktopPlatform; text:appController.debugEnabled?"Close Debugger":"Debugger"; onClicked:{if(appController.debugEnabled)appController.debugEnabled=false;else root.showDebugger()} }
                 Button { visible:appController.performanceAvailable; text:"Performance"; onClicked:appController.runPerformanceTest() }
                 Button { visible:root.desktopPlatform; text:appController.fullScreen?"Exit Full Screen":"Full Screen"; onClicked:root.toggleFullScreen() }
+            }
+            Rectangle { id:debugPanel; visible:root.desktopPlatform && appController.debugEnabled && !root.gameOnlyFullScreen; anchors.top:parent.top; anchors.topMargin:48; anchors.right:parent.right; anchors.bottom:parent.bottom; width:Math.min(parent.width-120,Math.max(430,parent.width*.46)); color:"#11161d"; border.color:"#364452"
+                ColumnLayout { anchors.fill:parent; anchors.margins:10; spacing:7
+                    RowLayout { Layout.fillWidth:true
+                        Label { text:"RV32IMAC DEBUGGER · "+(!appController.paused?"RUNNING":(appController.debugPhase==="idle"?"READY":"PAUSED · "+appController.debugPhase.toUpperCase())); color:"#45c9ff"; font.bold:true; font.family:"monospace" }
+                        Item { Layout.fillWidth:true }
+                        Button { text:appController.paused?"Resume":"Pause"; onClicked:appController.paused?appController.resume():appController.pause() }
+                        Button { text:"Step"; enabled:appController.running; onClicked:appController.debugStep() }
+                    }
+                    RowLayout { Layout.fillWidth:true
+                        Label { text:"PLAYBACK SPEED"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
+                        ComboBox { id:debugSpeedBox; Layout.preferredWidth:110; model:["0.1×","0.25×","0.5×","1×","2×","4×"]
+                            Component.onCompleted:currentIndex=Math.max(0,[0.1,0.25,0.5,1,2,4].indexOf(appController.debugSpeed))
+                            onActivated:appController.debugSpeed=[0.1,0.25,0.5,1,2,4][currentIndex] }
+                        Label { Layout.fillWidth:true; text:appController.debugSpeed<1?"Slow motion":(appController.debugSpeed>1?"Fast forward":"Real time"); color:"#c5ccd6" }
+                    }
+                    RowLayout { Layout.fillWidth:true
+                        Label { text:"GO TO"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
+                        Button { text:"Init"; highlighted:appController.debugView==="init"; onClicked:appController.showDebugEntry("init") }
+                        Button { text:"Update"; highlighted:appController.debugView==="update"; onClicked:appController.showDebugEntry("update") }
+                        Button { text:"Draw"; highlighted:appController.debugView==="draw"; onClicked:appController.showDebugEntry("draw") }
+                        Button { text:"PC"; highlighted:appController.debugView==="pc"; onClicked:appController.showDebugEntry("pc") }
+                        Item { Layout.fillWidth:true }
+                    }
+                    Label { text:"ASSEMBLY"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
+                    ScrollView { Layout.fillWidth:true; Layout.preferredHeight:Math.max(170,parent.height*.34); clip:true
+                        TextEdit { width:parent.width; text:appController.debugAssembly; textFormat:TextEdit.RichText; readOnly:true; color:"#d6dbe3"; font.family:"monospace"; font.pixelSize:13; selectByMouse:true }
+                    }
+                    Label { text:"REGISTERS"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
+                    TextArea { Layout.fillWidth:true; Layout.preferredHeight:128; text:appController.debugRegisters; readOnly:true; color:"#c8f3d0"; font.family:"monospace"; font.pixelSize:11; background:Rectangle{color:"#0b0f14";border.color:"#27313c"} }
+                    RowLayout { Layout.fillWidth:true
+                        Label { text:"MEMORY"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
+                        TextField { id:memoryAddress; Layout.fillWidth:true; text:"0x40800000"; placeholderText:"Guest address"; font.family:"monospace"; onAccepted:appController.inspectMemory(text,128) }
+                        Button { text:"Inspect"; onClicked:appController.inspectMemory(memoryAddress.text,128) }
+                    }
+                    TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appController.debugMemory; readOnly:true; wrapMode:TextEdit.NoWrap; color:"#f0d38a"; font.family:"monospace"; font.pixelSize:11; background:Rectangle{color:"#0b0f14";border.color:"#27313c"} }
+                }
             }
         }
     }

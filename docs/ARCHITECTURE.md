@@ -19,6 +19,11 @@ receive deterministic charges. Network latency and host rendering latency never 
 
 Downloaded cartridge bytes are never treated as host-native code.
 
+The interpreter can also prepare a guest call without running it to completion. `Runtime::debugStep` uses this
+to preserve the update/draw phase across timer stops and retire exactly one instruction. Debug memory reads use
+the CPU's normal bounded guest-address translation; resuming a partially stepped frame completes it before
+returning to normal frame execution.
+
 ### Synthetic ABI
 
 The runtime installs the PRG32 ABI 1.6 table in guest-visible memory and maps 139 ABI entries to synthetic host-call addresses. Current ABI hash `0x260f6136` and documented compatible hashes `0x006427c2` and `0x6be6e8d0` are accepted.
@@ -60,6 +65,14 @@ backend. `StoreClient` owns Store settings, catalog/discovery requests, architec
 
 `QtAudioEngine` uses Qt Multimedia and `QtMultiplayerService` uses Qt WebSockets; both implementations are
 shared across all Qt targets.
+
+On desktop, the optional debugger panel presents the game alongside highlighted RV32IMAC disassembly, the 32
+integer registers, and a bounded hexadecimal/ASCII memory monitor. `WebApiServer` exposes the same debugger
+state machine at `/api/debug`, so local UI, SDK commands, and Python automation cannot disagree about state.
+The disassembly view can navigate directly to the cartridge header's init, update, and draw offsets without
+altering CPU state, and returns to following the live program counter when stepping resumes.
+Debugger playback applies a persistent 0.1x-to-4x multiplier to the 33 ms host frame timer. Closing the debugger
+restores the selected normal performance profile's timer behavior.
 
 ## Layer 3 — Input adapters
 

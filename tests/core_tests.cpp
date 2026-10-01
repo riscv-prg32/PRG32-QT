@@ -3,6 +3,7 @@
 #include "InputButtons.h"
 #include "InputState.h"
 #include "PerformanceTiming.h"
+#include "RiscVDisassembler.h"
 #include "Runtime.h"
 #include "Rv32Cpu.h"
 #include <cassert>
@@ -95,6 +96,16 @@ int main() {
     memcpy(m.data(), &i1, 4);
     memcpy(m.data() + 4, &i2, 4);
     Rv32Cpu cpu;
+    cpu.reset(0x1000, &m);
+    assert(cpu.beginCall(0x1000, 0, e));
+    assert(cpu.callActive());
+    assert(cpu.step(e));
+    assert(cpu.reg(10) == 42);
+    assert(cpu.callActive());
+    assert(cpu.step(e));
+    assert(!cpu.callActive());
+    assert(disassembleRv32(0x1000, i1, 4) == "addi a0, zero, 42");
+    assert(disassembleRv32(0x1004, i2, 4) == "jalr zero, 0(ra)");
     cpu.reset(0x1000, &m);
     assert(cpu.call(0x1000, 0, 10, e));
     assert(cpu.reg(10) == 42);

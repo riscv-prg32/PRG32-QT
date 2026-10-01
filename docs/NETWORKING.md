@@ -63,9 +63,34 @@ The discovery document at `GET /api` lists the active endpoints. The current hos
 | `GET` | `/api/memory` | Runtime memory statistics |
 | `GET` | `/api/scores` | Local scores |
 | `POST` | `/api/scores` | Submit a local score |
+| `GET` | `/api/debug?address=0x40800000&length=128` | Debug state, registers, and bounded guest-memory bytes |
+| `POST` | `/api/debug` | Enable, pause, single-step, or resume guest execution |
 
 Uploads still pass the normal PRG2 bounds, CRC, ABI, feature, import-model, and memory validation. Discovery does
 not weaken cartridge isolation or execute native host code.
+
+Debugger commands use a small JSON body. This is directly callable from Python or can be wrapped by PRG32 SDK
+frontends that use the device URL:
+
+```sh
+curl -X POST http://prg32-host.local:8080/api/debug \
+  -H 'Content-Type: application/json' -d '{"command":"enable","enabled":true}'
+curl -X POST http://prg32-host.local:8080/api/debug \
+  -H 'Content-Type: application/json' -d '{"command":"pause"}'
+curl -X POST http://prg32-host.local:8080/api/debug \
+  -H 'Content-Type: application/json' -d '{"command":"step"}'
+curl -X POST http://prg32-host.local:8080/api/debug \
+  -H 'Content-Type: application/json' -d '{"command":"speed","speed":0.25}'
+curl 'http://prg32-host.local:8080/api/debug?address=0x40800000&length=128'
+curl -X POST http://prg32-host.local:8080/api/debug \
+  -H 'Content-Type: application/json' -d '{"command":"resume"}'
+```
+
+`step` retires exactly one RV32IMAC instruction. The response reports the update/draw phase, program counter,
+all 32 integer registers, and requested memory as hexadecimal. Reads are limited to 1024 bytes and cannot
+leave allocated guest memory. Resuming in the middle of a frame completes that update/draw cycle before the
+normal frame timer continues. The `speed` command accepts 0.1, 0.25, 0.5, 1, 2, or 4 and changes the debugger's
+continuous-playback frame cadence; the selected multiplier is returned in debugger state and persists locally.
 
 ## Platform implementation
 

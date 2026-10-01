@@ -31,6 +31,12 @@ class Rv32Cpu {
     }
     /** Execute a guest function until it returns or consumes `budget` instructions. */
     bool call(uint32_t entry, uint32_t a0, uint64_t budget, std::string& error);
+    /** Prepare a guest function call that can subsequently be advanced with step(). */
+    bool beginCall(uint32_t entry, uint32_t a0, std::string& error);
+    /** Return whether a call prepared by beginCall() still has guest instructions to execute. */
+    bool callActive() const {
+        return pc_ != ReturnSentinel;
+    }
     /** Fetch, decode, and execute one instruction, reporting traps through `error`. */
     bool step(std::string& error);
     /** Read an integer register; reads of x0 always return zero. */

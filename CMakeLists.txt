@@ -14,6 +14,7 @@ add_library(prg32qt_core
     src/core/Cartridge.cpp
     src/core/Framebuffer.cpp
     src/core/PerformanceTiming.cpp
+    src/core/RiscVDisassembler.cpp
     src/core/Rv32Cpu.cpp
     src/core/Runtime.cpp)
 target_include_directories(prg32qt_core PUBLIC src/core)

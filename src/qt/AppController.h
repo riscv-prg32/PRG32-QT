@@ -38,6 +38,13 @@ class AppController : public QObject {
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY frameStatsChanged)
     Q_PROPERTY(bool statusBarsEnabled READ statusBarsEnabled WRITE setStatusBarsEnabled NOTIFY
                    displayPreferencesChanged)
+    Q_PROPERTY(bool debugEnabled READ debugEnabled WRITE setDebugEnabled NOTIFY debugChanged)
+    Q_PROPERTY(QString debugAssembly READ debugAssembly NOTIFY debugChanged)
+    Q_PROPERTY(QString debugRegisters READ debugRegisters NOTIFY debugChanged)
+    Q_PROPERTY(QString debugMemory READ debugMemory NOTIFY debugChanged)
+    Q_PROPERTY(QString debugPhase READ debugPhase NOTIFY debugChanged)
+    Q_PROPERTY(QString debugView READ debugView NOTIFY debugChanged)
+    Q_PROPERTY(double debugSpeed READ debugSpeed WRITE setDebugSpeed NOTIFY debugChanged)
     // clang-format on
 
   public:
@@ -94,10 +101,27 @@ class AppController : public QObject {
     int framesPerSecond() const {
         return framesPerSecond_;
     }
+    bool debugEnabled() const {
+        return debugEnabled_;
+    }
+    QString debugAssembly() const;
+    QString debugRegisters() const;
+    QString debugMemory() const {
+        return debugMemory_;
+    }
+    QString debugPhase() const;
+    QString debugView() const {
+        return debugView_;
+    }
+    double debugSpeed() const {
+        return debugSpeed_;
+    }
     QJsonObject runtimeJson() const;
     QJsonArray gamesJson() const;
     QJsonObject performanceJson() const;
     QJsonObject memoryJson() const;
+    QJsonObject debugJson(uint32_t address = 0, int length = 128) const;
+    bool debugCommand(const QJsonObject& command, QString& error);
     QJsonArray scoresJson() const;
     bool submitScore(const QJsonObject&, QString&);
     QByteArray screenshotBmp() const;
@@ -108,6 +132,13 @@ class AppController : public QObject {
     Q_INVOKABLE void stop();
     Q_INVOKABLE void pause();
     Q_INVOKABLE void resume();
+    Q_INVOKABLE void setDebugEnabled(bool enabled);
+    Q_INVOKABLE bool debugStep();
+    /** Move the disassembly view to init, update, draw, or the live program counter. */
+    Q_INVOKABLE void showDebugEntry(const QString& entry);
+    /** Set the debugger's continuous-playback rate multiplier. */
+    Q_INVOKABLE void setDebugSpeed(double speed);
+    Q_INVOKABLE void inspectMemory(const QString& address, int length = 128);
     Q_INVOKABLE void setButton(int, bool);
     Q_INVOKABLE void setDirectional(int);
     Q_INVOKABLE void setKeyboardButton(int, bool);
@@ -137,11 +168,13 @@ class AppController : public QObject {
     void displayPreferencesChanged();
     void performanceModeChanged();
     void frameStatsChanged();
+    void debugChanged();
 
   private:
     void setStatus(QString);
     void saveCartridge(const QByteArray&, const QString&);
     void updateFrame();
+    void updateTimerInterval();
     void refreshIp();
     QString slotPath(int) const;
     prg32::Runtime rt_;
@@ -159,6 +192,11 @@ class AppController : public QObject {
     bool running_ = false, paused_ = false, performanceAvailable_ = false;
     bool fullScreen_ = false;
     bool statusBarsEnabled_ = false;
+    bool debugEnabled_ = false;
+    QString debugMemory_;
+    QString debugView_ = "pc";
+    uint32_t debugViewAddress_ = 0;
+    double debugSpeed_ = 1.0;
     uint64_t frameCount_ = 0;
     QElapsedTimer frameRateTimer_;
     int framesPerSecond_ = 0;

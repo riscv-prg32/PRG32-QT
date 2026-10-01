@@ -78,7 +78,9 @@ void WebApiServer::serve(QTcpSocket* socket, const QByteArray& request) {
                                       qMakePair("GET", "/api/performance.json"),
                                       qMakePair("GET", "/api/scores"),
                                       qMakePair("POST", "/api/scores"),
-                                      qMakePair("GET", "/api/memory")})
+                                      qMakePair("GET", "/api/memory"),
+                                      qMakePair("GET", "/api/debug"),
+                                      qMakePair("POST", "/api/debug")})
                 endpoints.append(
                     QJsonObject{{"method", entry.first}, {"path", entry.second}, {"available", true}});
             json(QJsonObject{{"ok", true}, {"service", "PRG32"}, {"endpoints", endpoints}});
@@ -90,7 +92,14 @@ void WebApiServer::serve(QTcpSocket* socket, const QByteArray& request) {
             json(controller_->performanceJson());
         else if (method == "GET" && path == "/api/memory")
             json(controller_->memoryJson());
-        else if (method == "GET" && path == "/api/scores")
+        else if (method == "GET" && path == "/api/debug") {
+            bool addressOk = false;
+            QString addressText = query.queryItemValue("address");
+            uint32_t address = addressText.toUInt(&addressOk, 0);
+            bool lengthOk = false;
+            int length = query.queryItemValue("length").toInt(&lengthOk);
+            json(controller_->debugJson(addressOk ? address : 0, lengthOk ? length : 128));
+        } else if (method == "GET" && path == "/api/scores")
             json(controller_->scoresJson());
         else if (method == "GET" && path == "/api/screenshot.bmp") {
             mime = "image/bmp";
@@ -120,6 +129,15 @@ void WebApiServer::serve(QTcpSocket* socket, const QByteArray& request) {
                 json(QJsonObject{{"ok", false}, {"error", error}});
             } else
                 json(QJsonObject{{"ok", true}});
+        } else if (method == "POST" && path == "/api/debug") {
+            QString error;
+            const auto command = QJsonDocument::fromJson(body).object();
+            if (!controller_->debugCommand(command, error)) {
+                status = 400;
+                json(QJsonObject{{"ok", false}, {"error", error}});
+            } else {
+                json(controller_->debugJson());
+            }
         } else {
             status = 404;
             json(QJsonObject{{"ok", false}, {"error", "unknown endpoint"}});

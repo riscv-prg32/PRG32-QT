@@ -109,6 +109,7 @@ bool Runtime::load(const Cartridge& c, std::string& e) {
     started_ = std::chrono::steady_clock::now();
     nextFrameCycles_ = VirtualClock::FramePeriodCycles;
     lateFrames_ = 0;
+    debugPhase_ = DebugPhase::Idle;
     channelVolumes_.fill(255);
     channelPans_.fill(0);
     return true;
@@ -131,6 +132,18 @@ bool Runtime::init(std::string& e) {
 bool Runtime::frame(uint32_t in, std::string& e) {
     if (!loaded_)
         return false;
+    if (debugPhase_ != DebugPhase::Idle) {
+        uint64_t budget = 20'000'000;
+        while (debugPhase_ != DebugPhase::Idle && budget--) {
+            if (!debugStep(in, e))
+                return false;
+        }
+        if (debugPhase_ != DebugPhase::Idle) {
+            e = "instruction budget exhausted while resuming debugger";
+            return false;
+        }
+        return true;
+    }
     input_ = in;
     auto n = nowUs();
     if (lastAudioUs_)
@@ -147,6 +160,57 @@ bool Runtime::frame(uint32_t in, std::string& e) {
         nextFrameCycles_ += VirtualClock::FramePeriodCycles;
     }
     return true;
+}
+bool Runtime::debugStep(uint32_t in, std::string& e) {
+    if (!loaded_)
+        return false;
+    input_ = in;
+    if (debugPhase_ == DebugPhase::Idle) {
+        if (!cpu_.beginCall(base_ + cart_.header().updateOffset, guestPtr(abiOffset_), e))
+            return false;
+        debugPhase_ = DebugPhase::Update;
+    }
+    if (!cpu_.step(e))
+        return false;
+    if (cpu_.callActive())
+        return true;
+    if (debugPhase_ == DebugPhase::Update) {
+        debugPhase_ = DebugPhase::Draw;
+        return cpu_.beginCall(base_ + cart_.header().drawOffset, guestPtr(abiOffset_), e);
+    }
+    debugPhase_ = DebugPhase::Idle;
+    if (performanceMode_ == PerformanceMode::Esp32C6Accurate) {
+        if (cpu_.virtualCycles() > nextFrameCycles_)
+            ++lateFrames_;
+        cpu_.advanceVirtualClockTo(nextFrameCycles_);
+        nextFrameCycles_ += VirtualClock::FramePeriodCycles;
+    }
+    return true;
+}
+std::vector<uint8_t> Runtime::debugMemory(uint32_t address, size_t length) const {
+    std::vector<uint8_t> bytes;
+    bytes.reserve(length);
+    bool ok = false;
+    for (size_t index = 0; index < length; ++index) {
+        const uint64_t candidate = uint64_t(address) + index;
+        if (candidate > UINT32_MAX)
+            break;
+        const uint8_t value = cpu_.load8(uint32_t(candidate), ok);
+        if (!ok)
+            break;
+        bytes.push_back(value);
+    }
+    return bytes;
+}
+std::string Runtime::debugPhase() const {
+    switch (debugPhase_) {
+    case DebugPhase::Update:
+        return "update";
+    case DebugPhase::Draw:
+        return "draw";
+    default:
+        return "idle";
+    }
 }
 void Runtime::stop() {
     track_.reset();

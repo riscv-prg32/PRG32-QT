@@ -49,6 +49,28 @@ class Runtime {
     bool init(std::string&);
     /** Execute one update/draw cycle with the supplied PRG32 input bit mask. */
     bool frame(uint32_t, std::string&);
+    /** Advance the current update/draw cycle by exactly one RV32IMAC instruction. */
+    bool debugStep(uint32_t input, std::string& error);
+    /** Return the current guest program counter. */
+    uint32_t programCounter() const {
+        return cpu_.pc();
+    }
+    /** Read a guest integer register; x0 always reads as zero. */
+    uint32_t registerValue(unsigned index) const {
+        return index < 32 ? cpu_.reg(index) : 0;
+    }
+    /** Copy a bounded range from the guest address space for debugger inspection. */
+    std::vector<uint8_t> debugMemory(uint32_t address, size_t length) const;
+    /** Return the address of guest memory offset zero. */
+    uint32_t guestBase() const {
+        return base_;
+    }
+    /** Return the allocated guest address-space size. */
+    size_t guestMemorySize() const {
+        return mem_.size();
+    }
+    /** Return the debugger's current frame phase. */
+    std::string debugPhase() const;
     /** Stop guest-controlled audio and release runtime-side playback state. */
     void stop();
     void pause() {
@@ -188,6 +210,8 @@ class Runtime {
     uint64_t lastAudioUs_ = 0, perfStart_ = 0;
     uint64_t nextFrameCycles_ = VirtualClock::FramePeriodCycles;
     uint64_t lateFrames_ = 0;
+    enum class DebugPhase { Idle, Update, Draw };
+    DebugPhase debugPhase_ = DebugPhase::Idle;
     PerformanceMode performanceMode_ = PerformanceMode::Esp32C6Accurate;
     PerfSnapshot perf_;
     int activePerfCase_ = -1;
