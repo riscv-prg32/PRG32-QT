@@ -4,14 +4,41 @@ PRG32-QT uses layered validation.
 
 ## Debugger validation (2026-10-01)
 
+- The 0.4.0 release candidate passed the live default-Store 900-frame media/input sweep: 29 portable cartridges
+  passed and two non-portable packages were explicitly excluded. The complete catalog and per-cartridge media
+  counters are recorded in the [debugger release Store certification](STORE-CERTIFICATION-2026-10-01-DEBUGGER.md).
+- The startup splash was rebuilt with a single centered PRG32 logo; the obsolete second title-logo image was
+  removed from the splash component.
 - Apple Silicon macOS, arm64: the Qt application compiled with the locally installed Qt kit. The portable core
   suite, Asteroids and Bach headless fixtures, and required PerformanceTest contract all passed.
 - Core tests cover resumable call preparation, one-instruction stepping, call completion, and representative
   RV32 disassembly. The desktop debugger UI and HTTP API compiled; interactive panel inspection and live API
   actuation verified that Step advances the PC/register state and Resume returns to continuous execution. The
   panel distinguishes a paused frame boundary (`READY`) from continuous execution (`RUNNING`) and a partially
-  stepped update/draw call. Debugger playback-rate selection covers the supported 0.1x, 0.25x, 0.5x, 1x, 2x,
-  and 4x timer intervals; physical timing observation remains a manual UI check.
+  stepped update/draw call. Debugger playback-rate selection covers the supported 0.01x, 0.025x, 0.05x, 0.1x,
+  0.25x, 0.5x, 1x, 2x, and 4x timer intervals; physical timing observation remains a manual UI check.
+- The default-off Settings selector is the sole UI control for debug mode. With it enabled, Run Cartridge opens
+  the player running with game input active; with it disabled, Run Cartridge resumes normal play without the
+  debugger panel. Pause remains explicit for instruction stepping.
+- On macOS, Init, Update, Draw, and PC were verified as one exclusive selector group. The execution highlight
+  tracks the current execution position independently from the chosen disassembly view.
+- Core tests verify retirement-trace ordering. The macOS PC panel was checked for a single active-instruction
+  highlight, visibly advancing PC/register state between execution slices, and a refreshed hexadecimal/ASCII
+  dump for the selected guest address.
+- The macOS transport toggle was checked for `⏸` while running and `▶` while paused, with matching Pause/Resume
+  accessible names; changing transport state does not alter the selected playback rate.
+- Guest-address breakpoints were checked for add/remove, a pre-retirement pause at the marked PC, one-instruction
+  progress after Resume, clearing on cartridge load, and matching HTTP API state.
+- The macOS disassembly gutter was checked with multiple simultaneous breakpoints. Clicking beside an address
+  adds a filled red circle, clicking it again removes only that breakpoint, and other breakpoint rows remain set.
+- The `▶│` control was checked to retire one instruction per activation while remaining paused. Escape was
+  checked from windowed and fullscreen debugger views and returned to Setup without sending cartridge input.
+- The bug toggle was checked in both states: active execution honored breakpoints and instruction stepping;
+  inactive execution continued through the regular frame path with the debugger screen still visible. The player
+  telemetry displayed the merged input mask, independent left/right mixer snapshots, host execution microseconds,
+  FPS, retired instruction and virtual-cycle counters, and accurate-mode late-frame count.
+- In landscape debug presentation, the telemetry frame was checked against the full player-container width; its
+  border and the left/right waveform row extend beneath the complete virtual-console layout.
 - Windows, Linux, Raspberry Pi OS, iOS, Android, Apple TV, and Android TV were not locally built because their
   toolchains/runners are unavailable on this macOS host; the shared C++/Qt sources remain in their build graph
   and require the normal eight-target CI matrix before merge.

@@ -1,5 +1,6 @@
 // RV32IMAC fetch, memory, and instruction semantics for the portable architecture layer.
 #include "Rv32Cpu.h"
+#include <algorithm>
 #include <cstring>
 #include <limits>
 namespace prg32 {
@@ -8,6 +9,9 @@ void Rv32Cpu::reset(uint32_t b, std::vector<uint8_t>* m) {
     mem_ = m;
     x_.fill(0);
     pc_ = b;
+    lastInstructionAddress_ = b;
+    instructionTraceCount_ = 0;
+    instructionTraceNext_ = 0;
     retired_ = 0;
     clock_.reset();
     hasReservation_ = false;
@@ -99,6 +103,10 @@ bool Rv32Cpu::step(std::string& e) {
         return true;
     }
     bool ok;
+    lastInstructionAddress_ = pc_;
+    instructionTrace_[instructionTraceNext_] = pc_;
+    instructionTraceNext_ = (instructionTraceNext_ + 1) % instructionTrace_.size();
+    instructionTraceCount_ = std::min(instructionTraceCount_ + 1, instructionTrace_.size());
     uint16_t lo = load16(pc_, ok);
     if (!ok) {
         e = "instruction fetch outside cartridge memory";
@@ -112,6 +120,15 @@ bool Rv32Cpu::step(std::string& e) {
         return false;
     }
     return exec32(ins, e);
+}
+std::vector<uint32_t> Rv32Cpu::recentInstructionAddresses() const {
+    std::vector<uint32_t> addresses;
+    addresses.reserve(instructionTraceCount_);
+    const size_t oldest = (instructionTraceNext_ + instructionTrace_.size() - instructionTraceCount_) %
+                          instructionTrace_.size();
+    for (size_t index = 0; index < instructionTraceCount_; ++index)
+        addresses.push_back(instructionTrace_[(oldest + index) % instructionTrace_.size()]);
+    return addresses;
 }
 bool Rv32Cpu::exec32(uint32_t i, std::string& e) {
     // R-type/common fields (RISC-V unprivileged ISA): opcode[6:0], rd[11:7], funct3[14:12],

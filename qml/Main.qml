@@ -28,6 +28,8 @@ ApplicationWindow {
                                                 (tvPlatform || (desktopPlatform && (appController.fullScreen || documentationFullScreen)))
     readonly property bool statusBarsVisible: appController.statusBarsEnabled && !gameOnlyFullScreen
     readonly property int playerHeightUnits: statusBarsVisible ? 240 : 200
+    readonly property string codeFont: Qt.platform.os === "osx" ? "Menlo" :
+                                       (Qt.platform.os === "windows" ? "Consolas" : "monospace")
     color: "#101216"
 
     component SetupButton: Fusion.Button {
@@ -73,10 +75,8 @@ ApplicationWindow {
             const hay=(gameTitle(g)+" "+(g.summary||"")+" "+t.join(" ")).toLowerCase(); if(q.length===0||hay.indexOf(q)>=0) out.push(g) }
         out.sort((a,b)=>gameTitle(a).localeCompare(gameTitle(b))); return out
     }
-    function showPlayer() { appController.resume(); page=2; requestActivate(); keyboardHandler.forceActiveFocus() }
-    function showDebugger() {
-        appController.debugEnabled=true
-        appController.pause()
+    function showPlayer() {
+        appController.resume()
         page=2
         requestActivate()
         keyboardHandler.forceActiveFocus()
@@ -144,7 +144,7 @@ ApplicationWindow {
 
     Shortcut { sequence:"F11"; enabled:root.desktopPlatform; onActivated:root.toggleFullScreen() }
     Shortcut { sequence:"Ctrl+Meta+F"; enabled:root.desktopPlatform; onActivated:root.toggleFullScreen() }
-    Shortcut { sequence:"Escape"; enabled:root.desktopPlatform && root.visibility === Window.FullScreen; onActivated:root.exitFullScreen() }
+    Shortcut { sequence:"Escape"; enabled:root.desktopPlatform && root.page === 2; onActivated:root.showSetup() }
 
     Timer { id:splashTimer; interval:900; repeat:false; onTriggered:root.splashVisible=false }
     FileDialog { id:importDialog; title:"Import PRG32 cartridge"; nameFilters:["PRG32 cartridges (*.prg32)","All files (*)"]; onAccepted: if(appController.loadFile(selectedFile)) root.showPlayer() }
@@ -160,7 +160,7 @@ ApplicationWindow {
                 onToggled:{appController.fullScreen=checked;root.applyFullScreen()} }
             CheckBox { text:"Show top and bottom status bars"; checked:appController.statusBarsEnabled
                 onToggled:appController.statusBarsEnabled=checked }
-            CheckBox { visible:root.desktopPlatform; text:"Enable RISC-V debugger"; checked:appController.debugEnabled
+            CheckBox { visible:root.desktopPlatform; text:"Run cartridges in RISC-V debug mode"; checked:appController.debugEnabled
                 onToggled:appController.debugEnabled=checked }
             Label { Layout.fillWidth:true; font.bold:true; text:"Performance" }
             ComboBox { id:performanceModeBox; Layout.fillWidth:true; model:["Accurate (ESP32-C6)","Optimal (30 FPS)","Unlimited"]
@@ -198,7 +198,6 @@ ApplicationWindow {
                 Label { text:"PRG32 SETUP"; color:"white"; font.family:"monospace"; font.pixelSize:18 }
                 Label { Layout.fillWidth:true; text:"PLATFORM: "+Qt.platform.os.toUpperCase()+"\nRUNTIME: RV32IMAC · 30 FPS\nCARTRIDGES: "+storeClient.cartridges.length+"\nIP: "+(appController.deviceIp||"No local IPv4 address")+"\nWEB API: "+(appController.webApiUrl||"Unavailable"); color:"#43d17b"; font.family:"monospace"; wrapMode:Text.WrapAnywhere }
                 SetupButton { text:"›  RUN CARTRIDGE"; enabled:appController.running; onClicked:root.showPlayer() }
-                SetupButton { visible:root.desktopPlatform; text:"›  DEBUG CARTRIDGE"; enabled:appController.running; onClicked:root.showDebugger() }
                 SetupButton { visible:appController.performanceAvailable; text:"›  RUN PERFORMANCE TEST"; onClicked:{appController.runPerformanceTest();root.showPlayer()} }
                 SetupButton { id:browseButton; focus:tvPlatform && root.page===0; text:"›  BROWSE STORE"; onClicked:root.showStore() }
                 SetupButton { text:"›  IMPORT CARTRIDGE"; onClicked:importDialog.open() }
@@ -238,7 +237,6 @@ ApplicationWindow {
             RowLayout { visible:!root.gameOnlyFullScreen; anchors.left:parent.left; anchors.right:parent.right; anchors.top:parent.top; anchors.margins:6; height:42; z:3
                 Button { text:"‹ Setup"; onClicked:root.showSetup() }
                 Label { Layout.fillWidth:true; text:appController.cartridgeName; elide:Text.ElideRight; font.bold:true; horizontalAlignment:Text.AlignHCenter }
-                Button { visible:root.desktopPlatform; text:appController.debugEnabled?"Close Debugger":"Debugger"; onClicked:{if(appController.debugEnabled)appController.debugEnabled=false;else root.showDebugger()} }
                 Button { visible:appController.performanceAvailable; text:"Performance"; onClicked:appController.runPerformanceTest() }
                 Button { visible:root.desktopPlatform; text:appController.fullScreen?"Exit Full Screen":"Full Screen"; onClicked:root.toggleFullScreen() }
             }
@@ -247,36 +245,64 @@ ApplicationWindow {
                     RowLayout { Layout.fillWidth:true
                         Label { text:"RV32IMAC DEBUGGER · "+(!appController.paused?"RUNNING":(appController.debugPhase==="idle"?"READY":"PAUSED · "+appController.debugPhase.toUpperCase())); color:"#45c9ff"; font.bold:true; font.family:"monospace" }
                         Item { Layout.fillWidth:true }
-                        Button { text:appController.paused?"Resume":"Pause"; onClicked:appController.paused?appController.resume():appController.pause() }
-                        Button { text:"Step"; enabled:appController.running; onClicked:appController.debugStep() }
+                        Fusion.Button { Layout.preferredWidth:52; text:"🐞"; font.pixelSize:18; highlighted:appController.debugInstrumentation
+                            Accessible.name:appController.debugInstrumentation?"Disable debugger execution":"Enable debugger execution"
+                            ToolTip.visible:hovered
+                            ToolTip.text:appController.debugInstrumentation?"Run with debugger":"Run normally with debugger screen visible"
+                            onClicked:appController.debugInstrumentation=!appController.debugInstrumentation }
+                        Fusion.Button { Layout.preferredWidth:52; text:appController.paused?"▶":"⏸"; font.pixelSize:20
+                            Accessible.name:appController.paused?"Resume":"Pause"
+                            ToolTip.visible:hovered
+                            ToolTip.text:appController.paused?"Resume":"Pause"
+                            onClicked:appController.paused?appController.resume():appController.pause() }
+                        Fusion.Button { Layout.preferredWidth:52; text:"▶│"; font.pixelSize:18; enabled:appController.running&&appController.debugInstrumentation
+                            Accessible.name:"Step one instruction"
+                            ToolTip.visible:hovered
+                            ToolTip.text:"Step one instruction"
+                            onClicked:appController.debugStep() }
                     }
                     RowLayout { Layout.fillWidth:true
                         Label { text:"PLAYBACK SPEED"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
-                        ComboBox { id:debugSpeedBox; Layout.preferredWidth:110; model:["0.1×","0.25×","0.5×","1×","2×","4×"]
-                            Component.onCompleted:currentIndex=Math.max(0,[0.1,0.25,0.5,1,2,4].indexOf(appController.debugSpeed))
-                            onActivated:appController.debugSpeed=[0.1,0.25,0.5,1,2,4][currentIndex] }
-                        Label { Layout.fillWidth:true; text:appController.debugSpeed<1?"Slow motion":(appController.debugSpeed>1?"Fast forward":"Real time"); color:"#c5ccd6" }
+                        Fusion.ComboBox { id:debugSpeedBox; Layout.preferredWidth:110; model:["0.01×","0.025×","0.05×","0.1×","0.25×","0.5×","1×","2×","4×"]
+                            font.family:root.codeFont
+                            Component.onCompleted:currentIndex=Math.max(0,[0.01,0.025,0.05,0.1,0.25,0.5,1,2,4].indexOf(appController.debugSpeed))
+                            onActivated:appController.debugSpeed=[0.01,0.025,0.05,0.1,0.25,0.5,1,2,4][currentIndex] }
+                        Label { Layout.fillWidth:true; text:"Current: "+appController.debugSpeed+"× · "+Math.max(1,Math.round(33/appController.debugSpeed))+" ms/frame"; color:"#c5ccd6"; font.family:root.codeFont }
                     }
                     RowLayout { Layout.fillWidth:true
                         Label { text:"GO TO"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
-                        Button { text:"Init"; highlighted:appController.debugView==="init"; onClicked:appController.showDebugEntry("init") }
-                        Button { text:"Update"; highlighted:appController.debugView==="update"; onClicked:appController.showDebugEntry("update") }
-                        Button { text:"Draw"; highlighted:appController.debugView==="draw"; onClicked:appController.showDebugEntry("draw") }
-                        Button { text:"PC"; highlighted:appController.debugView==="pc"; onClicked:appController.showDebugEntry("pc") }
+                        Fusion.Button { text:"Init"; highlighted:appController.debugView==="init"; onClicked:appController.showDebugEntry("init") }
+                        Fusion.Button { text:"Update"; highlighted:appController.debugView==="update"; onClicked:appController.showDebugEntry("update") }
+                        Fusion.Button { text:"Draw"; highlighted:appController.debugView==="draw"; onClicked:appController.showDebugEntry("draw") }
+                        Fusion.Button { text:"PC"; highlighted:appController.debugView==="pc"; onClicked:appController.showDebugEntry("pc") }
                         Item { Layout.fillWidth:true }
                     }
                     Label { text:"ASSEMBLY"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
-                    ScrollView { Layout.fillWidth:true; Layout.preferredHeight:Math.max(170,parent.height*.34); clip:true
-                        TextEdit { width:parent.width; text:appController.debugAssembly; textFormat:TextEdit.RichText; readOnly:true; color:"#d6dbe3"; font.family:"monospace"; font.pixelSize:13; selectByMouse:true }
+                    ListView { id:assemblyList; Layout.fillWidth:true; Layout.preferredHeight:Math.max(170,parent.height*.34); clip:true; model:appController.debugAssemblyRows
+                        delegate:Rectangle { required property var modelData; width:assemblyList.width; height:22; color:modelData.current?"#075985":"transparent"
+                            RowLayout { anchors.fill:parent; spacing:5
+                                Item { id:gutter; Layout.preferredWidth:34; Layout.fillHeight:true
+                                    Rectangle { anchors.left:parent.left; anchors.leftMargin:5; anchors.verticalCenter:parent.verticalCenter; width:11; height:11; radius:width/2
+                                        color:modelData.breakpoint?"#ef4444":"transparent"; border.width:modelData.breakpoint?0:(gutterMouse.containsMouse?1:0); border.color:"#ef4444" }
+                                    Label { anchors.right:parent.right; anchors.verticalCenter:parent.verticalCenter; text:"▶"; visible:modelData.current; color:"#ffffff"; font.pixelSize:11 }
+                                    MouseArea { id:gutterMouse; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
+                                        Accessible.name:(modelData.breakpoint?"Remove":"Add")+" breakpoint at 0x"+modelData.address
+                                        onClicked:appController.toggleBreakpoint("0x"+modelData.address) }
+                                }
+                                Label { Layout.preferredWidth:76; text:modelData.address; color:"#45c9ff"; font.family:root.codeFont; font.pixelSize:13 }
+                                Label { Layout.preferredWidth:86; text:modelData.operation; color:"#d987ff"; font.family:root.codeFont; font.pixelSize:13; font.bold:true }
+                                Label { Layout.fillWidth:true; text:modelData.operands; color:"#d6dbe3"; font.family:root.codeFont; font.pixelSize:13; elide:Text.ElideRight }
+                            }
+                        }
                     }
-                    Label { text:"REGISTERS"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
-                    TextArea { Layout.fillWidth:true; Layout.preferredHeight:128; text:appController.debugRegisters; readOnly:true; color:"#c8f3d0"; font.family:"monospace"; font.pixelSize:11; background:Rectangle{color:"#0b0f14";border.color:"#27313c"} }
+                    Label { text:"REGISTERS · LIVE"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
+                    TextArea { Layout.fillWidth:true; Layout.preferredHeight:128; text:appController.debugRegisters; readOnly:true; color:"#c8f3d0"; font.family:root.codeFont; font.pixelSize:11; background:Rectangle{color:"#0b0f14";border.color:"#27313c"} }
                     RowLayout { Layout.fillWidth:true
-                        Label { text:"MEMORY"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
-                        TextField { id:memoryAddress; Layout.fillWidth:true; text:"0x40800000"; placeholderText:"Guest address"; font.family:"monospace"; onAccepted:appController.inspectMemory(text,128) }
+                        Label { text:"MEMORY · LIVE"; color:"#8c98a7"; font.bold:true; font.pixelSize:11 }
+                        TextField { id:memoryAddress; Layout.fillWidth:true; text:"0x40800000"; placeholderText:"Guest address"; font.family:root.codeFont; onAccepted:appController.inspectMemory(text,128) }
                         Button { text:"Inspect"; onClicked:appController.inspectMemory(memoryAddress.text,128) }
                     }
-                    TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appController.debugMemory; readOnly:true; wrapMode:TextEdit.NoWrap; color:"#f0d38a"; font.family:"monospace"; font.pixelSize:11; background:Rectangle{color:"#0b0f14";border.color:"#27313c"} }
+                    TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appController.debugMemory; readOnly:true; wrapMode:TextEdit.NoWrap; color:"#f0d38a"; font.family:root.codeFont; font.pixelSize:11; background:Rectangle{color:"#0b0f14";border.color:"#27313c"} }
                 }
             }
         }
@@ -304,12 +330,53 @@ ApplicationWindow {
         Item { RoundButton { width:68;height:68;text:"B";anchors.left:parent.left;anchors.bottom:parent.bottom;onPressed:appController.setButton(32,true);onReleased:appController.setButton(32,false) }
             RoundButton { width:72;height:72;text:"A";anchors.right:parent.right;anchors.top:parent.top;onPressed:appController.setButton(16,true);onReleased:appController.setButton(16,false) } }
     }
+    component WaveformView: Canvas {
+        property var samples: []
+        property color traceColor: "#45c9ff"
+        onSamplesChanged:requestPaint()
+        onWidthChanged:requestPaint()
+        onHeightChanged:requestPaint()
+        onPaint: {
+            const context=getContext("2d")
+            context.clearRect(0,0,width,height)
+            context.strokeStyle="#27313c"
+            context.beginPath();context.moveTo(0,height/2);context.lineTo(width,height/2);context.stroke()
+            if(!samples||samples.length<2)return
+            context.strokeStyle=traceColor
+            context.lineWidth=1.5
+            context.beginPath()
+            for(let index=0;index<samples.length;index++) {
+                const x=index*(width/(samples.length-1)),y=height/2-samples[index]*(height*.44)
+                if(index===0)context.moveTo(x,y);else context.lineTo(x,y)
+            }
+            context.stroke()
+        }
+    }
+    component DebugTelemetry: Rectangle {
+        color:"#0b0f14"; border.color:"#364452"; radius:4
+        ColumnLayout { anchors.fill:parent; anchors.margins:6; spacing:3
+            RowLayout { Layout.fillWidth:true
+                Label { text:"INPUT"; color:"#8c98a7"; font.bold:true; font.pixelSize:10 }
+                Label { text:appController.telemetryInputMask; color:"#c8f3d0"; font.family:root.codeFont; font.pixelSize:11 }
+                Item { Layout.fillWidth:true }
+                Label { text:appController.debugInstrumentation?"DEBUG EXECUTION":"REGULAR EXECUTION"; color:appController.debugInstrumentation?"#45c9ff":"#c5ccd6"; font.bold:true; font.pixelSize:10 }
+            }
+            RowLayout { Layout.fillWidth:true; Layout.preferredHeight:42; spacing:5
+                Label { text:"L"; color:"#8c98a7"; font.bold:true }
+                WaveformView { Layout.fillWidth:true; Layout.fillHeight:true; samples:appController.telemetryWaveformLeft; traceColor:"#45c9ff" }
+                Label { text:"R"; color:"#8c98a7"; font.bold:true }
+                WaveformView { Layout.fillWidth:true; Layout.fillHeight:true; samples:appController.telemetryWaveformRight; traceColor:"#d987ff" }
+            }
+            Label { Layout.fillWidth:true; text:appController.telemetryPerformance; color:"#f0d38a"; font.family:root.codeFont; font.pixelSize:10; elide:Text.ElideRight }
+        }
+    }
     Component { id:portraitPlayer
         ColumnLayout { anchors.fill:parent; anchors.margins:18; spacing:12
             RowLayout { Layout.fillWidth:true; PRG32Image{source:"qrc:/prg32qt/assets/prg32_logo.png";Layout.preferredWidth:150;Layout.preferredHeight:42} Item{Layout.fillWidth:true} Rectangle{width:9;height:9;radius:5;color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.max(.15,appController.ledIntensity))} }
             Item { Layout.fillWidth:true; Layout.preferredHeight:Math.min(330,width*root.playerHeightUnits/320+20); Layout.fillHeight:true
                 Loader { anchors.centerIn:parent; width:Math.min(parent.width,parent.height*320/root.playerHeightUnits); height:width*root.playerHeightUnits/320; sourceComponent:screenComponent }
             }
+            DebugTelemetry { visible:appController.debugEnabled; Layout.fillWidth:true; Layout.preferredHeight:96 }
             RowLayout { Layout.fillWidth:true; Layout.preferredHeight:Math.min(150,Math.max(110,parent.height*.2)); Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(130,parent.width);height:Math.min(130,parent.height);sourceComponent:dpadComponent}} Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(150,parent.width);height:Math.min(120,parent.height);sourceComponent:actionsComponent}} }
             Button { Layout.alignment:Qt.AlignHCenter; text:"START / SELECT"; onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false) }
             RowLayout { Layout.fillWidth:true; Label{text:"RV32IMAC · 30 FPS"} Item{Layout.fillWidth:true} Label{text:appController.deviceIp||"Offline"} }
@@ -317,16 +384,19 @@ ApplicationWindow {
         }
     }
     Component { id:landscapePlayer
-        RowLayout { anchors.fill:parent; anchors.margins:14; spacing:12
-            ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png"} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Item{Layout.fillHeight:true} }
-            ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(parent.width,parent.height*320/root.playerHeightUnits);height:width*root.playerHeightUnits/320;sourceComponent:screenComponent}} Button{Layout.alignment:Qt.AlignHCenter;text:"START / SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
-            ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:150;Layout.preferredHeight:130;sourceComponent:actionsComponent} Label{Layout.alignment:Qt.AlignHCenter;text:"PRG32";font.bold:true} Item{Layout.fillHeight:true} }
+        ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:8
+            RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:12
+                ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:60;source:"qrc:/prg32qt/assets/prg32_logo.png"} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:130;Layout.preferredHeight:130;sourceComponent:dpadComponent} Item{Layout.fillHeight:true} }
+                ColumnLayout { Layout.fillWidth:true; Layout.fillHeight:true; Item{Layout.fillWidth:true;Layout.fillHeight:true;Loader{anchors.centerIn:parent;width:Math.min(parent.width,parent.height*320/root.playerHeightUnits);height:width*root.playerHeightUnits/320;sourceComponent:screenComponent}} Button{Layout.alignment:Qt.AlignHCenter;text:"START / SELECT";onPressed:appController.setButton(64,true);onReleased:appController.setButton(64,false)} Label{Layout.alignment:Qt.AlignHCenter;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight;text:(appController.performanceAvailable?"Performance: "+appController.performanceState+" · ":"")+(appController.deviceIp||"Offline")+" · "+(appController.controllerConnected?appController.controllerName:"30 FPS");opacity:.7} }
+                ColumnLayout { Layout.preferredWidth:Math.min(190,Math.max(126,parent.width*.16)); Layout.fillHeight:true; Item{Layout.fillHeight:true} Loader{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:150;Layout.preferredHeight:130;sourceComponent:actionsComponent} Label{Layout.alignment:Qt.AlignHCenter;text:"PRG32";font.bold:true} Item{Layout.fillHeight:true} }
+            }
+            DebugTelemetry { visible:appController.debugEnabled; Layout.fillWidth:true; Layout.preferredHeight:96 }
         }
     }
 
     Connections { target:storeClient; function onCartridgeDownloaded(id,data){ if(appController.loadBytes(data,id)) root.showPlayer() } }
 
     Rectangle { visible:root.splashVisible; anchors.fill:parent; color:"black"; z:100
-        ColumnLayout { anchors.centerIn:parent; width:Math.min(parent.width-50,560); PRG32Image{Layout.fillWidth:true;Layout.preferredHeight:220;source:"qrc:/prg32qt/assets/prg32_logo.png"} PRG32Image{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:Math.min(246,parent.width);Layout.preferredHeight:46;source:"qrc:/prg32qt/assets/prg32_title.png"} Label{Layout.alignment:Qt.AlignHCenter;text:"RISC-V PLAYGROUND";color:"#45c9ff";font.family:"monospace";font.letterSpacing:3} }
+        ColumnLayout { anchors.centerIn:parent; width:Math.min(parent.width-50,560); PRG32Image{Layout.alignment:Qt.AlignHCenter;Layout.preferredWidth:Math.min(360,parent.width);Layout.preferredHeight:148;source:"qrc:/prg32qt/assets/prg32_logo.png"} Label{Layout.alignment:Qt.AlignHCenter;text:"RISC-V PLAYGROUND";color:"#45c9ff";font.family:"monospace";font.letterSpacing:3} }
     }
 }

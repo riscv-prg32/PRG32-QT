@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 #include <QTimer>
 #include <QUrl>
 #include <memory>
@@ -39,12 +40,19 @@ class AppController : public QObject {
     Q_PROPERTY(bool statusBarsEnabled READ statusBarsEnabled WRITE setStatusBarsEnabled NOTIFY
                    displayPreferencesChanged)
     Q_PROPERTY(bool debugEnabled READ debugEnabled WRITE setDebugEnabled NOTIFY debugChanged)
+    Q_PROPERTY(bool debugInstrumentation READ debugInstrumentation WRITE setDebugInstrumentation NOTIFY debugChanged)
     Q_PROPERTY(QString debugAssembly READ debugAssembly NOTIFY debugChanged)
+    Q_PROPERTY(QVariantList debugAssemblyRows READ debugAssemblyRows NOTIFY debugChanged)
     Q_PROPERTY(QString debugRegisters READ debugRegisters NOTIFY debugChanged)
     Q_PROPERTY(QString debugMemory READ debugMemory NOTIFY debugChanged)
     Q_PROPERTY(QString debugPhase READ debugPhase NOTIFY debugChanged)
     Q_PROPERTY(QString debugView READ debugView NOTIFY debugChanged)
+    Q_PROPERTY(QString debugBreakpoints READ debugBreakpoints NOTIFY debugChanged)
     Q_PROPERTY(double debugSpeed READ debugSpeed WRITE setDebugSpeed NOTIFY debugChanged)
+    Q_PROPERTY(QString telemetryInputMask READ telemetryInputMask NOTIFY debugChanged)
+    Q_PROPERTY(QVariantList telemetryWaveformLeft READ telemetryWaveformLeft NOTIFY debugChanged)
+    Q_PROPERTY(QVariantList telemetryWaveformRight READ telemetryWaveformRight NOTIFY debugChanged)
+    Q_PROPERTY(QString telemetryPerformance READ telemetryPerformance NOTIFY debugChanged)
     // clang-format on
 
   public:
@@ -104,11 +112,13 @@ class AppController : public QObject {
     bool debugEnabled() const {
         return debugEnabled_;
     }
-    QString debugAssembly() const;
-    QString debugRegisters() const;
-    QString debugMemory() const {
-        return debugMemory_;
+    bool debugInstrumentation() const {
+        return debugInstrumentation_;
     }
+    QString debugAssembly() const;
+    QVariantList debugAssemblyRows() const;
+    QString debugRegisters() const;
+    QString debugMemory() const;
     QString debugPhase() const;
     QString debugView() const {
         return debugView_;
@@ -116,6 +126,11 @@ class AppController : public QObject {
     double debugSpeed() const {
         return debugSpeed_;
     }
+    QString debugBreakpoints() const;
+    QString telemetryInputMask() const;
+    QVariantList telemetryWaveformLeft() const;
+    QVariantList telemetryWaveformRight() const;
+    QString telemetryPerformance() const;
     QJsonObject runtimeJson() const;
     QJsonArray gamesJson() const;
     QJsonObject performanceJson() const;
@@ -133,9 +148,12 @@ class AppController : public QObject {
     Q_INVOKABLE void pause();
     Q_INVOKABLE void resume();
     Q_INVOKABLE void setDebugEnabled(bool enabled);
+    Q_INVOKABLE void setDebugInstrumentation(bool enabled);
     Q_INVOKABLE bool debugStep();
     /** Move the disassembly view to init, update, draw, or the live program counter. */
     Q_INVOKABLE void showDebugEntry(const QString& entry);
+    /** Add or remove an instruction breakpoint at a guest address. */
+    Q_INVOKABLE bool toggleBreakpoint(const QString& address);
     /** Set the debugger's continuous-playback rate multiplier. */
     Q_INVOKABLE void setDebugSpeed(double speed);
     Q_INVOKABLE void inspectMemory(const QString& address, int length = 128);
@@ -175,6 +193,8 @@ class AppController : public QObject {
     void saveCartridge(const QByteArray&, const QString&);
     void updateFrame();
     void updateTimerInterval();
+    uint32_t debugExecutionAddress() const;
+    bool pauseAtBreakpoint();
     void refreshIp();
     QString slotPath(int) const;
     prg32::Runtime rt_;
@@ -193,12 +213,21 @@ class AppController : public QObject {
     bool fullScreen_ = false;
     bool statusBarsEnabled_ = false;
     bool debugEnabled_ = false;
-    QString debugMemory_;
+    bool debugInstrumentation_ = true;
+    QString debugMemoryError_;
+    uint32_t debugMemoryAddress_ = 0;
+    int debugMemoryLength_ = 128;
     QString debugView_ = "pc";
     uint32_t debugViewAddress_ = 0;
+    QSet<uint32_t> debugBreakpoints_;
+    bool ignoreBreakpointOnce_ = false;
     double debugSpeed_ = 1.0;
+    uint32_t debugFrameInput_ = 0;
+    int debugInstructionsThisFrame_ = 0;
+    int debugInstructionsPerFrame_ = 8192;
     uint64_t frameCount_ = 0;
     QElapsedTimer frameRateTimer_;
     int framesPerSecond_ = 0;
     int frameRateCount_ = 0;
+    qint64 lastExecutionMicroseconds_ = 0;
 };

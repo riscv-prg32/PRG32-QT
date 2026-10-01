@@ -24,6 +24,8 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - Optional desktop debugger with highlighted RV32IMAC assembly, registers, guest-memory monitor, and
   pause/instruction-step/resume controls; the controls are also available to SDK/Python clients over HTTP.
 
+![PRG32-QT debugger with live assembly, registers, and memory](docs/images/macos-debugger-overview.png)
+
 ## Build and test
 
 Portable runtime only:
@@ -72,11 +74,33 @@ python3 -m prg32 esp32c6 upload-and-run game.prg32 \
 See [network discovery and SDK access](docs/NETWORKING.md) for the DNS-SD/TXT contract, endpoint table,
 platform behavior, security boundary, and troubleshooting steps.
 
-On desktop, enable **RISC-V debugger** in Settings or choose **Debug Cartridge**. The player and debugger run
-side by side; Pause, Step, and Resume operate on the same runtime used by the game. Fullscreen remains a
-game-only presentation and therefore hides the debugger panel. The Init, Update, and Draw buttons jump directly
-to those cartridge entry points without executing code; PC returns to live instruction-following mode. Playback
-speed can be selected from 0.1x, 0.25x, 0.5x, 1x, 2x, or 4x while the debugger is enabled.
+On desktop, enable **Run cartridges in RISC-V debug mode** in Settings, then use **Run Cartridge**. Debug mode
+is off by default and persists locally. A debug launch starts running so game controls remain active; use Pause
+when instruction stepping is needed. The player and debugger run side by side; Pause, Step, and Resume
+operate on the same runtime used by the game. Fullscreen remains a
+game-only presentation and therefore hides the debugger panel. The mutually exclusive Init, Update, Draw, and
+PC selectors jump to those cartridge entry points without executing code or return to live instruction-following
+mode. The current execution position is highlighted independently of the selected view. Playback
+speed can be selected from 0.01x, 0.025x, 0.05x, 0.1x, 0.25x, 0.5x, 1x, 2x, or 4x while the debugger is enabled.
+The PC view includes recent and upcoming instructions but visually distinguishes only the active instruction.
+Debug playback executes bounded instruction slices so the PC and registers visibly advance between UI updates.
+The hexadecimal/ASCII dump at the chosen guest-memory address refreshes with the same live debugger state.
+The transport control displays `⏸` while running and `▶` while paused; its tooltip and accessible name expose
+the corresponding Pause or Resume action. Playback-rate selection remains independent.
+Click the gutter to the left of any instruction address to add a breakpoint; click its filled red circle again
+to remove it. Multiple breakpoints can be active together. Execution pauses before a marked instruction retires,
+and Resume skips that breakpoint once so execution can continue.
+The `▶│` transport button executes exactly the highlighted instruction and stays paused. On desktop, Escape
+always leaves the player/debugger and returns to Setup, including from fullscreen.
+The bug toggle to the left of Play selects execution behavior without closing the debugger screen. When active,
+instruction stepping and breakpoints apply; when inactive, the cartridge uses the regular frame execution path.
+The telemetry frame below the virtual device reports the merged digital-input bitmask, recently rendered left
+and right audio waveforms, measured host execution time, FPS, retired instructions, virtual cycles, and late frames.
+
+![Debugger live assembly, registers, memory, and execution telemetry](docs/images/macos-debugger-details.png)
+
+For a complete walkthrough of execution controls, assembly navigation, breakpoints, registers, memory, telemetry,
+HTTP automation, and troubleshooting, see [Debugging cartridges](docs/DEBUGGING.md).
 
 To exercise every discoverable Store cartridge after building the headless runner:
 
@@ -95,7 +119,8 @@ Open **Settings** to choose Accurate (the ESP32-C6-oriented default), Optimal (p
 performance, and Auto, Portrait, or Landscape independently of the window shape and, on
 desktop, to make fullscreen the persistent default. iOS and Android reserve the native status/notch/home-indicator
 safe area and do not offer fullscreen. On Windows, macOS, Linux, Apple TV, and Android TV fullscreen shows only the letterboxed 320x200
-game area; use the keyboard or controller, and press `Escape` to return to windowed mode. Keyboard and
+game area; use the keyboard or controller. On desktop, `Escape` leaves the player and returns to Setup.
+Keyboard and
 USB/Bluetooth controller inputs share this mapping:
 
 The optional top and bottom status bars reproduce the firmware's 320×240 presentation: a 20-pixel FPS band,

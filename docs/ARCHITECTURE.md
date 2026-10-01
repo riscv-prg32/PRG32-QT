@@ -69,10 +69,34 @@ shared across all Qt targets.
 On desktop, the optional debugger panel presents the game alongside highlighted RV32IMAC disassembly, the 32
 integer registers, and a bounded hexadecimal/ASCII memory monitor. `WebApiServer` exposes the same debugger
 state machine at `/api/debug`, so local UI, SDK commands, and Python automation cannot disagree about state.
-The disassembly view can navigate directly to the cartridge header's init, update, and draw offsets without
-altering CPU state, and returns to following the live program counter when stepping resumes.
-Debugger playback applies a persistent 0.1x-to-4x multiplier to the 33 ms host frame timer. Closing the debugger
+The mutually exclusive disassembly views can navigate directly to the cartridge header's init, update, and draw
+offsets without altering CPU state, or follow live execution in the PC view. The interpreter separately records
+the last retired guest-instruction address so the execution highlight is not confused with the first address of
+a selected entry-point view.
+The CPU retains a bounded 64-address retirement trace for presentation only. The PC view combines its recent
+tail with the current execution position and sequential look-ahead; this trace does not alter architectural
+state. Continuous debug playback divides each update/draw cycle into eight adaptive instruction slices and
+publishes debugger state after every slice. Register and selected memory-range rendering is regenerated on each
+debugger state notification.
+Debugger playback applies a persistent 0.01x-to-4x multiplier to the 33 ms host frame timer. Closing the debugger
 restores the selected normal performance profile's timer behavior.
+Address breakpoints are owned by `AppController` and checked before each guest instruction in a debug slice.
+Hitting one pauses before retirement; resuming ignores that address once to permit forward progress. Breakpoints
+are cleared when another cartridge is loaded and never modify guest memory.
+The QML assembly list exposes a separate clickable gutter for every decoded row. Gutter state is derived from
+the same controller breakpoint set used by the HTTP API, allowing independent multi-breakpoint toggling without
+embedding debugger metadata in cartridge memory.
+The single-instruction transport invokes `Runtime::debugStep` once and does not restart the frame timer. The
+desktop Escape shortcut routes through the common Setup transition, which pauses execution and also normalizes
+fullscreen presentation.
+The debugger execution toggle selects between bounded `Runtime::debugStep` slices and the normal `Runtime::frame`
+path while leaving the surrounding inspection UI mounted. Breakpoint checks and single-step are active only on
+the instruction-level path. `QtAudioEngine` retains bounded copies of its latest 64 rendered stereo samples for
+display; the copies are protected by its mixer mutex and do not alter audio output. Player telemetry also reads
+the merged host input mask and runtime instruction/cycle/late-frame counters, plus measured host execution time.
+Debug mode is a default-off desktop setting. The common Run Cartridge action checks that setting and either
+enters the running player with the debugger panel or resumes ordinary cartridge execution; there is no separate
+debug launch path. The debugger does not consume keyboard/controller input, so controls remain live until Pause.
 
 ## Layer 3 — Input adapters
 

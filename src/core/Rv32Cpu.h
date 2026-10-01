@@ -52,6 +52,12 @@ class Rv32Cpu {
     uint32_t pc() const {
         return pc_;
     }
+    /** Return the address of the most recently executed guest instruction. */
+    uint32_t lastInstructionAddress() const {
+        return lastInstructionAddress_;
+    }
+    /** Return recently executed guest-instruction addresses in retirement order. */
+    std::vector<uint32_t> recentInstructionAddresses() const;
     /** Load an unsigned byte from guest memory and set `ok` when the address is valid. */
     uint8_t load8(uint32_t a, bool& ok) const;
     /** Load a little-endian halfword from guest memory. */
@@ -98,6 +104,10 @@ class Rv32Cpu {
     bool exec16(uint16_t ins, std::string& e);
     std::array<uint32_t, 32> x_{};
     uint32_t pc_ = 0, base_ = 0, hostBase_ = 0, hostCount_ = 0;
+    uint32_t lastInstructionAddress_ = 0;
+    std::array<uint32_t, 64> instructionTrace_{};
+    size_t instructionTraceCount_ = 0;
+    size_t instructionTraceNext_ = 0;
     uint64_t retired_ = 0;
     VirtualClock clock_;
     PerformanceMode performanceMode_ = PerformanceMode::Esp32C6Accurate;

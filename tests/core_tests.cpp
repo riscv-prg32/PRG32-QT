@@ -101,8 +101,11 @@ int main() {
     assert(cpu.callActive());
     assert(cpu.step(e));
     assert(cpu.reg(10) == 42);
+    assert(cpu.lastInstructionAddress() == 0x1000);
     assert(cpu.callActive());
     assert(cpu.step(e));
+    assert(cpu.lastInstructionAddress() == 0x1004);
+    assert((cpu.recentInstructionAddresses() == std::vector<uint32_t>{0x1000, 0x1004}));
     assert(!cpu.callActive());
     assert(disassembleRv32(0x1000, i1, 4) == "addi a0, zero, 42");
     assert(disassembleRv32(0x1004, i2, 4) == "jalr zero, 0(ra)");

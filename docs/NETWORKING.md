@@ -81,6 +81,8 @@ curl -X POST http://prg32-host.local:8080/api/debug \
   -H 'Content-Type: application/json' -d '{"command":"step"}'
 curl -X POST http://prg32-host.local:8080/api/debug \
   -H 'Content-Type: application/json' -d '{"command":"speed","speed":0.25}'
+curl -X POST http://prg32-host.local:8080/api/debug \
+  -H 'Content-Type: application/json' -d '{"command":"breakpoint","address":"0x40800100","enabled":true}'
 curl 'http://prg32-host.local:8080/api/debug?address=0x40800000&length=128'
 curl -X POST http://prg32-host.local:8080/api/debug \
   -H 'Content-Type: application/json' -d '{"command":"resume"}'
@@ -89,8 +91,10 @@ curl -X POST http://prg32-host.local:8080/api/debug \
 `step` retires exactly one RV32IMAC instruction. The response reports the update/draw phase, program counter,
 all 32 integer registers, and requested memory as hexadecimal. Reads are limited to 1024 bytes and cannot
 leave allocated guest memory. Resuming in the middle of a frame completes that update/draw cycle before the
-normal frame timer continues. The `speed` command accepts 0.1, 0.25, 0.5, 1, 2, or 4 and changes the debugger's
+normal frame timer continues. The `speed` command accepts 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, or 4 and changes the debugger's
 continuous-playback frame cadence; the selected multiplier is returned in debugger state and persists locally.
+The `breakpoint` command adds or removes a validated guest instruction address using its `enabled` field. The
+debug state returns the active address array as `breakpoints`.
 
 ## Platform implementation
 

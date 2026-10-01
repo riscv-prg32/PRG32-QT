@@ -32,8 +32,9 @@ AppController::AppController(QObject* p)
     statusBarsEnabled_ = settings.value("display/statusBars", false).toBool();
     debugEnabled_ = settings.value("debug/enabled", false).toBool();
     debugSpeed_ = settings.value("debug/speed", 1.0).toDouble();
-    if (debugSpeed_ != 0.1 && debugSpeed_ != 0.25 && debugSpeed_ != 0.5 && debugSpeed_ != 1.0 &&
-        debugSpeed_ != 2.0 && debugSpeed_ != 4.0)
+    if (debugSpeed_ != 0.01 && debugSpeed_ != 0.025 && debugSpeed_ != 0.05 && debugSpeed_ != 0.1 &&
+        debugSpeed_ != 0.25 && debugSpeed_ != 0.5 && debugSpeed_ != 1.0 && debugSpeed_ != 2.0 &&
+        debugSpeed_ != 4.0)
         debugSpeed_ = 1.0;
     performanceMode_ = settings.value("performance/mode", "accurate").toString();
     if (performanceMode_ == "esp32-c6")
@@ -61,14 +62,72 @@ AppController::AppController(QObject* p)
     timer_.setTimerType(Qt::PreciseTimer);
     updateTimerInterval();
     connect(&timer_, &QTimer::timeout, this, [this] {
+        QElapsedTimer executionTimer;
+        executionTimer.start();
         std::string e;
-        if (!rt_.frame(input_.takeMerged(), e)) {
+        bool frameComplete = false;
+        if (debugEnabled_ && debugInstrumentation_) {
+            debugFrameInput_ |= input_.takeMerged();
+            static constexpr int DebugSlicesPerFrame = 8;
+            const int instructionBudget = std::max(1, debugInstructionsPerFrame_ / DebugSlicesPerFrame);
+            for (int instruction = 0; instruction < instructionBudget; ++instruction) {
+                if (pauseAtBreakpoint())
+                    return;
+                if (!rt_.debugStep(debugFrameInput_, e)) {
+                    timer_.stop();
+                    running_ = false;
+                    emit runningChanged();
+                    setStatus(QString::fromStdString(e));
+                    return;
+                }
+                ++debugInstructionsThisFrame_;
+                if (rt_.debugPhase() == "idle") {
+                    debugInstructionsPerFrame_ = std::max(1, debugInstructionsThisFrame_);
+                    debugInstructionsThisFrame_ = 0;
+                    debugFrameInput_ = 0;
+                    frameComplete = true;
+                    break;
+                }
+            }
+            const auto pcIsInGuestMemory = [this] {
+                const uint32_t pc = rt_.programCounter();
+                return pc >= rt_.guestBase() &&
+                       uint64_t(pc) < uint64_t(rt_.guestBase()) + rt_.guestMemorySize();
+            };
+            while (!frameComplete && !pcIsInGuestMemory()) {
+                if (pauseAtBreakpoint())
+                    return;
+                if (!rt_.debugStep(debugFrameInput_, e)) {
+                    timer_.stop();
+                    running_ = false;
+                    emit runningChanged();
+                    setStatus(QString::fromStdString(e));
+                    return;
+                }
+                ++debugInstructionsThisFrame_;
+                if (rt_.debugPhase() == "idle") {
+                    debugInstructionsPerFrame_ = std::max(1, debugInstructionsThisFrame_);
+                    debugInstructionsThisFrame_ = 0;
+                    debugFrameInput_ = 0;
+                    frameComplete = true;
+                }
+            }
+            updateFrame();
+            lastExecutionMicroseconds_ = executionTimer.nsecsElapsed() / 1000;
+            emit debugChanged();
+            if (!frameComplete)
+                return;
+        } else if (!rt_.frame(input_.takeMerged(), e)) {
             timer_.stop();
             running_ = false;
             emit runningChanged();
             setStatus(QString::fromStdString(e));
             return;
+        } else {
+            frameComplete = true;
         }
+        if (!frameComplete)
+            return;
         ++frameCount_;
         ++frameRateCount_;
         const qint64 elapsedMilliseconds = frameRateTimer_.elapsed();
@@ -82,6 +141,7 @@ AppController::AppController(QObject* p)
         emit ledChanged();
         updateFrame();
         emit performanceChanged();
+        lastExecutionMicroseconds_ = executionTimer.nsecsElapsed() / 1000;
         if (debugEnabled_)
             emit debugChanged();
     });
@@ -176,8 +236,13 @@ bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName)
                                        v.toString().compare("performance", Qt::CaseInsensitive) == 0;
                             });
     frameCount_ = 0;
+    debugFrameInput_ = 0;
+    debugInstructionsThisFrame_ = 0;
+    debugInstructionsPerFrame_ = 8192;
     debugViewAddress_ = 0;
     debugView_ = "pc";
+    debugBreakpoints_.clear();
+    ignoreBreakpointOnce_ = false;
     frameRateCount_ = 0;
     framesPerSecond_ = 0;
     frameRateTimer_.restart();
@@ -242,6 +307,7 @@ void AppController::pause() {
 void AppController::resume() {
     if (!running_ || !paused_)
         return;
+    ignoreBreakpointOnce_ = debugBreakpoints_.contains(debugExecutionAddress());
     paused_ = false;
     timer_.start();
     emit pausedChanged();
@@ -257,8 +323,15 @@ void AppController::setDebugEnabled(bool enabled) {
         inspectMemory(QString("0x%1").arg(rt_.guestBase(), 8, 16, QChar('0')), 128);
     emit debugChanged();
 }
+void AppController::setDebugInstrumentation(bool enabled) {
+    if (debugInstrumentation_ == enabled)
+        return;
+    debugInstrumentation_ = enabled;
+    updateTimerInterval();
+    emit debugChanged();
+}
 void AppController::setDebugSpeed(double speed) {
-    static constexpr double SupportedSpeeds[] = {0.1, 0.25, 0.5, 1.0, 2.0, 4.0};
+    static constexpr double SupportedSpeeds[] = {0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0};
     const auto supported = std::find(std::begin(SupportedSpeeds), std::end(SupportedSpeeds), speed);
     if (supported == std::end(SupportedSpeeds) || debugSpeed_ == speed)
         return;
@@ -267,12 +340,87 @@ void AppController::setDebugSpeed(double speed) {
     updateTimerInterval();
     emit debugChanged();
 }
+uint32_t AppController::debugExecutionAddress() const {
+    if (rt_.debugCallActive())
+        return rt_.programCounter();
+    if (!rt_.loaded())
+        return 0;
+    return rt_.guestBase() + rt_.cartridge().header().updateOffset;
+}
+bool AppController::pauseAtBreakpoint() {
+    const uint32_t address = debugExecutionAddress();
+    if (!debugBreakpoints_.contains(address))
+        return false;
+    if (ignoreBreakpointOnce_) {
+        ignoreBreakpointOnce_ = false;
+        return false;
+    }
+    debugViewAddress_ = 0;
+    debugView_ = "pc";
+    pause();
+    setStatus(QString("Breakpoint at 0x%1").arg(address, 8, 16, QChar('0')));
+    emit debugChanged();
+    return true;
+}
+QString AppController::debugBreakpoints() const {
+    QList<uint32_t> addresses = debugBreakpoints_.values();
+    std::sort(addresses.begin(), addresses.end());
+    QStringList labels;
+    for (const uint32_t address : addresses)
+        labels.append(QString("0x%1").arg(address, 8, 16, QChar('0')));
+    return labels.isEmpty() ? "None" : labels.join("  ");
+}
+bool AppController::toggleBreakpoint(const QString& addressText) {
+    bool ok = false;
+    QString normalized = addressText.trimmed();
+    int base = 10;
+    if (normalized.startsWith("0x", Qt::CaseInsensitive)) {
+        normalized.remove(0, 2);
+        base = 16;
+    }
+    const uint32_t address = normalized.toUInt(&ok, base);
+    if (!ok || rt_.debugMemory(address, 2).size() != 2) {
+        setStatus("Invalid breakpoint address");
+        return false;
+    }
+    if (debugBreakpoints_.contains(address))
+        debugBreakpoints_.remove(address);
+    else
+        debugBreakpoints_.insert(address);
+    emit debugChanged();
+    return true;
+}
 void AppController::updateTimerInterval() {
-    if (debugEnabled_) {
-        timer_.setInterval(std::max(1, int(std::lround(33.0 / debugSpeed_))));
+    if (debugEnabled_ && debugInstrumentation_) {
+        static constexpr double DebugSlicesPerFrame = 8.0;
+        timer_.setInterval(std::max(1, int(std::lround(33.0 / (debugSpeed_ * DebugSlicesPerFrame)))));
         return;
     }
     timer_.setInterval(performanceMode_ == "unlimited" ? 0 : 33);
+}
+QString AppController::telemetryInputMask() const {
+    return QString("0x%1").arg(input_.merged() | debugFrameInput_, 8, 16, QChar('0'));
+}
+static QVariantList waveformVariant(const std::vector<float>& samples) {
+    QVariantList values;
+    values.reserve(qsizetype(samples.size()));
+    for (const float sample : samples)
+        values.append(sample);
+    return values;
+}
+QVariantList AppController::telemetryWaveformLeft() const {
+    return waveformVariant(audio_->waveformLeft());
+}
+QVariantList AppController::telemetryWaveformRight() const {
+    return waveformVariant(audio_->waveformRight());
+}
+QString AppController::telemetryPerformance() const {
+    return QString("%1 FPS · %2 µs host · %3 insn · %4 cycles · %5 late")
+        .arg(framesPerSecond_)
+        .arg(lastExecutionMicroseconds_)
+        .arg(rt_.retiredInstructions())
+        .arg(rt_.virtualCycles())
+        .arg(rt_.lateFrames());
 }
 bool AppController::debugStep() {
     if (!debugEnabled_ || !running_)
@@ -319,14 +467,28 @@ void AppController::inspectMemory(const QString& addressText, int length) {
     }
     const uint32_t address = normalized.toUInt(&ok, base);
     if (!ok) {
-        debugMemory_ = "Invalid address";
+        debugMemoryError_ = "Invalid address";
         emit debugChanged();
         return;
     }
-    const auto bytes = rt_.debugMemory(address, size_t(std::clamp(length, 1, 1024)));
+    const auto bytes = rt_.debugMemory(address, 1);
+    if (bytes.empty()) {
+        debugMemoryError_ = "Address outside guest memory";
+        emit debugChanged();
+        return;
+    }
+    debugMemoryError_.clear();
+    debugMemoryAddress_ = address;
+    debugMemoryLength_ = std::clamp(length, 1, 1024);
+    emit debugChanged();
+}
+QString AppController::debugMemory() const {
+    if (!debugMemoryError_.isEmpty())
+        return debugMemoryError_;
+    const auto bytes = rt_.debugMemory(debugMemoryAddress_, size_t(debugMemoryLength_));
     QStringList lines;
     for (size_t offset = 0; offset < bytes.size(); offset += 16) {
-        QString line = QString("%1  ").arg(uint64_t(address) + offset, 8, 16, QChar('0'));
+        QString line = QString("%1  ").arg(uint64_t(debugMemoryAddress_) + offset, 8, 16, QChar('0'));
         QString ascii;
         for (size_t column = 0; column < 16; ++column) {
             if (offset + column < bytes.size()) {
@@ -340,8 +502,7 @@ void AppController::inspectMemory(const QString& addressText, int length) {
         }
         lines.append(line + " |" + ascii + '|');
     }
-    debugMemory_ = lines.isEmpty() ? "Address outside guest memory" : lines.join('\n');
-    emit debugChanged();
+    return lines.isEmpty() ? "Address outside guest memory" : lines.join('\n');
 }
 QString AppController::debugPhase() const {
     return QString::fromStdString(rt_.debugPhase());
@@ -361,39 +522,89 @@ QString AppController::debugRegisters() const {
     }
     return lines.join('\n');
 }
-QString AppController::debugAssembly() const {
+QVariantList AppController::debugAssemblyRows() const {
+    QVariantList rows;
     if (!rt_.loaded())
-        return "<span style='color:#77808d'>No cartridge loaded</span>";
-    uint32_t address = debugViewAddress_ ? debugViewAddress_ : rt_.programCounter();
+        return rows;
+    const auto trace = rt_.recentInstructionAddresses();
+    const uint32_t currentAddress = rt_.debugCallActive()
+                                        ? rt_.programCounter()
+                                        : rt_.guestBase() + rt_.cartridge().header().updateOffset;
+    uint32_t address = debugViewAddress_ ? debugViewAddress_ : currentAddress;
     if (address < rt_.guestBase() || uint64_t(address) >= uint64_t(rt_.guestBase()) + rt_.guestMemorySize())
         address = rt_.guestBase() + rt_.cartridge().header().updateOffset;
-    QStringList lines;
-    uint32_t cursor = address;
-    for (int line = 0; line < 15; ++line) {
+    const auto appendInstruction = [&](uint32_t cursor, const QString& state) -> unsigned {
         const auto first = rt_.debugMemory(cursor, 2);
         if (first.size() != 2)
-            break;
+            return 0;
         const uint16_t low = uint16_t(first[0]) | uint16_t(first[1]) << 8;
         const unsigned width = (low & 3u) == 3u ? 4u : 2u;
         const auto bytes = rt_.debugMemory(cursor, width);
         if (bytes.size() != width)
-            break;
+            return 0;
         uint32_t instruction = low;
         if (width == 4)
             instruction |= uint32_t(bytes[2]) << 16 | uint32_t(bytes[3]) << 24;
-        QString assembly =
-            QString::fromStdString(prg32::disassembleRv32(cursor, instruction, width)).toHtmlEscaped();
+        const QString assembly = QString::fromStdString(prg32::disassembleRv32(cursor, instruction, width));
         const int separator = assembly.indexOf(' ');
         const QString operation = separator < 0 ? assembly : assembly.left(separator);
         const QString operands = separator < 0 ? QString() : assembly.mid(separator);
-        const QString marker = cursor == address ? "▶" : " ";
-        const QString background = cursor == address ? "background-color:#26384a;" : "";
+        QVariantMap row;
+        row.insert("address", QString("%1").arg(cursor, 8, 16, QChar('0')));
+        row.insert("operation", operation);
+        row.insert("operands", operands);
+        row.insert("current", state == "current");
+        row.insert("breakpoint", debugBreakpoints_.contains(cursor));
+        rows.append(row);
+        return width;
+    };
+    if (debugView_ == "pc") {
+        const int firstPast = std::max(0, int(trace.size()) - 6);
+        for (int index = firstPast; index < int(trace.size()); ++index) {
+            if (trace[size_t(index)] != currentAddress)
+                appendInstruction(trace[size_t(index)], "past");
+        }
+        unsigned width = appendInstruction(currentAddress, "current");
+        uint32_t cursor = currentAddress + width;
+        while (width && rows.size() < 15) {
+            width = appendInstruction(cursor, "next");
+            cursor += width;
+        }
+        return rows;
+    }
+    uint32_t cursor = address;
+    for (int line = 0; line < 15; ++line) {
+        const bool past = std::find(trace.begin(), trace.end(), cursor) != trace.end();
+        const QString state = cursor == currentAddress ? "current" : (past ? "past" : "next");
+        const unsigned width = appendInstruction(cursor, state);
+        if (!width)
+            break;
+        cursor += width;
+    }
+    return rows;
+}
+QString AppController::debugAssembly() const {
+    const QVariantList rows = debugAssemblyRows();
+    if (rows.isEmpty())
+        return "<span style='color:#77808d'>No cartridge loaded</span>";
+    QStringList lines;
+    for (const QVariant& value : rows) {
+        const QVariantMap row = value.toMap();
+        const bool current = row.value("current").toBool();
+        const bool breakpoint = row.value("breakpoint").toBool();
+        const QString marker = current ? "▶" : (breakpoint ? "●" : " ");
+        const QString background = current ? "background-color:#075985;color:#ffffff;font-weight:700;" : "";
+        const QString markerColor = breakpoint && !current ? "#ff3b30" : "#45c9ff";
         lines.append(
             QString(
-                "<div style='%1'><span style='color:#45c9ff'>%2 %3</span>  <span "
-                "style='color:#d987ff;font-weight:600'>%4</span><span style='color:#d6dbe3'>%5</span></div>")
-                .arg(background, marker, QString("%1").arg(cursor, 8, 16, QChar('0')), operation, operands));
-        cursor += width;
+                "<div style='%1'><span style='color:%2'>%3 %4</span>  <span "
+                "style='color:#d987ff;font-weight:600'>%5</span><span style='color:#d6dbe3'>%6</span></div>")
+                .arg(background,
+                     markerColor,
+                     marker,
+                     row.value("address").toString(),
+                     row.value("operation").toString().toHtmlEscaped(),
+                     row.value("operands").toString().toHtmlEscaped()));
     }
     return lines.join(QString());
 }
@@ -582,13 +793,18 @@ QJsonObject AppController::debugJson(uint32_t address, int length) const {
     QJsonArray registers;
     for (unsigned index = 0; index < 32; ++index)
         registers.append(double(rt_.registerValue(index)));
-    uint32_t pc = rt_.programCounter();
+    const uint32_t pc = debugExecutionAddress();
     if (address == 0)
         address = pc >= rt_.guestBase() && uint64_t(pc) < uint64_t(rt_.guestBase()) + rt_.guestMemorySize()
                       ? pc
                       : rt_.guestBase();
     const auto bytes = rt_.debugMemory(address, size_t(std::clamp(length, 1, 1024)));
     QByteArray raw(reinterpret_cast<const char*>(bytes.data()), qsizetype(bytes.size()));
+    QJsonArray breakpoints;
+    QList<uint32_t> breakpointAddresses = debugBreakpoints_.values();
+    std::sort(breakpointAddresses.begin(), breakpointAddresses.end());
+    for (const uint32_t breakpointAddress : breakpointAddresses)
+        breakpoints.append(double(breakpointAddress));
     return {{"ok", true},
             {"enabled", debugEnabled_},
             {"running", running_ && !paused_},
@@ -596,6 +812,7 @@ QJsonObject AppController::debugJson(uint32_t address, int length) const {
             {"phase", debugPhase()},
             {"speed", debugSpeed_},
             {"pc", double(pc)},
+            {"breakpoints", breakpoints},
             {"assembly_html", debugAssembly()},
             {"registers", registers},
             {"memory_address", double(address)},
@@ -612,7 +829,7 @@ bool AppController::debugCommand(const QJsonObject& command, QString& error) {
         const double previousSpeed = debugSpeed_;
         setDebugSpeed(requestedSpeed);
         if (debugSpeed_ != requestedSpeed && previousSpeed != requestedSpeed) {
-            error = "supported speeds are 0.1, 0.25, 0.5, 1, 2, and 4";
+            error = "supported speeds are 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, and 4";
             return false;
         }
         return true;
@@ -620,6 +837,34 @@ bool AppController::debugCommand(const QJsonObject& command, QString& error) {
     if (!debugEnabled_) {
         error = "debug mode is disabled";
         return false;
+    }
+    if (operation == "breakpoint") {
+        bool ok = false;
+        uint32_t address = 0;
+        const QJsonValue addressValue = command.value("address");
+        if (addressValue.isString()) {
+            QString normalized = addressValue.toString().trimmed();
+            int base = 10;
+            if (normalized.startsWith("0x", Qt::CaseInsensitive)) {
+                normalized.remove(0, 2);
+                base = 16;
+            }
+            address = normalized.toUInt(&ok, base);
+        } else if (addressValue.isDouble()) {
+            const double numericAddress = addressValue.toDouble(-1.0);
+            ok = numericAddress >= 0.0 && numericAddress <= double(UINT32_MAX);
+            address = ok ? uint32_t(numericAddress) : 0;
+        }
+        if (!ok || rt_.debugMemory(address, 2).size() != 2) {
+            error = "invalid breakpoint address";
+            return false;
+        }
+        if (command.value("enabled").toBool(true))
+            debugBreakpoints_.insert(address);
+        else
+            debugBreakpoints_.remove(address);
+        emit debugChanged();
+        return true;
     }
     if (operation == "pause") {
         if (!running_) {

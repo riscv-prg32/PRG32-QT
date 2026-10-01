@@ -208,7 +208,23 @@ void QtAudioEngine::render(float* l, float* r, int frames) {
         l[f] = std::tanh(L);
         r[f] = std::tanh(R);
     }
+    const int waveformFrames = std::min(frames, int(waveformLeft_.size()));
+    const int waveformStart = frames - waveformFrames;
+    waveformLeft_.fill(0.f);
+    waveformRight_.fill(0.f);
+    for (int index = 0; index < waveformFrames; ++index) {
+        waveformLeft_[size_t(index)] = l[waveformStart + index];
+        waveformRight_[size_t(index)] = r[waveformStart + index];
+    }
     std::erase_if(voices_, [](auto& v) { return !v.active; });
+}
+std::vector<float> QtAudioEngine::waveformLeft() const {
+    QMutexLocker lock(&mutex_);
+    return {waveformLeft_.begin(), waveformLeft_.end()};
+}
+std::vector<float> QtAudioEngine::waveformRight() const {
+    QMutexLocker lock(&mutex_);
+    return {waveformRight_.begin(), waveformRight_.end()};
 }
 void QtAudioEngine::encode(char* dst, int frames, const std::vector<float>& x) {
     int ch = std::max(1, format_.channelCount());

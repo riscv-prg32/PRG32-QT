@@ -76,8 +76,9 @@ record probing, and instance-name collisions.
 
 Settings exposes Accurate (default), Optimal (30 FPS), and Unlimited performance profiles on every target,
 together with Auto, Portrait, and Landscape player layouts and optional firmware-style status bars. Fullscreen can be toggled from the player,
-with `F11`, or with `Control+Command+F`; `Escape` returns to a window. On desktop, fullscreen deliberately hides
-all chrome and touch controls and displays only the aspect-correct game surface for keyboard/controller play.
+with `F11`, or with `Control+Command+F`; `Escape` leaves the desktop player and returns to Setup. On desktop,
+fullscreen deliberately hides all chrome and touch controls and displays only the aspect-correct game surface
+for keyboard/controller play.
 These choices persist through `QSettings`. Status bars are disabled by default and are not shown in game-only
 desktop or TV fullscreen mode.
 

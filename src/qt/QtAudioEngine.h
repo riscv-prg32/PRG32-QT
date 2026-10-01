@@ -39,6 +39,10 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
     qint64 bytesAvailable() const override {
         return 32768 + QIODevice::bytesAvailable();
     }
+    /** Return a bounded snapshot of recently rendered left-channel samples. */
+    std::vector<float> waveformLeft() const;
+    /** Return a bounded snapshot of recently rendered right-channel samples. */
+    std::vector<float> waveformRight() const;
 
   private:
     enum class Kind { Oscillator, Synth, Pcm };
@@ -57,11 +61,13 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
     void ensureStarted();
     void render(float* left, float* right, int frames);
     void encode(char* dst, int frames, const std::vector<float>& interleaved);
-    QMutex mutex_;
+    mutable QMutex mutex_;
     std::vector<Voice> voices_;
     std::unique_ptr<QAudioSink> sink_;
     QAudioFormat format_;
     float master_ = 0.86f;
     std::array<float, 8> channelVolumes_{};
     std::array<float, 8> channelPans_{};
+    std::array<float, 64> waveformLeft_{};
+    std::array<float, 64> waveformRight_{};
 };

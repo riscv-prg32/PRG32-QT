@@ -55,6 +55,18 @@ class Runtime {
     uint32_t programCounter() const {
         return cpu_.pc();
     }
+    /** Return the address of the most recently executed guest RV32IMAC instruction. */
+    uint32_t lastInstructionAddress() const {
+        return cpu_.lastInstructionAddress();
+    }
+    /** Return recently executed guest-instruction addresses in retirement order. */
+    std::vector<uint32_t> recentInstructionAddresses() const {
+        return cpu_.recentInstructionAddresses();
+    }
+    /** Return whether an update or draw call is currently between instructions. */
+    bool debugCallActive() const {
+        return cpu_.callActive();
+    }
     /** Read a guest integer register; x0 always reads as zero. */
     uint32_t registerValue(unsigned index) const {
         return index < 32 ? cpu_.reg(index) : 0;

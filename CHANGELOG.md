@@ -2,15 +2,38 @@
 
 All notable changes to PRG32-QT will be documented here. The project follows Semantic Versioning once compatibility guarantees are established.
 
-## [Unreleased]
+## [0.4.0] - 2026-10-01
 
 - Add an optional desktop RV32IMAC debugger with a live, syntax-highlighted disassembly view, integer
   registers, bounded memory inspection, and pause/single-instruction-step/resume controls. The same debugger
   state and commands are available through `GET` and `POST /api/debug` for SDK and Python clients.
 - Add one-click disassembly navigation to the cartridge `init`, `update`, and `draw` entry points, plus a PC
   button for returning to live instruction-following mode.
-- Add persistent debugger playback rates from 0.1x slow motion through 4x fast forward, controllable from the
+- Add persistent debugger playback rates from 0.01x slow motion through 4x fast forward, controllable from the
   debugger panel or the device HTTP API.
+- Add guest-address instruction breakpoints that pause before execution, with UI toggle controls, disassembly
+  markers, and shared HTTP debugger API state and commands.
+- Add an IDE-style disassembly gutter: clicking beside any instruction address independently adds or removes
+  that breakpoint, with every active breakpoint rendered as a filled red circle.
+- Make Escape return from the desktop player/debugger to Setup, and add an accessible frame-advance transport
+  button that executes exactly one guest instruction and remains paused.
+- Add a bug-icon execution toggle beside the debugger transport: enabled uses instruction-level debugging and
+  breakpoints; disabled runs normal cartridge frames while retaining the debugger screen. Add live input-mask,
+  stereo waveform, and real-time execution telemetry below the virtual device.
+- Extend the landscape telemetry frame across the full player container instead of limiting it to the central
+  game-screen column.
+- Make the persistent, default-off Settings option the single debug-mode selector. Run Cartridge now starts
+  with the debugger visible and running when enabled, preserving game controls, and runs normally when disabled;
+  redundant debugger launch buttons were removed.
+- Improve debugger readability with a strong CURRENT-instruction highlight, platform-native monospace code and
+  value fonts, and an always-visible playback multiplier plus effective milliseconds-per-frame readout.
+- Make Init, Update, Draw, and PC mutually exclusive disassembly views, and distinguish the selected view from
+  the highlighted current execution position.
+- Execute debug playback in bounded instruction slices so the highlighted PC and register values visibly change
+  in real time, while continuously refreshing the selected hexadecimal/ASCII memory range. Only the active
+  instruction is visually distinguished; surrounding code remains unlabelled.
+- Replace the debugger's textual Pause/Resume control with an accessible video-style transport toggle while
+  retaining the existing playback-rate selector.
 - Advertise the HTTP device API as `_prg32._tcp.local.` with Bonjour/mDNS metadata so PRG32 SDK tooling can
   discover PRG32-QT for cartridge deployment, execution, and debugging without a manually entered IP address.
 - Report the available guest RAM and default load address before a cartridge is loaded so the SDK can validate
