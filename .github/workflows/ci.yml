@@ -277,7 +277,9 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - name: Install Android NDK with retry
+        run: ./scripts/install-android-ndk.sh
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
@@ -300,7 +302,9 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      - name: Install Android NDK with retry
+        run: ./scripts/install-android-ndk.sh
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'

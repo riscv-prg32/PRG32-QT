@@ -2,6 +2,14 @@
 
 PRG32-QT uses layered validation.
 
+## Android NDK download recovery (2026-10-01)
+
+GitHub Actions run 36893506650 failed only in the Android ARM64 job because `sdkmanager` received a truncated
+NDK 26.1.10909125 ZIP and reported `Error reading Zip content from a SeekableByteChannel`. Every other job in
+that run passed, and the subsequent v0.4.0 release workflow installed the same NDK and built both Android
+packages successfully. CI and release workflows now install the NDK separately with up to three attempts,
+removing only the incomplete version directory between attempts.
+
 ## Debugger validation (2026-10-01)
 
 - The 0.4.0 release candidate passed the live default-Store 900-frame media/input sweep: 29 portable cartridges

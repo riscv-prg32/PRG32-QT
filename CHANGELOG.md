@@ -2,6 +2,11 @@
 
 All notable changes to PRG32-QT will be documented here. The project follows Semantic Versioning once compatibility guarantees are established.
 
+## [Unreleased]
+
+- Retry Android NDK installation in CI and release builds after removing an incomplete package directory, so a
+  truncated SDK archive download does not fail the Android or Android TV build permanently.
+
 ## [0.4.0] - 2026-10-01
 
 - Add an optional desktop RV32IMAC debugger with a live, syntax-highlighted disassembly view, integer
