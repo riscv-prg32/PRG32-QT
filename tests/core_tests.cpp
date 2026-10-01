@@ -113,5 +113,22 @@ int main() {
     cpu.setPerformanceMode(PerformanceMode::Unlimited);
     assert(cpu.call(0x1000, 0, 10, e));
     assert(cpu.virtualCycles() == cpu.retiredInstructions());
+    bool memoryAccessOk = false;
+    m.assign(4, 0xa5);
+    cpu.reset(0x1000, &m);
+    cpu.store32(0x1000, 0x12345678, memoryAccessOk);
+    assert(memoryAccessOk);
+    assert((m == std::vector<uint8_t>{0x78, 0x56, 0x34, 0x12}));
+    m.assign(4, 0xa5);
+    cpu.store16(0x1003, 0x1234, memoryAccessOk);
+    assert(!memoryAccessOk);
+    assert(m == std::vector<uint8_t>(4, 0xa5));
+    cpu.store32(0x1001, 0x12345678, memoryAccessOk);
+    assert(!memoryAccessOk);
+    assert(m == std::vector<uint8_t>(4, 0xa5));
+    cpu.reset(0xfffffffc, &m);
+    cpu.store32(0xfffffffe, 0x12345678, memoryAccessOk);
+    assert(!memoryAccessOk);
+    assert(m == std::vector<uint8_t>(4, 0xa5));
     std::cout << "PRG32-QT portable core tests passed\n";
 }

@@ -2,6 +2,14 @@
 
 PRG32-QT uses layered validation.
 
+## RV32 store-boundary validation (2026-10-01)
+
+The optimized portable build, an AddressSanitizer/UndefinedBehaviorSanitizer build, and the native arm64 macOS
+Qt 6.11.2 application passed all four CTest targets after making out-of-range halfword and word stores atomic.
+The native application also launched and rendered the Setup page. The official Store snapshot contained 29
+entries; all 27 portable cartridges passed the 900-frame media/input sweep and the two non-portable entries were
+explicitly excluded. See the [complete catalog, media evidence, and platform limitations](STORE-CERTIFICATION-2026-10-01-RV32-STORES.md).
+
 ## Portable deterministic suite
 
 ```sh

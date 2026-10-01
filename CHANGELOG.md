@@ -4,6 +4,9 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Reject out-of-range RV32 halfword and word stores before writing any guest-memory bytes, preventing partial
+  memory corruption when a store crosses the cartridge-memory boundary.
+
 ## [0.3.3] - 2026-09-27
 
 - Bundled the pinned OpenSSL 3 runtime in Android and Android TV APKs so HTTPS Cartridge Store requests work

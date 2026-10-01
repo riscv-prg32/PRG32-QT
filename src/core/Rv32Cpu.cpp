@@ -46,16 +46,24 @@ void Rv32Cpu::store8(uint32_t a, uint8_t v, bool& ok) {
     }
 }
 void Rv32Cpu::store16(uint32_t a, uint16_t v, bool& ok) {
-    bool a0, a1;
-    store8(a, v, a0);
-    store8(a + 1, v >> 8, a1);
-    ok = a0 && a1;
+    const uint64_t offset = uint64_t(a) - base_;
+    ok = mem_ && a >= base_ && offset + sizeof(v) <= mem_->size();
+    if (!ok)
+        return;
+    (*mem_)[offset] = uint8_t(v);
+    (*mem_)[offset + 1] = uint8_t(v >> 8);
+    hasReservation_ = false;
 }
 void Rv32Cpu::store32(uint32_t a, uint32_t v, bool& ok) {
-    bool a0, a1;
-    store16(a, v, a0);
-    store16(a + 2, v >> 16, a1);
-    ok = a0 && a1;
+    const uint64_t offset = uint64_t(a) - base_;
+    ok = mem_ && a >= base_ && offset + sizeof(v) <= mem_->size();
+    if (!ok)
+        return;
+    (*mem_)[offset] = uint8_t(v);
+    (*mem_)[offset + 1] = uint8_t(v >> 8);
+    (*mem_)[offset + 2] = uint8_t(v >> 16);
+    (*mem_)[offset + 3] = uint8_t(v >> 24);
+    hasReservation_ = false;
 }
 bool Rv32Cpu::call(uint32_t entry, uint32_t a0, uint64_t budget, std::string& e) {
     pc_ = entry;
