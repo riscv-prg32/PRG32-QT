@@ -10,6 +10,10 @@ class WebApiServer final : public QObject {
     bool listening() const {
         return server_.isListening();
     }
+    /** Return the TCP port selected for the PRG32 HTTP API. */
+    [[nodiscard]] quint16 port() const {
+        return server_.serverPort();
+    }
 
   private:
     void serve(class QTcpSocket* socket, const QByteArray& request);

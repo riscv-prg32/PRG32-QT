@@ -2,6 +2,25 @@
 
 PRG32-QT uses layered validation.
 
+## Bonjour/mDNS device discovery validation (2026-10-01)
+
+- The native arm64 macOS application built with Qt 6.11.2 and passed all four CTest targets. With the application
+  running, `dns-sd -B _prg32._tcp local.` found the PRG32-QT instance and `dns-sd -L` resolved it to port 8080
+  with `api=prg32-http-1`, `path=/api`, `runtime=qt`, and the application version in its TXT record.
+- The API was reached through the resolved `.local` hostname. The PRG32 SDK then used that hostname to upload
+  the Asteroids fixture into `cart0`, select and run it, and read live runtime/debug metadata. The cartridge
+  advanced frames after selection.
+- The dependency-free Qt UDP backend used by non-Apple targets was compiled independently with warnings enabled.
+  A live harness advertised port 18080, and the macOS Bonjour browser resolved its SRV, A, and TXT records.
+- The final official Store retry executed all 27 portable cartridges for 900 frames with media verification and
+  the input sweep; all passed. `space_invaders` and `terraforge` were the two explicit non-portable exclusions.
+  The first attempt lost Store DNS resolution after 11 passes, so no cartridge result from that interrupted run
+  was used as certification evidence. No physical speaker listening check was performed.
+- Android and Android TV declare multicast permission and acquire a Wi-Fi multicast lock while advertising.
+  The Android Qt kit was unavailable on this host, so the JNI branch and APKs require their CI builds plus
+  emulator/device discovery checks. Windows, Linux, Raspberry Pi OS, iOS, Android, Android TV, and Apple TV
+  were not compiled or device-tested in this session.
+
 ## RV32 store-boundary validation (2026-10-01)
 
 The optimized portable build, an AddressSanitizer/UndefinedBehaviorSanitizer build, and the native arm64 macOS

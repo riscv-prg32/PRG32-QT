@@ -110,4 +110,10 @@ TV fullscreen deliberately suppresses the bands.
 
 The host listens on TCP port 8080 and publishes the PRG32 device endpoints: `GET /api`, `/api/runtime`, `/api/games`, `/api/screenshot.bmp`, `/api/performance.json`, `/api/scores`, and `/api/memory`, plus `POST /api/games`, `/api/games/select`, and `/api/scores`. Cartridge uploads use the four `cart0` through `cart3` slots. The Setup and player screens show the active local IPv4 address and API URL.
 
+The running API is advertised with DNS-SD as `_prg32._tcp.local.`. Its TXT record declares
+`api=prg32-http-1`, `path=/api`, `runtime=qt`, and the PRG32-QT version. Apple targets use the system Bonjour
+registration API; the remaining targets use the same wire contract through a Qt UDP mDNS responder. This lets
+SDK tooling locate the host, then use the existing upload, select/run, runtime, memory, screenshot, and
+performance endpoints without a manually entered IP address.
+
 Performance ABI calls 124 through 132 implement the public version 1 broker. A cartridge that declares a `performance_contract` or `performance` metadata value, or uses a `benchmark` or `performance` tag, receives a visible performance action. Results use the PRG32 performance JSON schema version 2.

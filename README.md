@@ -20,6 +20,7 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - Gamer-selectable Auto, Portrait, or Landscape player layout plus persistent fullscreen TV mode (`F11`, `Control+Command+F`, or the player button; `Escape` exits).
 - Canonical PRG32 artwork used by the PRG32 project.
 - Headless regression fixtures included for compatibility testing and live whole-Store certification tooling.
+- Bonjour/mDNS advertisement of the HTTP device API for SDK deployment, execution, and debugging workflows.
 
 ## Build and test
 

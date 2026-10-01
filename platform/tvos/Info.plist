@@ -23,6 +23,10 @@
   </dict>
   <key>NSLocalNetworkUsageDescription</key>
   <string>PRG32 shares cartridges, screenshots, and performance results on your local network.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_prg32._tcp</string>
+  </array>
   <key>UIRequiredDeviceCapabilities</key>
   <array>
     <string>arm64</string>

@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "FrameItem.h"
+#include "MdnsAdvertiser.h"
 #include "MobileSafeArea.h"
 #include "RasterImageItem.h"
 #include "StoreClient.h"
@@ -41,6 +42,7 @@ int main(int argc, char** argv) {
     if (!screenshotCartridge.isEmpty())
         controller.loadFile(QUrl::fromLocalFile(screenshotCartridge));
     WebApiServer web(&controller);
+    MdnsAdvertiser discovery(web.port());
     QQmlApplicationEngine e;
     e.rootContext()->setContextProperty("storeClient", &store);
     e.rootContext()->setContextProperty("appController", &controller);

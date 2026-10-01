@@ -48,7 +48,7 @@ if(PRG32QT_BUILD_APP)
       src/qt/main.cpp src/qt/AppController.cpp src/qt/StoreClient.cpp src/qt/FrameItem.cpp src/qt/WebApiServer.cpp
       src/qt/QtAudioEngine.cpp src/qt/QtMultiplayerService.cpp src/qt/QtMultiplayerService.h
       src/qt/RasterImageItem.cpp src/qt/RasterImageItem.h src/qt/GamepadBackend.h
-      src/qt/MobileSafeArea.h)
+      src/qt/MobileSafeArea.h src/qt/MdnsAdvertiser.h)
   if(IOS)
     enable_language(OBJCXX)
     list(APPEND PRG32QT_APP_SOURCES src/qt/GamepadBackend_mac.mm src/qt/MobileSafeArea_ios.mm)
@@ -63,6 +63,11 @@ if(PRG32QT_BUILD_APP)
     list(APPEND PRG32QT_APP_SOURCES src/qt/GamepadBackend_stub.cpp src/qt/MobileSafeArea_android.cpp)
   else()
     list(APPEND PRG32QT_APP_SOURCES src/qt/GamepadBackend_stub.cpp src/qt/MobileSafeArea_stub.cpp src/qt/MobileSafeArea.h)
+  endif()
+  if(APPLE)
+    list(APPEND PRG32QT_APP_SOURCES src/qt/MdnsAdvertiser_apple.cpp)
+  else()
+    list(APPEND PRG32QT_APP_SOURCES src/qt/MdnsAdvertiser_udp.cpp)
   endif()
 
   qt_add_executable(PRG32_QT ${PRG32QT_APP_SOURCES})

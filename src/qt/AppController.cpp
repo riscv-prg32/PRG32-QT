@@ -306,6 +306,7 @@ void AppController::runPerformanceTest() {
 }
 QJsonObject AppController::runtimeJson() const {
     auto& h = rt_.cartridge().header();
+    const uint32_t cartridgeLoadAddress = h.loadAddr ? h.loadAddr : 0x40800000u;
     QJsonObject cart{
         {"name", cartridgeName_},
         {"loaded", rt_.loaded()},
@@ -323,9 +324,9 @@ QJsonObject AppController::runtimeJson() const {
         {"cart_abi_minor", 6},
         {"cart_abi_hash", double(prg32::Runtime::CurrentAbiHash)},
         {"cart_abi_features", double(prg32::Runtime::ProvidedFeatures)},
-        {"cart_load_addr", double(h.loadAddr)},
+        {"cart_load_addr", double(cartridgeLoadAddress)},
         {"cart_max_size", double(prg32::Cartridge::MaximumGuestBytes)},
-        {"cart_ram_size", double(h.memSize)},
+        {"cart_ram_size", double(prg32::Cartridge::MaximumGuestBytes)},
         {"cart_loaded", rt_.loaded()},
         {"qemu", false},
         {"cart", cart},

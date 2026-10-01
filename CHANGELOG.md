@@ -4,6 +4,10 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Advertise the HTTP device API as `_prg32._tcp.local.` with Bonjour/mDNS metadata so PRG32 SDK tooling can
+  discover PRG32-QT for cartridge deployment, execution, and debugging without a manually entered IP address.
+- Report the available guest RAM and default load address before a cartridge is loaded so the SDK can validate
+  and perform an initial network deployment.
 - Reject out-of-range RV32 halfword and word stores before writing any guest-memory bytes, preventing partial
   memory corruption when a store crosses the cartridge-memory boundary.
 
