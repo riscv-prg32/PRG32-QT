@@ -16,7 +16,10 @@ Contributions are welcome. Please keep changes focused, portable, and testable o
 3. When changing cartridge execution, ABI dispatch, graphics, input, or Store handling, add or update regression tests.
 4. When Store compatibility may be affected, run the Store-wide smoke test against the configured Store.
 5. Build the Qt application on each platform affected by the change.
-6. Open a pull request describing behavior changes, tests performed, and known limitations.
+6. For device API or discovery changes, browse and resolve `_prg32._tcp.local.`, call the resolved `/api/runtime`,
+   and perform an SDK upload-and-run test. Exercise both the Apple Bonjour and portable Qt UDP backends when
+   either wire contract changes.
+7. Open a pull request describing behavior changes, tests performed, and known limitations.
 
 ## Coding guidelines
 

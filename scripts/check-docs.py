@@ -35,6 +35,16 @@ architecture = (ROOT / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
 compatibility = (ROOT / "docs/COMPATIBILITY.md").read_text(encoding="utf-8")
 readme = (ROOT / "README.md").read_text(encoding="utf-8")
 platforms = (ROOT / "docs/PLATFORMS.md").read_text(encoding="utf-8")
+networking = (ROOT / "docs/NETWORKING.md").read_text(encoding="utf-8")
+mdns = "\n".join(
+    (ROOT / path).read_text(encoding="utf-8")
+    for path in (
+        "src/qt/MdnsAdvertiser.h",
+        "src/qt/MdnsAdvertiser_apple.cpp",
+        "src/qt/MdnsAdvertiser_udp.cpp",
+        "src/qt/WebApiServer.cpp",
+    )
+)
 
 # These values are the serialized ABI-table contract written by Runtime::writeAbiTable.
 for literal, description in (
@@ -67,6 +77,22 @@ expected_helpers = {
 for platform, helper in expected_helpers.items():
     if not (ROOT / helper).is_file():
         fail(f"{platform} build helper is missing: {helper}")
+
+for literal, description in (
+    ("_prg32._tcp", "device DNS-SD service type"),
+    ("8080", "device HTTP port"),
+    ("prg32-http-1", "device API discovery version"),
+    ("path=/api", "device API TXT path"),
+    ("runtime=qt", "device runtime TXT value"),
+):
+    if literal not in mdns:
+        fail(f"mDNS/API implementation omits the documented {description} {literal}")
+    if literal not in networking:
+        fail(f"docs/NETWORKING.md omits the {description} {literal}")
+
+for manifest in ("platform/ios/Info.plist", "platform/tvos/Info.plist"):
+    if "_prg32._tcp" not in (ROOT / manifest).read_text(encoding="utf-8"):
+        fail(f"{manifest} does not declare the PRG32 Bonjour service")
 
 for document in sorted((ROOT / "docs").glob("*.md")):
     text = document.read_text(encoding="utf-8")

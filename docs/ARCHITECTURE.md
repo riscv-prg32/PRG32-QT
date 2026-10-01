@@ -82,8 +82,10 @@ The UI provides: startup splash/tone, a viewport-constrained setup menu, Store b
 - Windows and Linux: standard Qt desktop executable.
 - Raspberry Pi OS/Raspbian: native ARM Qt build; no architecture-specific runtime code.
 - macOS: application bundle and Apple GameController integration.
-- iOS: Qt iOS bundle, touch UI, Apple GameController integration, ATS exception for the configured HTTP Store.
-- Android: Qt Android activity, touch UI, Internet permission, and cleartext allowance for the configured HTTP Store.
+- iOS: Qt iOS bundle, touch UI, Apple GameController integration, ATS exception for configured HTTP Stores,
+  local-network purpose declaration, and native Bonjour registration.
+- Android: Qt Android activity, touch UI, Internet and multicast permissions, cleartext allowance for configured
+  HTTP Stores, and the Qt UDP mDNS backend with an Android Wi-Fi multicast lock.
 
 ## Test architecture
 
@@ -115,5 +117,7 @@ The running API is advertised with DNS-SD as `_prg32._tcp.local.`. Its TXT recor
 registration API; the remaining targets use the same wire contract through a Qt UDP mDNS responder. This lets
 SDK tooling locate the host, then use the existing upload, select/run, runtime, memory, screenshot, and
 performance endpoints without a manually entered IP address.
+The normative service metadata, endpoint table, platform backends, and trust boundary are documented in
+[Network discovery and PRG32 SDK access](NETWORKING.md).
 
 Performance ABI calls 124 through 132 implement the public version 1 broker. A cartridge that declares a `performance_contract` or `performance` metadata value, or uses a `benchmark` or `performance` tag, receives a visible performance action. Results use the PRG32 performance JSON schema version 2.

@@ -18,6 +18,11 @@ PRG32-QT keeps cartridge execution in portable C++20 and confines host-specific 
 CMake 3.21+, a C++20 compiler, Qt 6.5+ with Core, Gui, Quick, QuickControls2, Network, Multimedia and
 WebSockets. CI currently uses Qt 6.8.3 where binary Qt kits are installed.
 
+Every interactive target listens for the PRG32 device HTTP API on TCP port 8080 and advertises
+`_prg32._tcp.local.` on multicast-capable local networks. See
+[Network discovery and PRG32 SDK access](NETWORKING.md) for SDK commands, service metadata, firewall guidance,
+and the distinction between device and Cartridge Store discovery.
+
 ## Windows
 
 Install Qt 6 desktop and Ninja, then from PowerShell:
@@ -66,6 +71,8 @@ CI uses the macOS 15 runner with Xcode 16 because the Qt 6.8.3 binary kit still 
 which is absent from the newer Xcode 26 SDK on `macos-latest`.
 Tagged releases run `macdeployqt` and publish DMG installers from separate Apple Silicon (`arm64`) and Intel
 (`x86_64`) runners; the application bundle contains its Qt frameworks, QML modules, and plugins.
+The application registers the device API through the system Bonjour daemon, which handles interface changes,
+record probing, and instance-name collisions.
 
 Settings exposes Accurate (default), Optimal (30 FPS), and Unlimited performance profiles on every target,
 together with Auto, Portrait, and Landscape player layouts and optional firmware-style status bars. Fullscreen can be toggled from the player,
@@ -112,6 +119,9 @@ xcrun devicectl device process launch --device <device-udid> \
 
 The default Store uses HTTPS. The existing App Transport Security allowance remains only for user-configured
 development Stores that still use plain HTTP.
+The bundle declares `_prg32._tcp` in `NSBonjourServices` and provides a local-network usage description. iOS
+prompts for local-network access when Bonjour/API access is first used; denying it prevents SDK discovery and
+connections until the permission is restored in system settings.
 
 ## Apple TV
 
@@ -131,6 +141,7 @@ For a signed device build, set `TVOS_TEAM_ID` and use `platform=tvOS,id=<device-
 architecture. Qt's public online installer does not publish a tvOS binary kit. Build the checksum-pinned Qt
 6.8.3 simulator kit with `QT_HOST_ROOT=/path/to/Qt/macos ./scripts/build-qt-tvos.sh`; the script prints the
 resulting `QT_ROOT`. CI caches that source-built kit and requires the Apple TV application to compile.
+The tvOS bundle declares the same Bonjour service and local-network purpose string as iOS.
 
 ## Android
 
@@ -152,6 +163,10 @@ ANDROID_NDK_ROOT=/path/to/android-ndk \
 
 The build creates an ARM64 debug APK at `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` with application ID `org.riscvprg32.prg32qt`. It is debug-signed by Gradle; configure a release keystore and release packaging separately before distribution. The APK contains the required Qt libraries and plugins, plus checksum-pinned OpenSSL 3 libraries for Qt Network HTTPS on Android. The manifest enables Internet access, permits cleartext HTTP only for user-configured development Stores, and retains Qt's required activity metadata and file provider.
 
+The manifest also grants `CHANGE_WIFI_MULTICAST_STATE`. While the device API is advertised, PRG32-QT holds an
+Android Wi-Fi multicast lock so DNS-SD browse/resolve requests reach the Qt mDNS responder; the lock is released
+when the advertiser stops.
+
 The Android player reads system-bar and display-cutout `WindowInsets`, keeps all setup/player controls inside
 that safe region, and hides the desktop fullscreen preference and button.
 
@@ -168,3 +183,4 @@ The APK below `build-android-tv/android-build/build/outputs/apk/` uses applicati
 and advertises a TV banner. Its activity reapplies immersive fullscreen whenever it regains focus. In the
 player, remote/gamepad keys feed the PRG32 D-pad, A, B and Select masks. The game surface is letterboxed to
 320:200 and navigation/touch chrome is hidden.
+Android TV uses the same multicast permission, lock lifetime, and `_prg32._tcp.local.` contract as Android.

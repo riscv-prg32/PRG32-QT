@@ -17,9 +17,10 @@ PRG32-QT uses layered validation.
   The first attempt lost Store DNS resolution after 11 passes, so no cartridge result from that interrupted run
   was used as certification evidence. No physical speaker listening check was performed.
 - Android and Android TV declare multicast permission and acquire a Wi-Fi multicast lock while advertising.
-  The Android Qt kit was unavailable on this host, so the JNI branch and APKs require their CI builds plus
-  emulator/device discovery checks. Windows, Linux, Raspberry Pi OS, iOS, Android, Android TV, and Apple TV
-  were not compiled or device-tested in this session.
+  The Android Qt kit was unavailable on the local host. GitHub Actions run 36854482897 subsequently compiled
+  the Windows, Linux, ARM64 Raspberry Pi compatibility, macOS arm64/x86_64, iOS, Android, Android TV, and Apple
+  TV targets successfully, including the Android JNI branch. Physical-device discovery was not exercised on
+  Android, Android TV, iOS, or Apple TV and remains a release-qualification check.
 
 ## RV32 store-boundary validation (2026-10-01)
 

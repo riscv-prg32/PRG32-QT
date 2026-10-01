@@ -5,7 +5,10 @@
 3. Confirm CI is green for Windows, Linux, ARM64 Linux/Raspberry-Pi-compatible, macOS, iOS, Android, Android TV, and the source-built Qt Apple TV simulator job.
 4. Run the Store certification workflow against the default Store and review every cartridge result.
 5. Verify the canonical PRG32 artwork and platform packaging metadata.
-6. Tag `vX.Y.Z` and push the tag. `.github/workflows/release.yml` verifies that CMake derives exactly the tag version, reruns the portable release suite, creates `.tar.gz` and `.zip` source
+6. On a multicast-capable LAN, confirm `_prg32._tcp.local.` resolves to the running release, verify its TXT
+   contract and `/api/runtime`, and upload/run a cartridge with the PRG32 SDK. Repeat on representative Apple
+   Bonjour and Qt UDP-backend targets.
+7. Tag `vX.Y.Z` and push the tag. `.github/workflows/release.yml` verifies that CMake derives exactly the tag version, reruns the portable release suite, creates `.tar.gz` and `.zip` source
    archives plus `SHA256SUMS.txt`, and publishes them in a GitHub Release with generated notes.
 
 The release workflow may also be started manually for an existing tag. It never invents or moves a tag: the
@@ -15,4 +18,4 @@ An exact release tag produces `X.Y.Z`. Other Git checkouts produce `X.Y.Z-dev.N+
 distance from the nearest release tag (or the repository commit count before the first tag). Apple
 `CFBundleVersion` and Android `versionCode` use the corresponding generated monotonic numeric build value.
 
-Binary/app-store releases should additionally be installed and launched on representative physical hardware for each target family, with audio, touch/keyboard, controller hot-plug, local import and Store download exercised before signing/publication.
+Binary/app-store releases should additionally be installed and launched on representative physical hardware for each target family, with audio, touch/keyboard, controller hot-plug, local import, Store download, local-network permission, and Bonjour/mDNS discovery exercised before signing/publication.

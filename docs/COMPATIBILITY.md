@@ -13,7 +13,10 @@ PRG32-QT targets portable ABI-table PRG32 cartridges and follows the public PRG3
   audio-plus, tilemap, platformer, and sprites.
 - 320×200 indexed framebuffer with a 256-entry RGB565 palette.
 - `AUD0` packaged audio.
-- Store API `/api/games` and Store discovery ABI `prg32-store-discovery-1.0`.
+- Device HTTP API for cartridge slots, upload/select, runtime/debug metadata, screenshots, performance, memory,
+  and scores.
+- DNS-SD device advertisement `_prg32._tcp.local.` with API contract `prg32-http-1`; this is distinct from the
+  Cartridge Store's `_prg32store._tcp.local.` discovery ABI.
 - Multiplayer ABI calls #32-#40 and the Store `/api/multiplayer` WebSocket snapshot protocol.
 
 Hardware-specific cartridges that bypass the portable ABI and depend directly on ESP32 peripherals are outside this host's compatibility target.

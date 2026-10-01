@@ -5,7 +5,7 @@ PRG32-QT is the portable Qt/C++ host for the PRG32 educational RISC-V cartridge 
 ## Principles
 
 1. **One portable runtime core.** Cartridge parsing, RV32IMAC execution, ABI dispatch, graphics, audio sequencing, tile/platformer helpers, scores, and deterministic host behavior live in Qt-free C++20 under `src/core`.
-2. **Thin platform integration.** Qt 6 provides windows, touch UI, networking, audio output, persistent settings, and packaging. Native code is restricted to small adapters where Qt has no equivalent, notably physical game-controller discovery.
+2. **Thin platform integration.** Qt 6 provides windows, touch UI, networking, audio output, persistent settings, and packaging. Native code is restricted to small adapters where the operating system contract requires it, notably physical game-controller discovery, Apple Bonjour registration, and mobile safe-area reporting.
 3. **PRG32 compatibility before platform specialization.** The public PRG32 ABI and cartridge contracts define host interoperability.
 4. **Downloaded cartridges are passive guest data.** PRG32-QT interprets RV32IMAC guest instructions and exposes only the PRG32 ABI. It does not load downloaded native code into the host process.
 5. **Educational clarity.** The implementation favors explicit subsystems and testable boundaries so students can study the CPU, ABI, graphics, input, audio, and Store layers independently.
@@ -13,10 +13,14 @@ PRG32-QT is the portable Qt/C++ host for the PRG32 educational RISC-V cartridge 
 
 ## Supported hosts
 
-The intended host set is Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, and Android. Desktop systems add keyboard and physical game-controller input; mobile systems provide adaptive touch console controls.
+The intended host set is Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iOS, Android, Apple TV, and Android
+TV. Desktop systems add keyboard and physical game-controller input; mobile systems provide adaptive touch
+console controls; TV systems provide controller-first fullscreen presentation. Every interactive host exposes
+the same local HTTP API and `_prg32._tcp.local.` discovery contract when networking is available.
 
 ## Non-goals
 
 PRG32-QT is not an ESP32 peripheral emulator. Multiplayer uses the public Store relay protocol rather than
 emulating ESP32 networking, while unavailable Wi-Fi and keyboard services remain unadvertised instead of
-receiving misleading partial behavior.
+receiving misleading partial behavior. Host-side HTTP and mDNS access for SDK tooling does not imply that the
+guest cartridge receives an emulated Wi-Fi peripheral.

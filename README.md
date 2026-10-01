@@ -56,6 +56,20 @@ Qt application builds require the Qt Multimedia and Qt WebSockets modules. Multi
 #40 use the configured Store's `/api/multiplayer` WebSocket relay and share one implementation on every Qt
 target.
 
+## SDK deployment and discovery
+
+While PRG32-QT is running, it advertises its device API as `_prg32._tcp.local.` with Bonjour/mDNS. Resolve the
+service to a host and port, then pass that URL to the same PRG32 SDK workflow used for hardware:
+
+```sh
+python3 -m prg32 runtime --url http://prg32-host.local:8080
+python3 -m prg32 esp32c6 upload-and-run game.prg32 \
+  --url http://prg32-host.local:8080 --slot cart0
+```
+
+See [network discovery and SDK access](docs/NETWORKING.md) for the DNS-SD/TXT contract, endpoint table,
+platform behavior, security boundary, and troubleshooting steps.
+
 To exercise every discoverable Store cartridge after building the headless runner:
 
 ```sh

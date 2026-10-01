@@ -30,6 +30,8 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | Store cartridge icons | `StoreClient` image cache, `RasterImageItem`, QML |
 | Local `.prg32` import | Qt `FileDialog` + `AppController` |
 | Save successfully launched cartridges in app data | `AppController` |
+| PRG32 device HTTP API for upload/run/runtime/debug access | `WebApiServer`, `AppController` |
+| Bonjour/mDNS `_prg32._tcp.local.` device discovery | `MdnsAdvertiser` platform backends |
 | Local score APIs/current player | `Runtime` |
 | Performance ABI calls | `Runtime` |
 | Multiplayer rooms and player snapshots | `MultiplayerService`, `QtMultiplayerService`, `Runtime` ABI #32-#40 |
@@ -40,4 +42,6 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 
 ## Qt-only extensions
 
-PRG32-QT adds desktop keyboard input and external game-controller support without changing guest ABI semantics. The combined input mask is identical to the iOS touch mask.
+PRG32-QT adds desktop keyboard input, external game-controller support, and local-network SDK access without
+changing guest ABI semantics. The combined input mask is identical to the iOS touch mask. Network discovery is
+a host integration feature and is distinct from cartridge-visible Wi-Fi ABI support.
