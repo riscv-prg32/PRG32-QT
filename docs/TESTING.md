@@ -2,6 +2,18 @@
 
 PRG32-QT uses layered validation.
 
+## Rectangle clipping validation (2026-10-02)
+
+- Core regression coverage passes the signed 32-bit minimum and maximum coordinates and extents accepted by
+  ABI calls #56 and #136 through indexed rectangle clipping.
+- The Debug AddressSanitizer/UndefinedBehaviorSanitizer build and all four CTest targets pass on Apple Silicon
+  macOS. The native macOS Qt target was also rebuilt locally. Windows, Linux, Raspberry Pi OS, iOS, Android,
+  Android TV, and Apple TV require the normal CI matrix because their toolchains/runners are unavailable on
+  this host.
+- Accurate and Unlimited 900-frame media/input sweeps each passed all 30 portable cartridges in the current
+  32-entry default Store; the two non-portable cartridges were explicitly excluded. The complete catalog and
+  media counters are recorded in the [rectangle-clipping Store certification](STORE-CERTIFICATION-2026-10-02-RECTANGLE-CLIPPING.md).
+
 ## Android NDK download recovery (2026-10-01)
 
 GitHub Actions run 36893506650 failed only in the Android ARM64 job because `sdkmanager` received a truncated

@@ -7,6 +7,7 @@
 #include "Runtime.h"
 #include "Rv32Cpu.h"
 #include <cassert>
+#include <climits>
 #include <cstring>
 #include <iostream>
 using namespace prg32;
@@ -66,6 +67,11 @@ int main() {
     Framebuffer f;
     f.clear(0);
     f.rect(2, 3, 4, 5, 0xffff);
+    assert(f.rgb565Pixels()[3 * 320 + 2] == 0xffff);
+    f.rectIndexed(INT_MAX, 0, 1, 1, 7);
+    f.rectIndexed(INT_MIN, 0, INT_MAX, 1, 7);
+    f.rectIndexed(0, INT_MAX, 1, 1, 7);
+    f.rectIndexed(0, INT_MIN, 1, INT_MAX, 7);
     assert(f.rgb565Pixels()[3 * 320 + 2] == 0xffff);
     f.setPalette(7, 0x1234);
     f.pixelIndexed(1, 1, 7);

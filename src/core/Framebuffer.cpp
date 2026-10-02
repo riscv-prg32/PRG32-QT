@@ -47,7 +47,12 @@ void Framebuffer::rect(int x, int y, int w, int h, uint16_t c) {
 void Framebuffer::rectIndexed(int x, int y, int w, int h, uint8_t i) {
     if (w <= 0 || h <= 0)
         return;
-    int x0 = std::max(0, x), y0 = std::max(0, y), x1 = std::min(Width, x + w), y1 = std::min(Height, y + h);
+    // ABI calls #56 and #136 accept signed 32-bit geometry. Widen before adding the
+    // extent so hostile or malformed guest values cannot overflow before clipping.
+    const int x0 = int(std::clamp<int64_t>(x, 0, Width));
+    const int y0 = int(std::clamp<int64_t>(y, 0, Height));
+    const int x1 = int(std::clamp<int64_t>(int64_t(x) + w, 0, Width));
+    const int y1 = int(std::clamp<int64_t>(int64_t(y) + h, 0, Height));
     if (x0 >= x1 || y0 >= y1)
         return;
     for (int yy = y0; yy < y1; yy++)
