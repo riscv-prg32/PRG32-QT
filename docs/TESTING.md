@@ -2,6 +2,24 @@
 
 PRG32-QT uses layered validation.
 
+## 0.4.1 release validation (2026-10-04)
+
+- The Apple Silicon macOS host passed the optimized portable build and all four CTest targets: the core suite,
+  Asteroids, Bach, and the required PerformanceTest contract. The native macOS Qt application also compiled
+  with Homebrew Qt 6.11.2 and passed the same four tests.
+- The documentation-consistency check passed. The release contains the Android NDK download-recovery change
+  and the ABI calls #56/#136 extreme rectangle-clipping fix certified by the 2026-10-02 Store run below.
+- The locally installed official Qt 6.8.3 macOS, iOS, tvOS, and Android kits could not complete QML import
+  scanning on this host because their scanner aborted with `Incompatible processor` and reported a missing
+  `neon` feature. Windows, Linux x86-64, Raspberry Pi OS ARM64, Intel macOS, iOS, Android, Android TV, and
+  Apple TV therefore require the tag-triggered native release runners. No compatible physical mobile or TV
+  device was available for installation testing.
+- The tag-triggered release workflow is the packaging authority. It publishes the dependency-deployed Windows
+  NSIS installer, macOS Apple Silicon and Intel DMGs, dependency-declared Linux and Raspberry Pi OS Debian
+  packages, self-contained Android and Android TV APKs, and installable iOS and Apple TV simulator bundles,
+  together with source archives and SHA-256 manifests. Publication is blocked unless every packaging job
+  succeeds and all 11 expected platform assets are present.
+
 ## Rectangle clipping validation (2026-10-02)
 
 - Core regression coverage passes the signed 32-bit minimum and maximum coordinates and extents accepted by

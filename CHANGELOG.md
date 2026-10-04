@@ -4,6 +4,8 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-04
+
 - Reject fully clipped extreme rectangle geometry without signed overflow in RGB565 and indexed ABI drawing
   calls.
 - Retry Android NDK installation in CI and release builds after removing an incomplete package directory, so a
