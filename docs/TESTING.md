@@ -8,9 +8,10 @@ PRG32-QT uses layered validation.
   targets passed: the core suite, Asteroids, Bach, and the required PerformanceTest contract.
 - The Store-smoke Python regression suite passed all nine tests, the documentation-consistency check passed,
   and LLVM 22 `clang-format --dry-run --Werror` passed for the complete CI source list.
-- A live 900-frame Accurate sweep was attempted against the default Store. The endpoint still returned HTTP
-  503 after all five retry attempts, so no current catalog or per-cartridge result is claimed. Accurate and
-  Unlimited whole-Store certification remains required when the service is reachable.
+- The first live 900-frame sweep hit HTTP 503 after six packages and is not counted. Once the Store answered
+  again, the Release runner certified the 32-entry catalog in Accurate and Unlimited modes with a shared
+  package cache: `passed=30 skipped_nonportable=2 failed=0` in both. Per-cartridge evidence and the 0.4.1
+  frame comparison are in the [firmware-tile Store certification](STORE-CERTIFICATION-2026-10-17-FIRMWARE-TILES.md).
 - Windows, Linux, Raspberry Pi OS, Intel macOS, iOS, Android, Android TV, and Apple TV toolchains or runners
   were not available in this local macOS environment. No physical device, simulator, controller, speaker, or
   listening check was exercised; the normal CI platform matrix remains authoritative for those targets.
