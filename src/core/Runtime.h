@@ -174,21 +174,38 @@ class Runtime {
     void playTrack(int);
     void advanceAudio(double);
     void processTrack();
+    // Tile and playfield state mirrors the firmware (components/prg32/prg32_tile.c and prg32_platform.c):
+    // 256 zero-initialised tiles addressed by 8-bit ids, 8-bit maps, and per-cell dirty flags for the
+    // 40x25 tile screen so tile_present repaints only cells that changed.
     struct TileDef {
         std::array<uint8_t, 8> bits{};
-        uint16_t fg = 0xffff, bg = 0;
+        uint16_t fg = 0, bg = 0;
     };
-    std::unordered_map<uint16_t, TileDef> tiles_;
-    std::array<uint16_t, 40 * 25> tileScreen_{};
-    std::array<std::array<uint16_t, 64 * 32>, 2> playfield_{};
-    std::array<uint32_t, 65536> tileFlags_{};
+    /** Guest prg32_platform_actor_t, loaded from and stored back to guest memory around each call. */
+    struct Actor {
+        int x = 0, y = 0, vx = 0, vy = 0;
+        uint16_t w = 0, h = 0, state = 0;
+        uint8_t layer = 0;
+    };
+    std::array<TileDef, 256> tiles_{};
+    std::array<uint8_t, 40 * 25> tileScreen_{};
+    std::array<uint8_t, 40 * 25> tileDirty_{};
+    std::array<std::array<uint8_t, 64 * 32>, 2> playfield_{};
+    // The firmware allocates the playfield on the first playfield_clear/playfield_put; until then
+    // playfield_draw draws nothing.
+    bool playfieldReady_ = false;
+    std::array<uint8_t, 256> tileFlags_{};
     std::array<int, 2> scrollX_{}, scrollY_{}, parallaxX_{256, 256}, parallaxY_{256, 256};
     int cameraX_ = 0, cameraY_ = 0;
-    void drawTile(int, int, uint16_t, bool = false);
-    void drawPlayfield(int layer, bool transparentZero = false);
-    uint16_t tileAt(int, int, int) const;
-    bool solidAt(int, int, int, uint32_t) const;
-    uint16_t actorMove(uint32_t, int, int);
+    void drawTile(int, int, uint8_t, bool = false);
+    void drawPlayfield(uint8_t layer, bool transparentZero = false);
+    uint8_t tileAt(uint8_t, int, int) const;
+    uint8_t tileFlagsAt(uint8_t, int, int) const;
+    Actor loadActor(uint32_t);
+    void storeActor(uint32_t, const Actor&);
+    uint8_t actorFlagsOverlapping(const Actor&) const;
+    bool actorHitsPlatformFloor(const Actor&, int) const;
+    uint16_t actorMove(Actor&, int, int);
     uint16_t actorStep(uint32_t, uint32_t, int, int, int, int);
     void cameraFollow(uint32_t, int, int);
     void drawRGBSprite(int, int, int, int, uint32_t, std::optional<uint16_t>);

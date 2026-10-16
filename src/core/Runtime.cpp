@@ -16,6 +16,13 @@ constexpr uint32_t ActorHeightOffset = 18;
 constexpr uint32_t ActorStatusOffset = 20;
 constexpr uint32_t ActorLayerOffset = 22;
 constexpr uint32_t ActorReservedOffset = 23;
+// PRG32_TILE_FLAG_* and PRG32_PLATFORM_* bits from the firmware's prg32.h.
+constexpr uint8_t TileFlagSolid = 1u << 0, TileFlagPlatform = 1u << 1, TileFlagHazard = 1u << 2,
+                  TileFlagCollect = 1u << 3;
+constexpr uint16_t PlatformOnGround = 1u << 0, PlatformHitLeft = 1u << 1, PlatformHitRight = 1u << 2,
+                   PlatformHitHead = 1u << 3, PlatformHazard = 1u << 4, PlatformCollect = 1u << 5;
+// PRG32_BTN_* input bits used by actor_step.
+constexpr uint32_t ButtonLeft = 1u << 0, ButtonRight = 1u << 1, ButtonUp = 1u << 2, ButtonA = 1u << 4;
 } // namespace
 
 static void wr16(std::vector<uint8_t>& m, size_t o, uint16_t v) {
@@ -29,43 +36,49 @@ static void wr32(std::vector<uint8_t>& m, size_t o, uint32_t v) {
 static int si(uint32_t v) {
     return int(int32_t(v));
 }
-void Runtime::drawTile(int px, int py, uint16_t id, bool transparentZero) {
+// Port of the firmware's draw_tile_pixels: the whole 8x8 cell gets the tile background, then the set
+// bits are drawn in the foreground colour. Undefined tiles are all zero, so they paint black. Only tile
+// 0 is skipped when transparentZero is set; any other tile still paints its background.
+void Runtime::drawTile(int px, int py, uint8_t id, bool transparentZero) {
     if (transparentZero && id == 0)
         return;
-    auto it = tiles_.find(id);
-    if (it == tiles_.end())
+    const TileDef& tile = tiles_[id];
+    fb_.rect(px, py, 8, 8, tile.bg);
+    if (tile.fg == tile.bg)
         return;
-    uint16_t bg = it->second.bg;
-    fb_.draw1BPP(px, py, 8, 8, it->second.bits, it->second.fg, transparentZero ? nullptr : &bg);
+    fb_.draw1BPP(px, py, 8, 8, tile.bits, tile.fg, nullptr);
 }
-void Runtime::drawPlayfield(int layer, bool transparentZero) {
-    if (layer < 0 || layer > 1)
+void Runtime::drawPlayfield(uint8_t layer, bool transparentZero) {
+    if (layer > 1 || !playfieldReady_)
         return;
-    int originX = cameraX_ * parallaxX_[layer] / 256 + scrollX_[layer];
-    int originY = cameraY_ * parallaxY_[layer] / 256 + scrollY_[layer];
-    int startX = originX >= 0 ? originX / 8 : (originX - 7) / 8;
-    int startY = originY >= 0 ? originY / 8 : (originY - 7) / 8;
+    int originX = scrollX_[layer] + int(int64_t(cameraX_) * parallaxX_[layer] / 256);
+    int originY = scrollY_[layer] + int(int64_t(cameraY_) * parallaxY_[layer] / 256);
+    int startX = originX >= 0 ? originX / 8 : -((-originX + 7) / 8);
+    int startY = originY >= 0 ? originY / 8 : -((-originY + 7) / 8);
     int offsetX = originX - startX * 8;
     int offsetY = originY - startY * 8;
-    for (int screenY = -offsetY, row = 0; screenY < Framebuffer::Height; screenY += 8, ++row)
+    for (int screenY = -offsetY, row = 0; screenY < Framebuffer::Height; screenY += 8, ++row) {
+        int mapY = (startY + row) % 32;
+        if (mapY < 0)
+            mapY += 32;
         for (int screenX = -offsetX, column = 0; screenX < Framebuffer::Width; screenX += 8, ++column) {
             int mapX = (startX + column) % 64;
-            int mapY = (startY + row) % 32;
             if (mapX < 0)
                 mapX += 64;
-            if (mapY < 0)
-                mapY += 32;
             drawTile(screenX, screenY, playfield_[layer][mapY * 64 + mapX], transparentZero);
         }
+    }
 }
-uint16_t Runtime::tileAt(int l, int x, int y) const {
-    int tx = x >> 3, ty = y >> 3;
-    if (l < 0 || l > 1 || tx < 0 || ty < 0 || tx >= 64 || ty >= 32)
+uint8_t Runtime::tileAt(uint8_t layer, int x, int y) const {
+    if (x < 0 || y < 0 || layer > 1)
         return 0;
-    return playfield_[l][ty * 64 + tx];
+    int tx = x / 8, ty = y / 8;
+    if (tx >= 64 || ty >= 32)
+        return 0;
+    return playfield_[layer][ty * 64 + tx];
 }
-bool Runtime::solidAt(int l, int x, int y, uint32_t mask) const {
-    return (tileFlags_[tileAt(l, x, y)] & mask) != 0;
+uint8_t Runtime::tileFlagsAt(uint8_t layer, int x, int y) const {
+    return tileFlags_[tileAt(layer, x, y)];
 }
 bool Runtime::load(const Cartridge& c, std::string& e) {
     if (!c.isPortable()) {
@@ -448,71 +461,143 @@ void Runtime::drawIndexedSprite(int x, int y, uint32_t p, uint32_t frame, bool b
         fb_.drawIndexed(x, y, w, h, packed.data(), bpp, pv.data(), pc, tr < 0 ? -1 : tr);
     }
 }
-uint16_t Runtime::actorMove(uint32_t p, int dx, int dy) {
+// The platform helpers below are ports of the firmware's components/prg32/prg32_platform.c.
+Runtime::Actor Runtime::loadActor(uint32_t p) {
     bool ok = true;
-    int x = si(cpu_.load32(p + ActorXOffset, ok));
-    int y = si(cpu_.load32(p + ActorYOffset, ok));
-    int w = cpu_.load16(p + ActorWidthOffset, ok);
-    int h = cpu_.load16(p + ActorHeightOffset, ok);
-    int l = cpu_.load8(p + ActorLayerOffset, ok);
-    uint16_t st = 0;
-    int sx = (dx > 0) - (dx < 0);
-    for (int n = 0; n < std::abs(dx); n++) {
-        int nx = x + sx, edge = sx > 0 ? nx + w - 1 : nx;
-        if (solidAt(l, edge, y, 1) || solidAt(l, edge, y + h - 1, 1)) {
-            st |= sx > 0 ? 4 : 2;
+    Actor actor;
+    actor.x = si(cpu_.load32(p + ActorXOffset, ok));
+    actor.y = si(cpu_.load32(p + ActorYOffset, ok));
+    actor.vx = si(cpu_.load32(p + ActorVelocityXOffset, ok));
+    actor.vy = si(cpu_.load32(p + ActorVelocityYOffset, ok));
+    actor.w = cpu_.load16(p + ActorWidthOffset, ok);
+    actor.h = cpu_.load16(p + ActorHeightOffset, ok);
+    actor.state = cpu_.load16(p + ActorStatusOffset, ok);
+    actor.layer = cpu_.load8(p + ActorLayerOffset, ok);
+    return actor;
+}
+void Runtime::storeActor(uint32_t p, const Actor& actor) {
+    bool ok = true;
+    cpu_.store32(p + ActorXOffset, uint32_t(actor.x), ok);
+    cpu_.store32(p + ActorYOffset, uint32_t(actor.y), ok);
+    cpu_.store32(p + ActorVelocityXOffset, uint32_t(actor.vx), ok);
+    cpu_.store32(p + ActorVelocityYOffset, uint32_t(actor.vy), ok);
+    cpu_.store16(p + ActorWidthOffset, actor.w, ok);
+    cpu_.store16(p + ActorHeightOffset, actor.h, ok);
+    cpu_.store16(p + ActorStatusOffset, actor.state, ok);
+    cpu_.store8(p + ActorLayerOffset, actor.layer, ok);
+}
+// OR of the flags of every tile the actor's box overlaps.
+uint8_t Runtime::actorFlagsOverlapping(const Actor& actor) const {
+    uint8_t flags = 0;
+    int x0 = actor.x, y0 = actor.y;
+    int x1 = actor.x + int(actor.w) - 1, y1 = actor.y + int(actor.h) - 1;
+    for (int y = y0; y <= y1; y += 8) {
+        for (int x = x0; x <= x1; x += 8)
+            flags |= tileFlagsAt(actor.layer, x, y);
+        flags |= tileFlagsAt(actor.layer, x1, y);
+    }
+    for (int x = x0; x <= x1; x += 8)
+        flags |= tileFlagsAt(actor.layer, x, y1);
+    flags |= tileFlagsAt(actor.layer, x1, y1);
+    return flags;
+}
+// True when the actor's bottom edge has just crossed into a one-way platform tile from above.
+bool Runtime::actorHitsPlatformFloor(const Actor& actor, int previousY) const {
+    int oldBottom = previousY + int(actor.h) - 1;
+    int newBottom = actor.y + int(actor.h) - 1;
+    if (newBottom < oldBottom)
+        return false;
+    int x0 = actor.x, x1 = actor.x + int(actor.w) - 1;
+    int tileY = (newBottom / 8) * 8;
+    if (oldBottom >= tileY)
+        return false;
+    for (int x = x0; x <= x1; x += 8)
+        if (tileFlagsAt(actor.layer, x, newBottom) & TileFlagPlatform)
+            return true;
+    return (tileFlagsAt(actor.layer, x1, newBottom) & TileFlagPlatform) != 0;
+}
+static uint16_t actorStateFromFlags(uint8_t flags) {
+    uint16_t state = 0;
+    if (flags & TileFlagHazard)
+        state |= PlatformHazard;
+    if (flags & TileFlagCollect)
+        state |= PlatformCollect;
+    return state;
+}
+uint16_t Runtime::actorMove(Actor& actor, int dx, int dy) {
+    uint16_t state = actor.state & (PlatformHazard | PlatformCollect);
+    int stepX = dx < 0 ? -1 : 1;
+    int stepY = dy < 0 ? -1 : 1;
+    for (int i = 0; i < (dx < 0 ? -dx : dx); ++i) {
+        actor.x += stepX;
+        uint8_t flags = actorFlagsOverlapping(actor);
+        state |= actorStateFromFlags(flags);
+        if (flags & TileFlagSolid) {
+            actor.x -= stepX;
+            actor.vx = 0;
+            state |= stepX < 0 ? PlatformHitLeft : PlatformHitRight;
             break;
         }
-        x = nx;
     }
-    int sy = (dy > 0) - (dy < 0);
-    for (int n = 0; n < std::abs(dy); n++) {
-        int ny = y + sy, edge = sy > 0 ? ny + h - 1 : ny;
-        if (solidAt(l, x, edge, 1) || solidAt(l, x + w - 1, edge, 1)) {
-            st |= sy > 0 ? 1 : 8;
+    for (int i = 0; i < (dy < 0 ? -dy : dy); ++i) {
+        int previousY = actor.y;
+        actor.y += stepY;
+        uint8_t flags = actorFlagsOverlapping(actor);
+        state |= actorStateFromFlags(flags);
+        if ((flags & TileFlagSolid) || (stepY > 0 && actorHitsPlatformFloor(actor, previousY))) {
+            actor.y -= stepY;
+            actor.vy = 0;
+            state |= stepY < 0 ? PlatformHitHead : PlatformOnGround;
             break;
         }
-        y = ny;
     }
-    uint32_t fl = tileFlags_[tileAt(l, x + w / 2, y + h / 2)];
-    if (fl & 4)
-        st |= 16;
-    if (fl & 8)
-        st |= 32;
-    cpu_.store32(p + ActorXOffset, uint32_t(int32_t(x)), ok);
-    cpu_.store32(p + ActorYOffset, uint32_t(int32_t(y)), ok);
-    cpu_.store16(p + ActorStatusOffset, st, ok);
-    return st;
+    state |= actorStateFromFlags(actorFlagsOverlapping(actor));
+    actor.state = state;
+    return state;
 }
 uint16_t Runtime::actorStep(uint32_t p, uint32_t in, int move, int jump, int gravity, int maxFall) {
-    bool ok = true;
-    int vx = 0;
-    if (in & 1)
-        vx -= move;
-    if (in & 2)
-        vx += move;
-    int vy = si(cpu_.load32(p + ActorVelocityYOffset, ok));
-    uint16_t old = cpu_.load16(p + ActorStatusOffset, ok);
-    if ((in & 16) && (old & 1))
-        vy = -std::abs(jump);
-    vy = std::min(maxFall, vy + gravity);
-    cpu_.store32(p + ActorVelocityXOffset, uint32_t(int32_t(vx)), ok);
-    cpu_.store32(p + ActorVelocityYOffset, uint32_t(int32_t(vy)), ok);
-    auto st = actorMove(p, vx, vy);
-    if (st & 1)
-        cpu_.store32(p + ActorVelocityYOffset, 0, ok);
-    return st;
+    if (!p)
+        return 0;
+    Actor actor = loadActor(p);
+    actor.vx = 0;
+    if (in & ButtonLeft)
+        actor.vx -= move;
+    if (in & ButtonRight)
+        actor.vx += move;
+    if ((in & (ButtonA | ButtonUp)) && (actor.state & PlatformOnGround))
+        actor.vy = jump;
+    if (maxFall < 0)
+        maxFall = -maxFall;
+    actor.vy += gravity;
+    actor.vy = std::clamp(actor.vy, -maxFall, maxFall);
+    actor.state = 0;
+    uint16_t state = actorMove(actor, actor.vx, actor.vy);
+    storeActor(p, actor);
+    return state;
 }
-void Runtime::cameraFollow(uint32_t p, int dx, int dy) {
-    bool ok = true;
-    int x = si(cpu_.load32(p + ActorXOffset, ok));
-    int y = si(cpu_.load32(p + ActorYOffset, ok));
-    int tx = x - 160;
-    int ty = y - 100;
-    if (std::abs(tx - cameraX_) > dx)
-        cameraX_ = tx - (tx > cameraX_ ? dx : -dx);
-    if (std::abs(ty - cameraY_) > dy)
-        cameraY_ = ty - (ty > cameraY_ ? dy : -dy);
+void Runtime::cameraFollow(uint32_t p, int deadzoneX, int deadzoneY) {
+    if (!p)
+        return;
+    const Actor actor = loadActor(p);
+    const int gameW = Framebuffer::Width, gameH = Framebuffer::Height;
+    int cameraX = cameraX_, cameraY = cameraY_;
+    int maxX = 64 * 8 - gameW, maxY = 32 * 8 - gameH;
+    deadzoneX = std::clamp(deadzoneX, 0, gameW / 2);
+    deadzoneY = std::clamp(deadzoneY, 0, gameH / 2);
+    int actorLeft = actor.x - cameraX;
+    int actorRight = actorLeft + int(actor.w);
+    int actorTop = actor.y - cameraY;
+    int actorBottom = actorTop + int(actor.h);
+    if (actorLeft < deadzoneX)
+        cameraX = actor.x - deadzoneX;
+    else if (actorRight > gameW - deadzoneX)
+        cameraX = actor.x + int(actor.w) - (gameW - deadzoneX);
+    if (actorTop < deadzoneY)
+        cameraY = actor.y - deadzoneY;
+    else if (actorBottom > gameH - deadzoneY)
+        cameraY = actor.y + int(actor.h) - (gameH - deadzoneY);
+    cameraX_ = std::clamp(cameraX, 0, maxX);
+    cameraY_ = std::clamp(cameraY, 0, maxY);
 }
 int Runtime::scoreGet(const std::string& g, int idx, uint32_t out) {
     std::vector<Score> s;
@@ -976,69 +1061,90 @@ void Runtime::hostCall(uint32_t i) {
         ret(0);
         break;
     case 80:
-        // ABI #80 tile_screen_clear(color565).
-        fb_.clear(uint16_t(a(0)));
+        // ABI #80 tile_clear(color565): like the firmware, reset the map to tile 0, make tile 0 a solid
+        // block of `color`, and mark every cell dirty. The framebuffer is untouched until tile_present.
         tileScreen_.fill(0);
+        tileDirty_.fill(1);
+        tiles_[0] = TileDef{{}, uint16_t(a(0)), uint16_t(a(0))};
         break;
     case 81: {
+        // ABI #81 tile_define(id, bitmap8x8, fg, bg); ids are 8-bit like the firmware's uint8_t.
+        const uint8_t id = uint8_t(a(0));
         TileDef t{};
         if (a(1))
             for (int y = 0; y < 8; y++)
                 t.bits[y] = cpu_.load8(a(1) + y, ok);
         t.fg = uint16_t(a(2));
         t.bg = uint16_t(a(3));
-        tiles_[uint16_t(a(0))] = t;
+        tiles_[id] = t;
+        for (size_t n = 0; n < tileScreen_.size(); n++)
+            if (tileScreen_[n] == id)
+                tileDirty_[n] = 1;
         break;
     }
     case 82: {
-        int x = si(a(0)), y = si(a(1));
-        if (x >= 0 && y >= 0 && x < 40 && y < 25)
-            tileScreen_[y * 40 + x] = uint16_t(a(2));
+        // ABI #82 tile_put(tx, ty, id) with uint8_t arguments.
+        const uint8_t x = uint8_t(a(0)), y = uint8_t(a(1)), id = uint8_t(a(2));
+        if (x < 40 && y < 25 && tileScreen_[y * 40 + x] != id) {
+            tileScreen_[y * 40 + x] = id;
+            tileDirty_[y * 40 + x] = 1;
+        }
         break;
     }
     case 83:
+        // ABI #83 tile_present(): repaint only the dirty cells, then publish the frame.
         for (int y = 0; y < 25; y++)
             for (int x = 0; x < 40; x++)
-                drawTile(x * 8, y * 8, tileScreen_[y * 40 + x]);
+                if (tileDirty_[y * 40 + x]) {
+                    tileDirty_[y * 40 + x] = 0;
+                    drawTile(x * 8, y * 8, tileScreen_[y * 40 + x]);
+                }
         if (present_)
             present_();
         break;
     case 84: {
-        int l = si(a(0));
-        if (l >= 0 && l < 2)
-            playfield_[l].fill(uint16_t(a(1)));
+        // ABI #84 playfield_clear(layer, id) also resets the layer's scroll and parallax.
+        const uint8_t l = uint8_t(a(0));
+        if (l < 2) {
+            playfieldReady_ = true;
+            playfield_[l].fill(uint8_t(a(1)));
+            scrollX_[l] = scrollY_[l] = 0;
+            parallaxX_[l] = parallaxY_[l] = 256;
+        }
         break;
     }
     case 85: {
-        int l = si(a(0)), x = si(a(1)), y = si(a(2));
-        if (l >= 0 && l < 2 && x >= 0 && y >= 0 && x < 64 && y < 32)
-            playfield_[l][y * 64 + x] = uint16_t(a(3));
+        const uint8_t l = uint8_t(a(0)), x = uint8_t(a(1)), y = uint8_t(a(2));
+        if (l < 2 && x < 64 && y < 32) {
+            playfieldReady_ = true;
+            playfield_[l][y * 64 + x] = uint8_t(a(3));
+        }
         break;
     }
     case 86: {
-        int l = si(a(0)), x = si(a(1)), y = si(a(2));
-        ret(l >= 0 && l < 2 && x >= 0 && y >= 0 && x < 64 && y < 32 ? playfield_[l][y * 64 + x] : 0);
+        const uint8_t l = uint8_t(a(0)), x = uint8_t(a(1)), y = uint8_t(a(2));
+        ret(l < 2 && x < 64 && y < 32 ? playfield_[l][y * 64 + x] : 0);
         break;
     }
     case 87: {
-        int l = si(a(0));
-        if (l >= 0 && l < 2) {
+        const uint8_t l = uint8_t(a(0));
+        if (l < 2) {
             scrollX_[l] = si(a(1));
             scrollY_[l] = si(a(2));
         }
         break;
     }
     case 88: {
-        int l = si(a(0));
-        if (l >= 0 && l < 2) {
+        const uint8_t l = uint8_t(a(0));
+        if (l < 2) {
             scrollX_[l] += si(a(1));
             scrollY_[l] += si(a(2));
         }
         break;
     }
     case 89: {
-        int l = si(a(0));
-        if (l >= 0 && l < 2) {
+        const uint8_t l = uint8_t(a(0));
+        if (l < 2) {
             parallaxX_[l] = si(a(1));
             parallaxY_[l] = si(a(2));
         }
@@ -1056,7 +1162,7 @@ void Runtime::hostCall(uint32_t i) {
         break;
     case 93:
         // ABI #93 playfield_draw(layer, transparent_zero).
-        drawPlayfield(si(a(0)), a(1) != 0);
+        drawPlayfield(uint8_t(a(0)), a(1) != 0);
         break;
     case 94:
         drawPlayfield(0);
@@ -1069,34 +1175,44 @@ void Runtime::hostCall(uint32_t i) {
             present_();
         break;
     case 96:
-        tileFlags_[uint16_t(a(0))] = uint8_t(a(1));
+        tileFlags_[uint8_t(a(0))] = uint8_t(a(1));
         break;
     case 97:
-        ret(tileFlags_[uint16_t(a(0))] & 255);
+        ret(tileFlags_[uint8_t(a(0))]);
         break;
     case 98:
-        ret(tileAt(si(a(0)), si(a(1)), si(a(2))));
+        ret(tileAt(uint8_t(a(0)), si(a(1)), si(a(2))));
         break;
     case 99:
-        ret(solidAt(si(a(0)), si(a(1)), si(a(2)), 1) ? 1 : 0);
+        ret((tileFlagsAt(uint8_t(a(0)), si(a(1)), si(a(2))) & TileFlagSolid) ? 1 : 0);
         break;
     case 100: {
         // ABI #100 actor_init(actor, layer, x, y, width, height); offsets use the Actor* constants above.
         uint32_t p = a(0);
-        cpu_.store32(p + ActorXOffset, a(2), ok);
-        cpu_.store32(p + ActorYOffset, a(3), ok);
-        cpu_.store32(p + ActorVelocityXOffset, 0, ok);
-        cpu_.store32(p + ActorVelocityYOffset, 0, ok);
-        cpu_.store16(p + ActorWidthOffset, uint16_t(a(4)), ok);
-        cpu_.store16(p + ActorHeightOffset, uint16_t(a(5)), ok);
-        cpu_.store16(p + ActorStatusOffset, 0, ok);
-        cpu_.store8(p + ActorLayerOffset, uint8_t(a(1)), ok);
+        if (!p)
+            break;
+        Actor actor;
+        actor.x = si(a(2));
+        actor.y = si(a(3));
+        actor.w = uint16_t(si(a(4)) > 0 ? si(a(4)) : 1);
+        actor.h = uint16_t(si(a(5)) > 0 ? si(a(5)) : 1);
+        actor.layer = uint8_t(a(1));
+        storeActor(p, actor);
         cpu_.store8(p + ActorReservedOffset, 0, ok);
         break;
     }
-    case 101:
-        ret(actorMove(a(0), si(a(1)), si(a(2))));
+    case 101: {
+        uint32_t p = a(0);
+        if (!p) {
+            ret(0);
+            break;
+        }
+        Actor actor = loadActor(p);
+        uint16_t state = actorMove(actor, si(a(1)), si(a(2)));
+        storeActor(p, actor);
+        ret(state);
         break;
+    }
     case 102:
         ret(actorStep(a(0), a(1), si(a(2)), si(a(3)), si(a(4)), si(a(5))));
         break;
@@ -1106,10 +1222,14 @@ void Runtime::hostCall(uint32_t i) {
     case 104: {
         int ax = si(a(0)), ay = si(a(1)), aw = si(a(2)), ah = si(a(3)), bx = si(a(4)), by = si(a(5)),
             bw = si(a(6)), bh = si(a(7));
-        ret(ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by);
+        ret(aw > 0 && ah > 0 && bw > 0 && bh > 0 && ax < bx + bw && ax + aw > bx && ay < by + bh &&
+            ay + ah > by);
         break;
     }
     case 105: {
+        // ABI #105 sprite_draw_8x8(x, y, bits, fg, bg); a NULL bitmap draws nothing.
+        if (!a(2))
+            break;
         std::array<uint8_t, 8> b{};
         for (int n = 0; n < 8; n++)
             b[n] = cpu_.load8(a(2) + n, ok);
