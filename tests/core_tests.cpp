@@ -14,8 +14,8 @@
 #include <cstddef>
 #include <cstring>
 #include <functional>
-#include <optional>
 #include <iostream>
+#include <optional>
 using namespace prg32;
 static void put16(std::vector<uint8_t>& b, size_t o, uint16_t v) {
     b[o] = v;
@@ -64,7 +64,8 @@ struct TestCode {
 };
 static constexpr uint32_t TestLoadAddress = 0x40800000u, TestActor = TestLoadAddress + 0x800u;
 // Build a portable PRG32 cartridge from `code`, whose init entry is at offset 0.
-static std::optional<Cartridge> testCartridge(const TestCode& code, uint32_t updateOffset, uint32_t drawOffset) {
+static std::optional<Cartridge>
+testCartridge(const TestCode& code, uint32_t updateOffset, uint32_t drawOffset) {
     const size_t header = sizeof(CartHeaderV2), codeBytes = code.words.size() * 4;
     std::vector<uint8_t> b(header + codeBytes);
     memcpy(b.data(), "PRG2", 4);
@@ -170,8 +171,8 @@ static void testFirmwareTileCompatibility() {
                 c.call(83);           // tile_present()
             },
             [](TestCode& c) {
-                c.call(81, {3, 0, 0, 0});      // tile_define(3, NULL, black, black)
-                c.call(82, {1, 0, 256 + 3});   // tile_put(1, 0, 259) == tile_put(1, 0, 3)
+                c.call(81, {3, 0, 0, 0});    // tile_define(3, NULL, black, black)
+                c.call(82, {1, 0, 256 + 3}); // tile_put(1, 0, 259) == tile_put(1, 0, 3)
                 c.call(83);
             });
         assert(cellIs(runtime, 0, 0, 0xffff) && cellIs(runtime, 1, 0, 0xffff));
@@ -185,11 +186,11 @@ static void testFirmwareTileCompatibility() {
         // actor_move scans the whole actor box against solid tiles and reports HIT_RIGHT.
         Runtime runtime;
         runTestCartridge(runtime, [](TestCode& c) {
-            c.call(84, {0, 0});                     // playfield_clear(0, 0)
-            c.call(96, {1, 1});                     // tile_flags(1, SOLID)
-            c.call(85, {0, 2, 1, 1});               // solid tile at pixels x 16..23, y 8..15
+            c.call(84, {0, 0});                      // playfield_clear(0, 0)
+            c.call(96, {1, 1});                      // tile_flags(1, SOLID)
+            c.call(85, {0, 2, 1, 1});                // solid tile at pixels x 16..23, y 8..15
             c.call(100, {TestActor, 0, 0, 4, 8, 8}); // actor_init: box x 0..7, y 4..11
-            c.call(101, {TestActor, 20, 0});        // actor_move(actor, 20, 0)
+            c.call(101, {TestActor, 20, 0});         // actor_move(actor, 20, 0)
         });
         assert(runtime.registerValue(10) == (1u << 2));
         assert(guestWord(runtime, TestActor) == 8);

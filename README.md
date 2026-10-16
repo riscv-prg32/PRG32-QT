@@ -106,7 +106,7 @@ To exercise every discoverable Store cartridge after building the headless runne
 
 ```sh
 python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless \
-  --store https://store.prg32.uniparthenope.it/ --frames 900
+  --store https://store.prg32.uniparthenope.it/ --frames 900 --cache-dir store-packages
 ```
 
 The certification input-sweeps each cartridge and records non-black rendered pixels, distinct frame hashes,

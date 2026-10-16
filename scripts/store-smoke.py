@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
 import re
+import ssl
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -25,11 +29,53 @@ MEDIA_PATTERN = re.compile(
 )
 
 
+# HTTP statuses that report a temporarily overloaded or rate-limited Store rather than a missing package.
+TRANSIENT_HTTP_STATUSES = (429, 500, 502, 503, 504)
+FETCH_ATTEMPTS = 5
+FETCH_BACKOFF_SECONDS = 2.0
+# Pause between package downloads so a whole-Store run does not trip the server's rate limiter.
+DOWNLOAD_INTERVAL_SECONDS = 0.5
+# CA bundles tried when the interpreter has no usable default trust store (python.org macOS builds).
+FALLBACK_CA_BUNDLES = ("/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt")
+
+
+def tls_context() -> ssl.SSLContext:
+    """Return a verifying TLS context, falling back to a system CA bundle when the default store is empty."""
+    context = ssl.create_default_context()
+    if context.cert_store_stats().get("x509_ca", 0):
+        return context
+    for bundle in FALLBACK_CA_BUNDLES:
+        if pathlib.Path(bundle).is_file():
+            return ssl.create_default_context(cafile=bundle)
+    return context
+
+
+TLS_CONTEXT = tls_context()
+
+
 def fetch(url: str) -> bytes:
-    """Read a Store endpoint with a bounded timeout."""
-    request = urllib.request.Request(url, headers={"User-Agent": "PRG32-QT-store-certification/0.3"})
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return response.read()
+    """Read a Store endpoint with a bounded timeout, retrying transient server and network failures."""
+    request = urllib.request.Request(url, headers={"User-Agent": "PRG32-QT-store-certification/0.4"})
+    for attempt in range(FETCH_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(request, timeout=20, context=TLS_CONTEXT) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            if error.code not in TRANSIENT_HTTP_STATUSES or attempt + 1 == FETCH_ATTEMPTS:
+                raise
+            retry_after = error.headers.get("Retry-After", "")
+            delay = float(retry_after) if retry_after.isdigit() else FETCH_BACKOFF_SECONDS * 2**attempt
+        except urllib.error.URLError as error:
+            # Certificate failures are configuration errors, not transient outages.
+            if isinstance(error.reason, ssl.SSLError) or attempt + 1 == FETCH_ATTEMPTS:
+                raise
+            delay = FETCH_BACKOFF_SECONDS * 2**attempt
+        except TimeoutError:
+            if attempt + 1 == FETCH_ATTEMPTS:
+                raise
+            delay = FETCH_BACKOFF_SECONDS * 2**attempt
+        time.sleep(delay)
+    raise RuntimeError("unreachable: fetch retry loop exited without a result")
 
 
 def store_url(base: str, path: str) -> str:
@@ -114,7 +160,28 @@ def download_url(store: str, item: dict) -> str | None:
     return store_url(store, endpoint) + "?" + urllib.parse.urlencode(query)
 
 
-def certify(store: str, runner: str, frames: int, unlimited: bool = False) -> int:
+def cached_fetch(url: str, cache_directory: pathlib.Path | None) -> bytes:
+    """Download a package once per URL so accurate and Unlimited runs certify identical bytes."""
+    if cache_directory is None:
+        return fetch(url)
+    cache_key = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    cache_path = cache_directory / f"{cache_key}.prg32"
+    if cache_path.is_file():
+        return cache_path.read_bytes()
+    package = fetch(url)
+    time.sleep(DOWNLOAD_INTERVAL_SECONDS)
+    cache_directory.mkdir(parents=True, exist_ok=True)
+    cache_path.write_bytes(package)
+    return package
+
+
+def certify(
+    store: str,
+    runner: str,
+    frames: int,
+    unlimited: bool = False,
+    cache_directory: pathlib.Path | None = None,
+) -> int:
     """Print an ID/version/result snapshot and fail for portable runtime errors."""
     items = catalog(store)
     if not items:
@@ -136,7 +203,7 @@ def certify(store: str, runner: str, frames: int, unlimited: bool = False) -> in
                 skipped += 1
                 continue
             try:
-                package = fetch(url)
+                package = cached_fetch(url, cache_directory)
                 if not package.startswith(b"PRG2"):
                     raise ValueError("download is not a PRG2 package")
                 package_path = pathlib.Path(temporary_directory) / f"cartridge-{index}.prg32"
@@ -187,9 +254,10 @@ def main() -> int:
     parser.add_argument("--runner", default="./build-core/prg32qt-headless")
     parser.add_argument("--frames", type=int, default=300)
     parser.add_argument("--unlimited", action="store_true", help="certify the runner's Unlimited mode")
+    parser.add_argument("--cache-dir", type=pathlib.Path, help="reuse downloaded packages across runs")
     arguments = parser.parse_args()
     try:
-        return certify(arguments.store, arguments.runner, arguments.frames, arguments.unlimited)
+        return certify(arguments.store, arguments.runner, arguments.frames, arguments.unlimited, arguments.cache_dir)
     except (OSError, ValueError, RuntimeError) as error:
         print(f"FAIL: Store certification could not start: {error}", file=sys.stderr)
         return 1

@@ -3,7 +3,9 @@
 import importlib.util
 import pathlib
 import subprocess
+import tempfile
 import unittest
+import urllib.error
 from unittest import mock
 
 
@@ -61,6 +63,46 @@ class StoreSmokeTests(unittest.TestCase):
             store_smoke, "fetch", return_value=b"PRG2example"
         ), mock.patch.object(store_smoke.subprocess, "run", return_value=execution):
             self.assertEqual(store_smoke.certify("https://store.example", "runner", 300), 0)
+
+    def test_transient_http_error_is_retried(self):
+        unavailable = urllib.error.HTTPError("https://store.example", 503, "Service Unavailable", {}, None)
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"PRG2example"
+        with mock.patch.object(
+            store_smoke.urllib.request, "urlopen", side_effect=[unavailable, response]
+        ), mock.patch.object(store_smoke.time, "sleep") as sleep:
+            self.assertEqual(store_smoke.fetch("https://store.example/package"), b"PRG2example")
+            sleep.assert_called_once()
+
+    def test_missing_package_is_not_retried(self):
+        missing = urllib.error.HTTPError("https://store.example", 404, "Not Found", {}, None)
+        with mock.patch.object(store_smoke.urllib.request, "urlopen", side_effect=missing), mock.patch.object(
+            store_smoke.time, "sleep"
+        ) as sleep:
+            with self.assertRaises(urllib.error.HTTPError):
+                store_smoke.fetch("https://store.example/package")
+            sleep.assert_not_called()
+
+    def test_timeout_is_retried(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"PRG2example"
+        with mock.patch.object(
+            store_smoke.urllib.request, "urlopen", side_effect=[TimeoutError(), response]
+        ), mock.patch.object(store_smoke.time, "sleep") as sleep:
+            self.assertEqual(store_smoke.fetch("https://store.example/package"), b"PRG2example")
+            sleep.assert_called_once()
+
+    def test_cached_fetch_reuses_package_by_exact_url(self):
+        first_url = "https://store.example/package?name=a/b"
+        second_url = "https://store.example/package?name=a_b"
+        with tempfile.TemporaryDirectory() as temporary_directory, mock.patch.object(
+            store_smoke, "fetch", side_effect=[b"PRG2first", b"PRG2second"]
+        ) as fetch, mock.patch.object(store_smoke.time, "sleep"):
+            cache_directory = pathlib.Path(temporary_directory)
+            self.assertEqual(store_smoke.cached_fetch(first_url, cache_directory), b"PRG2first")
+            self.assertEqual(store_smoke.cached_fetch(second_url, cache_directory), b"PRG2second")
+            self.assertEqual(store_smoke.cached_fetch(first_url, cache_directory), b"PRG2first")
+            self.assertEqual(fetch.call_count, 2)
 
 
 if __name__ == "__main__":

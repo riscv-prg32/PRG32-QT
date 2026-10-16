@@ -327,8 +327,8 @@ jobs:
       - name: Certify current catalog
         run: |
           set -o pipefail
-          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 900 2>&1 | tee store-certification-accurate.txt
-          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 900 --unlimited 2>&1 | tee store-certification-unlimited.txt
+          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 900 --cache-dir store-packages 2>&1 | tee store-certification-accurate.txt
+          python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --frames 900 --unlimited --cache-dir store-packages 2>&1 | tee store-certification-unlimited.txt
       - uses: actions/upload-artifact@v7
         if: always()
         with:

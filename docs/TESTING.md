@@ -2,6 +2,19 @@
 
 PRG32-QT uses layered validation.
 
+## Store certification recovery validation (2026-10-17)
+
+- The Debug portable target built with Ninja and Apple Clang on Apple Silicon macOS 26.6.2. All four CTest
+  targets passed: the core suite, Asteroids, Bach, and the required PerformanceTest contract.
+- The Store-smoke Python regression suite passed all nine tests, the documentation-consistency check passed,
+  and LLVM 22 `clang-format --dry-run --Werror` passed for the complete CI source list.
+- A live 900-frame Accurate sweep was attempted against the default Store. The endpoint still returned HTTP
+  503 after all five retry attempts, so no current catalog or per-cartridge result is claimed. Accurate and
+  Unlimited whole-Store certification remains required when the service is reachable.
+- Windows, Linux, Raspberry Pi OS, Intel macOS, iOS, Android, Android TV, and Apple TV toolchains or runners
+  were not available in this local macOS environment. No physical device, simulator, controller, speaker, or
+  listening check was exercised; the normal CI platform matrix remains authoritative for those targets.
+
 ## 0.4.1 release validation (2026-10-04)
 
 - The Apple Silicon macOS host passed the optimized portable build and all four CTest targets: the core suite,
@@ -233,10 +246,14 @@ Validated on 2026-09-22:
 ## Whole-Store certification
 
 ```sh
-python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless --store https://store.prg32.uniparthenope.it/ --frames 900
+python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless \
+  --store https://store.prg32.uniparthenope.it/ --frames 900 --cache-dir store-packages
+python3 scripts/store-smoke.py --runner ./build-core/prg32qt-headless \
+  --store https://store.prg32.uniparthenope.it/ --frames 900 --unlimited --cache-dir store-packages
 ```
 
 This enumerates the Store, downloads PRG2 portable variants and executes each supported package headlessly.
+The shared cache makes the Accurate and Unlimited runs certify the same downloaded package bytes.
 Media mode cycles neutral, directional, A, B, Select, and combined inputs; samples the framebuffer every 15
 frames; rejects an entirely black run; and reports distinct hashes plus audio sink activity.
 The report includes cartridge IDs, versions, pass/fail outcomes, and explicit skips for packages rejected as

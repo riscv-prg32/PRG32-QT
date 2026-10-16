@@ -4,6 +4,15 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Paint undefined playfield tiles with the firmware's zero tile (black foreground and background) instead of
+  leaving stale pixels, so a cell switched back to a never-defined tile (ABI calls #85/#93) clears as it does
+  on hardware. Transparent tile zero on layer 1 is unchanged.
+- Keep `assert` checks active in the core test suite under Release builds; CI previously compiled them, and
+  the calls inside them, away.
+- Retry transient Store failures (HTTP 429/5xx and network errors) with backoff in `scripts/store-smoke.py`,
+  fall back to a system CA bundle when Python has no default trust store, and add `--cache-dir` so accurate
+  and Unlimited certification runs reuse the same downloaded packages.
+
 ## [0.4.1] - 2026-10-04
 
 - Reject fully clipped extreme rectangle geometry without signed overflow in RGB565 and indexed ABI drawing
