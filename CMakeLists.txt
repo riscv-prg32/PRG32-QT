@@ -108,8 +108,10 @@ if(PRG32QT_BUILD_APP)
     list(APPEND PRG32QT_APP_SOURCES src/qt/MdnsAdvertiser_udp.cpp)
   endif()
 
-  if(PRG32QT_BUILD_TESTS AND PRG32QT_FIRMWARE_AUDIO)
-    # The firmware engine's sound through the real output device (skipped without one).
+  if(PRG32QT_BUILD_TESTS AND PRG32QT_FIRMWARE_AUDIO AND NOT CMAKE_CROSSCOMPILING)
+    # The firmware engine's sound through the real output device (skipped without one). Desktop
+    # builds only: on Android and iOS a second Qt executable becomes a second app package, and
+    # the test could not run on the build machine anyway.
     qt_add_executable(prg32qt_audio_device_check tests/audio_device_check.cpp src/qt/QtAudioEngine.cpp)
     target_include_directories(prg32qt_audio_device_check PRIVATE src/core src/qt)
     target_link_libraries(prg32qt_audio_device_check PRIVATE prg32qt_core Qt6::Core Qt6::Multimedia)
