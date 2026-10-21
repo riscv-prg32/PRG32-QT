@@ -772,6 +772,13 @@ uint32_t Runtime::performanceCall(uint32_t i, uint32_t p, uint32_t arg) {
     return uint32_t(-1);
 }
 void Runtime::hostCall(uint32_t i) {
+    if (hostBefore_)
+        hostBefore_(i);
+    hostCallCore(i);
+    if (hostAfter_)
+        hostAfter_(i);
+}
+void Runtime::hostCallCore(uint32_t i) {
     // PRG32 ABI arguments follow the RISC-V integer calling convention: a0-a7 are x10-x17 and the
     // scalar result is returned in a0. Every numeric case below is a stable public table index.
     auto a = [&](int n) { return cpu_.reg(10 + n); };

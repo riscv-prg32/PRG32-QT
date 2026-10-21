@@ -4,6 +4,7 @@
 #include <QIODevice>
 #include <QMutex>
 #include <array>
+#include <deque>
 #include <memory>
 #include <vector>
 class QAudioSink;
@@ -39,6 +40,19 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
     qint64 bytesAvailable() const override {
         return 32768 + QIODevice::bytesAvailable();
     }
+    /** The PRG32 firmware audio engine's output (22050 Hz interleaved stereo): played as it is,
+     *  resampled to the device. Bounded to half a second so sound never lags the game. */
+    void pushFirmwarePcm(const std::vector<int16_t>& stereo);
+    /** What the output device has taken: its name, sink state, processed time, and the firmware
+     *  frames it pulled (count and 64-bit FNV-1a over their samples, before resampling). */
+    struct DeviceStatus {
+        QString device;
+        int state = -1;
+        qint64 processedUs = 0;
+        qint64 firmwareFrames = 0;
+        quint64 firmwareHash = 0;
+    };
+    DeviceStatus deviceStatus() const;
     /** Return a bounded snapshot of recently rendered left-channel samples. */
     std::vector<float> waveformLeft() const;
     /** Return a bounded snapshot of recently rendered right-channel samples. */
@@ -63,6 +77,10 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
     void encode(char* dst, int frames, const std::vector<float>& interleaved);
     mutable QMutex mutex_;
     std::vector<Voice> voices_;
+    std::deque<int16_t> firmwarePcm_;
+    double firmwarePosition_ = 0;
+    qint64 firmwareFramesPlayed_ = 0;
+    quint64 firmwareHash_ = 1469598103934665603ull;
     std::unique_ptr<QAudioSink> sink_;
     QAudioFormat format_;
     float master_ = 0.86f;

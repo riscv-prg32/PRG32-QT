@@ -248,6 +248,28 @@ void QtAudioEngine::encode(char* dst, int frames, const std::vector<float>& x) {
         std::memset(dst, 0, format_.bytesForFrames(frames));
     (void)ch;
 }
+QtAudioEngine::DeviceStatus QtAudioEngine::deviceStatus() const {
+    QMutexLocker lock(&mutex_);
+    DeviceStatus status;
+    status.device = QMediaDevices::defaultAudioOutput().description();
+    if (sink_) {
+        status.state = int(sink_->state());
+        status.processedUs = sink_->processedUSecs();
+    }
+    status.firmwareFrames = firmwareFramesPlayed_;
+    status.firmwareHash = firmwareHash_;
+    return status;
+}
+void QtAudioEngine::pushFirmwarePcm(const std::vector<int16_t>& stereo) {
+    if (stereo.empty())
+        return;
+    ensureStarted();
+    QMutexLocker lock(&mutex_);
+    firmwarePcm_.insert(firmwarePcm_.end(), stereo.begin(), stereo.end());
+    constexpr size_t limit = 22050; // half a second of stereo frames (two values each)
+    if (firmwarePcm_.size() > limit * 2)
+        firmwarePcm_.erase(firmwarePcm_.begin(), firmwarePcm_.end() - std::ptrdiff_t(limit * 2));
+}
 qint64 QtAudioEngine::readData(char* data, qint64 maxlen) {
     if (format_.bytesPerFrame() <= 0)
         return 0;
@@ -256,6 +278,26 @@ qint64 QtAudioEngine::readData(char* data, qint64 maxlen) {
         return 0;
     std::vector<float> L(frames), R(frames);
     render(L.data(), R.data(), frames);
+    {
+        // The firmware engine's frames, stepped through at 22050 Hz (linear between samples).
+        QMutexLocker lock(&mutex_);
+        const double step = 22050.0 / std::max(1, format_.sampleRate());
+        for (int f = 0; f < frames && firmwarePcm_.size() >= 4; f++) {
+            const double t = firmwarePosition_;
+            L[f] += float((firmwarePcm_[0] * (1 - t) + firmwarePcm_[2] * t) / 32768.0);
+            R[f] += float((firmwarePcm_[1] * (1 - t) + firmwarePcm_[3] * t) / 32768.0);
+            firmwarePosition_ += step;
+            while (firmwarePosition_ >= 1 && firmwarePcm_.size() >= 4) {
+                for (int side = 0; side < 2; ++side) {
+                    firmwareHash_ ^= quint16(firmwarePcm_.front());
+                    firmwareHash_ *= 1099511628211ull;
+                    firmwarePcm_.pop_front();
+                }
+                ++firmwareFramesPlayed_;
+                firmwarePosition_ -= 1;
+            }
+        }
+    }
     int ch = std::max(1, format_.channelCount());
     std::vector<float> x(size_t(frames) * ch);
     for (int f = 0; f < frames; f++)
