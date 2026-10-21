@@ -1,5 +1,9 @@
 #include "Cartridge.h"
 #include "Runtime.h"
+#include <cstdio>
+#ifdef PRG32QT_FIRMWARE_AUDIO
+#include "FirmwareAudio.h"
+#endif
 #include <algorithm>
 #include <array>
 #include <fstream>
@@ -64,7 +68,7 @@ uint64_t framebufferHash(const std::vector<uint16_t>& pixels) {
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: prg32qt-headless file.prg32 [frames] [--require-performance] [--verify-media] "
-                     "[--unlimited] [--input frame:mask] [--dump-ppm path]\n";
+                     "[--unlimited] [--input frame:mask] [--dump-ppm path] [--audio-wav path]\n";
         return 2;
     }
     std::ifstream f(argv[1], std::ios::binary);
@@ -78,6 +82,15 @@ int main(int argc, char** argv) {
     prg32::Runtime r;
     AuditAudioSink audio;
     r.setAudioSink(&audio);
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    // The PRG32 firmware's audio engine makes the sound (AuditAudioSink only counts).
+    prg32::FirmwareAudio firmwareAudio;
+    if (!firmwareAudio.attach(r, b, e)) {
+        std::cerr << e << "\n";
+        return 4;
+    }
+    std::vector<int16_t> pcm;
+#endif
     if (!r.load(*c, e) || !r.init(e)) {
         std::cerr << e << "\n";
         return 4;
@@ -88,6 +101,7 @@ int main(int argc, char** argv) {
     bool unlimited = false;
     std::map<int, uint32_t> scriptedInput;
     std::string dumpPath;
+    std::string audioPath;
     for (int argument = 3; argument < argc; ++argument) {
         std::string option = argv[argument];
         verifyMedia |= option == "--verify-media";
@@ -105,6 +119,8 @@ int main(int argc, char** argv) {
         }
         if (option == "--dump-ppm" && argument + 1 < argc)
             dumpPath = argv[++argument];
+        if (option == "--audio-wav" && argument + 1 < argc)
+            audioPath = argv[++argument];
     }
     if (unlimited)
         r.setPerformanceMode(prg32::PerformanceMode::Unlimited);
@@ -119,6 +135,12 @@ int main(int argc, char** argv) {
             std::cerr << "frame " << i << ": " << e << "\n";
             return 5;
         }
+#ifdef PRG32QT_FIRMWARE_AUDIO
+        firmwareAudio.frameDone();
+        auto mixed = firmwareAudio.take();
+        if (!audioPath.empty())
+            pcm.insert(pcm.end(), mixed.begin(), mixed.end());
+#endif
         if (verifyMedia && i % 15 == 0) {
             const auto& pixels = r.framebuffer().rgb565Pixels();
             frameHashes.insert(framebufferHash(pixels));
@@ -143,6 +165,28 @@ int main(int argc, char** argv) {
         return 6;
     }
     std::cout << c->name() << ": OK (" << frames << " frames)\n";
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    {
+        char hash[17];
+        std::snprintf(hash, sizeof hash, "%016llx", static_cast<unsigned long long>(firmwareAudio.pcmHash()));
+        std::cout << "AUDIO engine=prg32-firmware pcm_fnv1a=" << hash
+                  << " obsolete_buzzer_calls=" << firmwareAudio.obsoleteBuzzerCalls() << "\n";
+    }
+    if (!audioPath.empty()) {
+        // 22050 Hz, signed 16-bit, stereo WAV.
+        std::ofstream output(audioPath, std::ios::binary);
+        const uint32_t bytes = uint32_t(pcm.size() * 2);
+        auto u32 = [&](uint32_t v) { output.write(reinterpret_cast<const char*>(&v), 4); };
+        auto u16 = [&](uint16_t v) { output.write(reinterpret_cast<const char*>(&v), 2); };
+        output.write("RIFF", 4); u32(36 + bytes); output.write("WAVEfmt ", 8); u32(16); u16(1); u16(2);
+        u32(prg32::FirmwareAudio::SampleRate); u32(prg32::FirmwareAudio::SampleRate * 4); u16(4); u16(16);
+        output.write("data", 4); u32(bytes);
+        output.write(reinterpret_cast<const char*>(pcm.data()), std::streamsize(bytes));
+    }
+#else
+    if (!audioPath.empty())
+        std::cerr << "--audio-wav needs a build with PRG32QT_FIRMWARE_AUDIO=ON\n";
+#endif
     if (verifyMedia) {
         std::cout << "MEDIA graphics_non_black=" << maximumNonBlackPixels
                   << " unique_frame_hashes=" << frameHashes.size() << " audio_declared=" << bool(c->audio())
