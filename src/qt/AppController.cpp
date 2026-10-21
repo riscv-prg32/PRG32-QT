@@ -231,7 +231,8 @@ bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName)
 #ifdef PRG32QT_FIRMWARE_AUDIO
     // The firmware audio engine makes the sound; the Runtime's own sink stays silent.
     rt_.setAudioSink(&silentSink_);
-    if (!firmwareAudio_.attach(rt_, std::span<const uint8_t>((const uint8_t*)d.constData(), size_t(d.size())), e)) {
+    if (!firmwareAudio_.attach(
+            rt_, std::span<const uint8_t>((const uint8_t*)d.constData(), size_t(d.size())), e)) {
         setStatus(QString::fromStdString(e));
         return false;
     }

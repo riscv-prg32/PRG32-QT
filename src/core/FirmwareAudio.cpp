@@ -16,8 +16,8 @@ std::vector<uint8_t> audioBlockOf(std::span<const uint8_t> data) {
     if (data.size() < 20)
         return {};
     const uint32_t headerSize = uint32_t(data[8]) | uint32_t(data[9]) << 8;
-    const uint32_t codeSize = uint32_t(data[16]) | uint32_t(data[17]) << 8 | uint32_t(data[18]) << 16 |
-                              uint32_t(data[19]) << 24;
+    const uint32_t codeSize =
+        uint32_t(data[16]) | uint32_t(data[17]) << 8 | uint32_t(data[18]) << 16 | uint32_t(data[19]) << 24;
     const uint64_t offset = uint64_t(headerSize) + codeSize;
     if (offset + 40 > data.size() || std::memcmp(data.data() + offset, "AUD0", 4) != 0)
         return {};

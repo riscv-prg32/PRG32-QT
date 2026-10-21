@@ -178,9 +178,18 @@ int main(int argc, char** argv) {
         const uint32_t bytes = uint32_t(pcm.size() * 2);
         auto u32 = [&](uint32_t v) { output.write(reinterpret_cast<const char*>(&v), 4); };
         auto u16 = [&](uint16_t v) { output.write(reinterpret_cast<const char*>(&v), 2); };
-        output.write("RIFF", 4); u32(36 + bytes); output.write("WAVEfmt ", 8); u32(16); u16(1); u16(2);
-        u32(prg32::FirmwareAudio::SampleRate); u32(prg32::FirmwareAudio::SampleRate * 4); u16(4); u16(16);
-        output.write("data", 4); u32(bytes);
+        output.write("RIFF", 4);
+        u32(36 + bytes);
+        output.write("WAVEfmt ", 8);
+        u32(16);
+        u16(1);
+        u16(2);
+        u32(prg32::FirmwareAudio::SampleRate);
+        u32(prg32::FirmwareAudio::SampleRate * 4);
+        u16(4);
+        u16(16);
+        output.write("data", 4);
+        u32(bytes);
         output.write(reinterpret_cast<const char*>(pcm.data()), std::streamsize(bytes));
     }
 #else

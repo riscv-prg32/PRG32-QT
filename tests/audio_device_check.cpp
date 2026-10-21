@@ -72,9 +72,14 @@ int main(int argc, char** argv) {
     const bool timeOk = status.processedUs >= (seconds - 1) * 1000000LL;
     const bool framesOk = status.firmwareFrames >= (seconds - 1) * prg32::FirmwareAudio::SampleRate;
     const bool samplesOk = hash == status.firmwareHash;
-    std::printf("{\"device\": \"%s\", \"sink_state\": %d, \"processed_us\": %lld, \"firmware_frames_played\": %lld, "
-                "\"frames_pushed\": %zu, \"played_equal_engine\": %s}\n",
-                status.device.toUtf8().constData(), status.state, static_cast<long long>(status.processedUs),
-                static_cast<long long>(status.firmwareFrames), pushed.size() / 2, samplesOk ? "true" : "false");
+    std::printf(
+        "{\"device\": \"%s\", \"sink_state\": %d, \"processed_us\": %lld, \"firmware_frames_played\": %lld, "
+        "\"frames_pushed\": %zu, \"played_equal_engine\": %s}\n",
+        status.device.toUtf8().constData(),
+        status.state,
+        static_cast<long long>(status.processedUs),
+        static_cast<long long>(status.firmwareFrames),
+        pushed.size() / 2,
+        samplesOk ? "true" : "false");
     return timeOk && framesOk && samplesOk ? 0 : 1;
 }

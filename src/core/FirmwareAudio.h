@@ -39,8 +39,8 @@ class FirmwareAudio {
     void catchUp();
     Runtime* runtime_ = nullptr;
     std::vector<uint8_t> block_;
-    uint64_t frames_ = 0;             // frames run since attach
-    uint64_t audioNanoseconds_ = 0;   // cartridge time the engine has reached
+    uint64_t frames_ = 0;           // frames run since attach
+    uint64_t audioNanoseconds_ = 0; // cartridge time the engine has reached
     uint32_t args_[8]{};
     uint32_t buzzerCalls_ = 0;
 };
