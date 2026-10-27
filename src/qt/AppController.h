@@ -1,4 +1,7 @@
 #pragma once
+#ifdef PRG32QT_FIRMWARE_AUDIO
+#include "FirmwareAudio.h"
+#endif
 #include "InputState.h"
 #include "Runtime.h"
 #include <QByteArray>
@@ -221,6 +224,10 @@ class AppController : public QObject {
     void refreshIp();
     QString slotPath(int) const;
     prg32::Runtime rt_;
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    prg32::FirmwareAudio firmwareAudio_;
+    prg32::NullAudioSink silentSink_;
+#endif
     QTimer timer_, ipTimer_;
     InputState input_;
     QString status_, deviceIp_, cartridgeName_;

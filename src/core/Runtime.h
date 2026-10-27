@@ -126,6 +126,15 @@ class Runtime {
     void setPresentCallback(std::function<void()> cb) {
         present_ = std::move(cb);
     }
+    /** Called before and after every host call (the firmware audio engine listens here). */
+    void setHostHooks(std::function<void(uint32_t)> before, std::function<void(uint32_t)> after) {
+        hostBefore_ = std::move(before);
+        hostAfter_ = std::move(after);
+    }
+    /** The value a host call returns in a0. */
+    void setHostResult(uint32_t value) {
+        cpu_.setReg(10, value);
+    }
     void setLEDCallback(std::function<void(RGBState)> cb) {
         ledCallback_ = std::move(cb);
     }
@@ -160,6 +169,7 @@ class Runtime {
 
   private:
     void hostCall(uint32_t);
+    void hostCallCore(uint32_t);
     uint32_t performanceCall(uint32_t, uint32_t, uint32_t);
     uint32_t guestPtr(uint32_t off) const {
         return base_ + off;
@@ -221,6 +231,7 @@ class Runtime {
     Framebuffer fb_;
     std::function<void()> present_;
     std::function<void(RGBState)> ledCallback_;
+    std::function<void(uint32_t)> hostBefore_, hostAfter_;
     std::string log_;
     std::chrono::steady_clock::time_point started_;
     uint32_t rng_ = 0x12345678u;

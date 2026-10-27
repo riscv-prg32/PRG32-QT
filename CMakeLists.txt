@@ -6,6 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(PRG32QT_BUILD_APP "Build Qt application" ON)
 option(PRG32QT_BUILD_TESTS "Build portable core tests" ON)
 option(PRG32QT_TV_MODE "Build a controller-first fullscreen TV application" OFF)
+# The PRG32 firmware's own audio engine (components/prg32_audio of the PRG32 SDK), so the desktop
+# renders exactly the console's sound: 8 voices, ADSR envelopes, the SID-like synth, the stereo
+# mix. On by default; OFF keeps the older float mixer (no ADSR), which is not an audio reference.
+option(PRG32QT_FIRMWARE_AUDIO "Render sound with the PRG32 firmware audio engine" ON)
+set(PRG32_SDK_DIR "" CACHE PATH "PRG32 SDK checkout (default: the pinned PRG32_SDK_REVISION, fetched)")
+set(PRG32_SDK_REVISION "679dfb58783bd007125de9ca0b75eaa077908739" CACHE STRING "PRG32 SDK commit fetched when PRG32_SDK_DIR is empty")
 
 file(WRITE "${CMAKE_BINARY_DIR}/prg32qt-version.txt" "${PRG32QT_VERSION}\n")
 
@@ -19,6 +25,37 @@ add_library(prg32qt_core
     src/core/Runtime.cpp)
 target_include_directories(prg32qt_core PUBLIC src/core)
 target_compile_definitions(prg32qt_core PUBLIC PRG32QT_VERSION="${PRG32QT_VERSION}")
+
+if(PRG32QT_FIRMWARE_AUDIO)
+  if(NOT PRG32_SDK_DIR)
+    # Only the sources are needed: SOURCE_SUBDIR points at a folder without a CMakeLists.txt,
+    # so the SDK's own (ESP-IDF) build is never configured here.
+    include(FetchContent)
+    FetchContent_Declare(prg32_sdk
+        GIT_REPOSITORY https://github.com/riscv-prg32/PRG32.git
+        GIT_TAG ${PRG32_SDK_REVISION}
+        SOURCE_SUBDIR components/prg32_audio/include)
+    FetchContent_MakeAvailable(prg32_sdk)
+    set(PRG32_SDK_DIR "${prg32_sdk_SOURCE_DIR}")
+  endif()
+  set(PRG32_AUDIO_DIR "${PRG32_SDK_DIR}/components/prg32_audio")
+  if(NOT EXISTS "${PRG32_AUDIO_DIR}/audio_synth.c")
+    message(FATAL_ERROR "PRG32QT_FIRMWARE_AUDIO: no PRG32 audio engine in ${PRG32_SDK_DIR} (set PRG32_SDK_DIR, or OFF for the older mixer)")
+  endif()
+  enable_language(C)
+  # The engine is compiled unchanged; firmware_audio/ gives it time in 20 ms steps and a PCM queue
+  # in place of the console's audio task and I2S driver (the same port as PRG32-Construction-Kit's).
+  add_library(prg32_firmware_audio STATIC
+      ${PRG32_AUDIO_DIR}/audio.c ${PRG32_AUDIO_DIR}/audio_assets.c ${PRG32_AUDIO_DIR}/audio_mixer.c
+      ${PRG32_AUDIO_DIR}/audio_synth.c ${PRG32_AUDIO_DIR}/audio_tracker.c src/core/firmware_audio/audio_port.c)
+  target_include_directories(prg32_firmware_audio
+      PRIVATE src/core/firmware_audio/shim ${PRG32_AUDIO_DIR}
+      PUBLIC src/core/firmware_audio ${PRG32_AUDIO_DIR}/include)
+  target_compile_options(prg32_firmware_audio PRIVATE -O2 -ffp-contract=off)
+  target_sources(prg32qt_core PRIVATE src/core/FirmwareAudio.cpp)
+  target_link_libraries(prg32qt_core PUBLIC prg32_firmware_audio)
+  target_compile_definitions(prg32qt_core PUBLIC PRG32QT_FIRMWARE_AUDIO=1)
+endif()
 
 if(PRG32QT_BUILD_TESTS)
   enable_testing()
@@ -70,6 +107,18 @@ if(PRG32QT_BUILD_APP)
     list(APPEND PRG32QT_APP_SOURCES src/qt/MdnsAdvertiser_apple.cpp)
   else()
     list(APPEND PRG32QT_APP_SOURCES src/qt/MdnsAdvertiser_udp.cpp)
+  endif()
+
+  if(PRG32QT_BUILD_TESTS AND PRG32QT_FIRMWARE_AUDIO AND NOT CMAKE_CROSSCOMPILING)
+    # The firmware engine's sound through the real output device (skipped without one). Desktop
+    # builds only: on Android and iOS a second Qt executable becomes a second app package, and
+    # the test could not run on the build machine anyway.
+    qt_add_executable(prg32qt_audio_device_check tests/audio_device_check.cpp src/qt/QtAudioEngine.cpp)
+    target_include_directories(prg32qt_audio_device_check PRIVATE src/core src/qt)
+    target_link_libraries(prg32qt_audio_device_check PRIVATE prg32qt_core Qt6::Core Qt6::Multimedia)
+    add_test(NAME prg32qt_audio_device COMMAND prg32qt_audio_device_check
+             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/Bach.prg32 3)
+    set_tests_properties(prg32qt_audio_device PROPERTIES SKIP_RETURN_CODE 77)
   endif()
 
   qt_add_executable(PRG32_QT ${PRG32QT_APP_SOURCES})
