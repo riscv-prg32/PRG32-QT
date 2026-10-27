@@ -763,6 +763,15 @@ bool AppController::uploadSlot(int slot, const QByteArray& bytes, QString& error
     }
     return true;
 }
+void AppController::setUploadState(
+    bool active, const QString& name, const QString& slot, int progress, const QString& result) {
+    uploadActive_ = active;
+    uploadName_ = name;
+    uploadSlot_ = slot;
+    uploadProgress_ = qBound(0, progress, 100);
+    uploadResult_ = result;
+    emit uploadChanged();
+}
 bool AppController::selectSlot(int slot, QString& error) {
     if (slot < 0 || slot >= 4) {
         error = "invalid cartridge slot";

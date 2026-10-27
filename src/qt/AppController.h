@@ -53,6 +53,11 @@ class AppController : public QObject {
     Q_PROPERTY(QVariantList telemetryWaveformLeft READ telemetryWaveformLeft NOTIFY debugChanged)
     Q_PROPERTY(QVariantList telemetryWaveformRight READ telemetryWaveformRight NOTIFY debugChanged)
     Q_PROPERTY(QString telemetryPerformance READ telemetryPerformance NOTIFY debugChanged)
+    Q_PROPERTY(bool uploadActive READ uploadActive NOTIFY uploadChanged)
+    Q_PROPERTY(QString uploadName READ uploadName NOTIFY uploadChanged)
+    Q_PROPERTY(QString uploadSlot READ uploadSlot NOTIFY uploadChanged)
+    Q_PROPERTY(int uploadProgress READ uploadProgress NOTIFY uploadChanged)
+    Q_PROPERTY(QString uploadResult READ uploadResult NOTIFY uploadChanged)
     // clang-format on
 
   public:
@@ -131,6 +136,23 @@ class AppController : public QObject {
     QVariantList telemetryWaveformLeft() const;
     QVariantList telemetryWaveformRight() const;
     QString telemetryPerformance() const;
+    bool uploadActive() const {
+        return uploadActive_;
+    }
+    QString uploadName() const {
+        return uploadName_;
+    }
+    QString uploadSlot() const {
+        return uploadSlot_;
+    }
+    int uploadProgress() const {
+        return uploadProgress_;
+    }
+    QString uploadResult() const {
+        return uploadResult_;
+    }
+    void setUploadState(
+        bool active, const QString& name, const QString& slot, int progress, const QString& result = {});
     QJsonObject runtimeJson() const;
     QJsonArray gamesJson() const;
     QJsonObject performanceJson() const;
@@ -187,6 +209,7 @@ class AppController : public QObject {
     void performanceModeChanged();
     void frameStatsChanged();
     void debugChanged();
+    void uploadChanged();
 
   private:
     void setStatus(QString);
@@ -218,6 +241,9 @@ class AppController : public QObject {
     uint32_t debugMemoryAddress_ = 0;
     int debugMemoryLength_ = 128;
     QString debugView_ = "pc";
+    bool uploadActive_ = false;
+    QString uploadName_, uploadSlot_, uploadResult_;
+    int uploadProgress_ = 0;
     uint32_t debugViewAddress_ = 0;
     QSet<uint32_t> debugBreakpoints_;
     bool ignoreBreakpointOnce_ = false;

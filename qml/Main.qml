@@ -308,6 +308,24 @@ ApplicationWindow {
         }
     }
 
+    Rectangle {
+        anchors.fill: parent
+        z: 100
+        visible: appController.uploadActive
+        color: "#080b10"
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 560)
+            spacing: 18
+            Label { Layout.alignment: Qt.AlignHCenter; text: "USB CARTRIDGE UPLOAD"; color: "white"; font.family: root.codeFont; font.pixelSize: 22; font.bold: true }
+            Label { Layout.fillWidth: true; text: appController.uploadName; color: "#45c9ff"; font.family: root.codeFont; font.pixelSize: 18; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight }
+            Label { Layout.fillWidth: true; text: "TARGET: " + appController.uploadSlot; color: "#f0d38a"; font.family: root.codeFont; horizontalAlignment: Text.AlignHCenter }
+            ProgressBar { Layout.fillWidth: true; from: 0; to: 100; value: appController.uploadProgress }
+            Label { Layout.fillWidth: true; text: appController.uploadProgress + "%"; color: "white"; font.family: root.codeFont; horizontalAlignment: Text.AlignHCenter }
+            Label { Layout.fillWidth: true; text: appController.uploadResult; color: appController.uploadResult.indexOf("FAILED") >= 0 ? "#ff6b6b" : "#43d17b"; font.family: root.codeFont; font.bold: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
+        }
+    }
+
     Component { id:screenComponent
         Rectangle { color:"black"; radius:10; border.color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.min(.5,appController.ledIntensity)); border.width:2
             PRG32Frame { anchors.fill:parent; anchors.margins:10; statusBarsEnabled:root.statusBarsVisible; statusText:appController.cartridgeName; framesPerSecond:appController.framesPerSecond; Component.onCompleted:appController.attachFrame(this) }

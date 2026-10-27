@@ -4,6 +4,9 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Add the loopback-only `prg32-io-1.0` development listener with automatic
+  cartridge upload progress, store/run/debug actions, and performance-result
+  retrieval for offline SDK workflows.
 - Paint undefined playfield tiles with the firmware's zero tile (black foreground and background) instead of
   leaving stale pixels, so a cell switched back to a never-defined tile (ABI calls #85/#93) clears as it does
   on hardware. Transparent tile zero on layer 1 is unchanged.

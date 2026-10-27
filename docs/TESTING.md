@@ -2,6 +2,19 @@
 
 PRG32-QT uses layered validation.
 
+## Offline device-protocol validation (2026-10-27)
+
+- The local Qt application build and CTest suite exercise the same runtime and
+  cartridge parser used by the new loopback device listener.
+- A live SDK upload to `socket://127.0.0.1:8081` verifies metadata, ordered
+  transfer, CRC validation, slot persistence, run/debug selection, the upload
+  overlay, and performance JSON retrieval.
+- Verified on Apple Silicon macOS using DeviceDemo in `cart0`; the SDK returned
+  the cartridge name and enabled the debugger after the transfer. All four
+  CTest targets, documentation consistency, and clang-format checks passed.
+- The listener is verified bound only to loopback; network-facing HTTP/mDNS
+  behavior remains unchanged.
+
 ## Store certification recovery validation (2026-10-17)
 
 - The Debug portable target built with Ninja and Apple Clang on Apple Silicon macOS 26.6.2. All four CTest

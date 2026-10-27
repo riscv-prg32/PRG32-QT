@@ -21,6 +21,8 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - Canonical PRG32 artwork used by the PRG32 project.
 - Headless regression fixtures included for compatibility testing and live whole-Store certification tooling.
 - Bonjour/mDNS advertisement of the HTTP device API for SDK deployment, execution, and debugging workflows.
+- Loopback-only `prg32-io-1.0` uploads on port 8081, including an automatic
+  name/slot/progress screen and offline run, debug, and performance workflows.
 - Optional desktop debugger with highlighted RV32IMAC assembly, registers, guest-memory monitor, and
   pause/instruction-step/resume controls; the controls are also available to SDK/Python clients over HTTP.
 
@@ -73,6 +75,18 @@ python3 -m prg32 esp32c6 upload-and-run game.prg32 \
 
 See [network discovery and SDK access](docs/NETWORKING.md) for the DNS-SD/TXT contract, endpoint table,
 platform behavior, security boundary, and troubleshooting steps.
+
+For a network-free local development cycle, use the shared framed protocol:
+
+```sh
+python3 -m prg32 esp32c6 upload game.prg32 \
+  --port socket://127.0.0.1:8081 --slot cart0 --command debug
+python3 -m prg32 esp32c6 performance \
+  --port socket://127.0.0.1:8081 --out performance.json
+```
+
+Port 8081 listens only on loopback. It is intentionally not advertised or
+exposed to the LAN because the development protocol is not authenticated.
 
 On desktop, enable **Run cartridges in RISC-V debug mode** in Settings, then use **Run Cartridge**. Debug mode
 is off by default and persists locally. A debug launch starts running so game controls remain active; use Pause

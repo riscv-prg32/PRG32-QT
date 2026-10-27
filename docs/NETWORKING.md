@@ -4,6 +4,12 @@ PRG32-QT exposes the same PRG32 device HTTP contract used to deploy, select, run
 ESP32-C6 firmware and QEMU. The application listens on TCP port 8080 and advertises that listener on the local
 link with Bonjour/mDNS, so tooling does not need a manually entered numeric IP address.
 
+For offline local development, the application also listens on
+`127.0.0.1:8081` using the versioned `prg32-io-1.0` framed device protocol.
+It supports automatic upload, run, debugger launch, and performance-result
+retrieval. This listener is loopback-only and is not advertised: the protocol
+has no authentication and must not be exposed as a LAN control service.
+
 ## DNS-SD contract
 
 | Field | Value |

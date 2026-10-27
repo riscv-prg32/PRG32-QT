@@ -47,6 +47,7 @@ if(PRG32QT_BUILD_APP)
   endif()
   set(PRG32QT_APP_SOURCES
       src/qt/main.cpp src/qt/AppController.cpp src/qt/StoreClient.cpp src/qt/FrameItem.cpp src/qt/WebApiServer.cpp
+      src/qt/IoProtocolServer.cpp src/qt/IoProtocolServer.h
       src/qt/QtAudioEngine.cpp src/qt/QtMultiplayerService.cpp src/qt/QtMultiplayerService.h
       src/qt/RasterImageItem.cpp src/qt/RasterImageItem.h src/qt/GamepadBackend.h
       src/qt/MobileSafeArea.h src/qt/MdnsAdvertiser.h)
