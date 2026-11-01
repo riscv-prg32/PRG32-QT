@@ -74,6 +74,14 @@ class MacGamepadBackend final : public GamepadBackend {
             m |= prg32qt::input::A;
         if (p.buttonB.isPressed)
             m |= prg32qt::input::B;
+        if (p.buttonX.isPressed)
+            m |= prg32qt::input::C;
+        if (p.buttonY.isPressed)
+            m |= prg32qt::input::D;
+        if (p.leftShoulder.isPressed)
+            m |= prg32qt::input::L;
+        if (p.rightShoulder.isPressed)
+            m |= prg32qt::input::R;
         if (@available(macOS 10.15, iOS 13.0, *)) {
             if (p.buttonMenu.isPressed || p.buttonOptions.isPressed)
                 m |= prg32qt::input::Select;
@@ -209,6 +217,14 @@ class MacGamepadBackend final : public GamepadBackend {
             mask |= prg32qt::input::A;
         if (hidButtons_[1])
             mask |= prg32qt::input::B;
+        if (hidButtons_[2])
+            mask |= prg32qt::input::C;
+        if (hidButtons_[3])
+            mask |= prg32qt::input::D;
+        if (hidButtons_[4])
+            mask |= prg32qt::input::L;
+        if (hidButtons_[5])
+            mask |= prg32qt::input::R;
         if (hidButtons_[6] || hidButtons_[7] || hidButtons_[8] || hidButtons_[9])
             mask |= prg32qt::input::Select;
         publish(mask);

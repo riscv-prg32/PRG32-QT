@@ -4,6 +4,12 @@ PRG32-QT exposes the same PRG32 device HTTP contract used to deploy, select, run
 ESP32-C6 firmware and QEMU. The application listens on TCP port 8080 and advertises that listener on the local
 link with Bonjour/mDNS, so tooling does not need a manually entered numeric IP address.
 
+For offline local development, the application also listens on
+`127.0.0.1:8081` using the versioned `prg32-io-1.0` framed device protocol.
+It supports automatic upload, run, debugger launch, and performance-result
+retrieval. This listener is loopback-only and is not advertised: the protocol
+has no authentication and must not be exposed as a LAN control service.
+
 ## DNS-SD contract
 
 | Field | Value |
@@ -56,7 +62,7 @@ The discovery document at `GET /api` lists the active endpoints. The current hos
 | `GET` | `/api` or `/api/` | API discovery |
 | `GET` | `/api/runtime` | ABI, capacity, active cartridge, frame and input state |
 | `GET` | `/api/games` | Four persistent cartridge slots |
-| `POST` | `/api/games?slot=cartN` | Upload a cartridge to `cart0` through `cart3` |
+| `POST` | `/api/games?slot=cartN` | Upload a cartridge to `cart0` through `cart7` |
 | `POST` | `/api/games/select?slot=cartN` | Load and run a stored cartridge |
 | `GET` | `/api/screenshot.bmp` | Current framebuffer capture |
 | `GET` | `/api/performance.json` | Performance-contract state and results |

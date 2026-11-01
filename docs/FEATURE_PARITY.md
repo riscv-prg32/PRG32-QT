@@ -6,7 +6,7 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 |---|---|
 | PRG2 header, bounds, entry-point and CRC validation | `src/core/Cartridge.*` |
 | ABI-table portability/import validation | `Cartridge`, `Runtime` |
-| ABI 1.6 / 139 host calls / compatible hashes | `Runtime` |
+| ABI 1.8 / 144 host calls / compatible hashes | `Runtime` |
 | RV32I/M/A/C guest execution | `Rv32Cpu` |
 | Counter CSR reads used by optimized code | `Rv32Cpu` |
 | 320×200 indexed framebuffer + RGB565 palette | `Framebuffer` |
@@ -34,7 +34,7 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | Bonjour/mDNS `_prg32._tcp.local.` device discovery | `MdnsAdvertiser` platform backends |
 | Local score APIs/current player | `Runtime` |
 | Performance ABI calls | `Runtime` |
-| Multiplayer rooms and player snapshots | `MultiplayerService`, `QtMultiplayerService`, `Runtime` ABI #32-#40 |
+| Multiplayer rooms and player snapshots | `MultiplayerService`, `QtMultiplayerService`, `Runtime` ABI #32-#40, #139 |
 | Safe unavailable Wi-Fi semantics | `Runtime` |
 | Band/keyboard/text-input baseline stub semantics | `Runtime` |
 | Canonical PRG32 artwork | `assets/` |

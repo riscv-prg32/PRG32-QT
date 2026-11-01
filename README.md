@@ -9,11 +9,11 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - PRG2 validation, CRC, ABI/import-model and feature checks.
 - RV32IMAC guest execution including compressed instructions, atomics and counters used by portable cartridges.
 - Three persistent performance profiles: Accurate ESP32-C6 timing by default, 30 FPS Optimal, and Unlimited.
-- PRG32 ABI 1.6 (`0x260f6136`) plus documented compatible hashes.
+- PRG32 ABI 1.8 (`0x71b93e23`) plus documented compatible hashes.
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
 - Safe-area-aware touch controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
-- Store-relayed multiplayer snapshots, RGB LED emulation, local scores, metrics/performance ABI calls, and
+- `prg32-multiplayer-1.0` multiplayer through a PRG32 Multiplayer Server or the Store's relay, RGB LED emulation, local scores, metrics/performance ABI calls, and
   safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL, performance and firmware-style status-bar settings,
   architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
@@ -21,6 +21,8 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - Canonical PRG32 artwork used by the PRG32 project.
 - Headless regression fixtures included for compatibility testing and live whole-Store certification tooling.
 - Bonjour/mDNS advertisement of the HTTP device API for SDK deployment, execution, and debugging workflows.
+- Loopback-only `prg32-io-1.0` uploads on port 8081, including an automatic
+  name/slot/progress screen and offline run, debug, and performance workflows.
 - Optional desktop debugger with highlighted RV32IMAC assembly, registers, guest-memory monitor, and
   pause/instruction-step/resume controls; the controls are also available to SDK/Python clients over HTTP.
 
@@ -57,7 +59,8 @@ For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 The APK is written to `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`.
 
 Qt application builds require the Qt Multimedia and Qt WebSockets modules. Multiplayer ABI calls #32 through
-#40 use the configured Store's `/api/multiplayer` WebSocket relay and share one implementation on every Qt
+#40 and #139 use the server address from Settings or, when it is empty, the configured Store's
+`/api/multiplayer` WebSocket relay, and share one implementation on every Qt
 target.
 
 ## SDK deployment and discovery
@@ -73,6 +76,18 @@ python3 -m prg32 esp32c6 upload-and-run game.prg32 \
 
 See [network discovery and SDK access](docs/NETWORKING.md) for the DNS-SD/TXT contract, endpoint table,
 platform behavior, security boundary, and troubleshooting steps.
+
+For a network-free local development cycle, use the shared framed protocol:
+
+```sh
+python3 -m prg32 esp32c6 upload game.prg32 \
+  --port socket://127.0.0.1:8081 --slot cart0 --command debug
+python3 -m prg32 esp32c6 performance \
+  --port socket://127.0.0.1:8081 --out performance.json
+```
+
+Port 8081 listens only on loopback. It is intentionally not advertised or
+exposed to the LAN because the development protocol is not authenticated.
 
 On desktop, enable **Run cartridges in RISC-V debug mode** in Settings, then use **Run Cartridge**. Debug mode
 is off by default and persists locally. A debug launch starts running so game controls remain active; use Pause

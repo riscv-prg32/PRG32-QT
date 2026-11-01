@@ -13,6 +13,7 @@
 #include <QSet>
 #include <QTimer>
 #include <QUrl>
+#include <array>
 #include <memory>
 class FrameItem;
 class GamepadBackend;
@@ -29,6 +30,8 @@ class AppController : public QObject {
     Q_PROPERTY(int ledB READ ledB NOTIFY ledChanged)
     Q_PROPERTY(double ledIntensity READ ledIntensity NOTIFY ledChanged)
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
+    Q_PROPERTY(QString multiplayerServerUrl READ multiplayerServerUrl WRITE setMultiplayerServerUrl NOTIFY
+                   multiplayerServerUrlChanged)
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
     Q_PROPERTY(QString deviceIp READ deviceIp NOTIFY networkChanged)
     Q_PROPERTY(QString webApiUrl READ webApiUrl NOTIFY networkChanged)
@@ -56,6 +59,11 @@ class AppController : public QObject {
     Q_PROPERTY(QVariantList telemetryWaveformLeft READ telemetryWaveformLeft NOTIFY debugChanged)
     Q_PROPERTY(QVariantList telemetryWaveformRight READ telemetryWaveformRight NOTIFY debugChanged)
     Q_PROPERTY(QString telemetryPerformance READ telemetryPerformance NOTIFY debugChanged)
+    Q_PROPERTY(bool uploadActive READ uploadActive NOTIFY uploadChanged)
+    Q_PROPERTY(QString uploadName READ uploadName NOTIFY uploadChanged)
+    Q_PROPERTY(QString uploadSlot READ uploadSlot NOTIFY uploadChanged)
+    Q_PROPERTY(int uploadProgress READ uploadProgress NOTIFY uploadChanged)
+    Q_PROPERTY(QString uploadResult READ uploadResult NOTIFY uploadChanged)
     // clang-format on
 
   public:
@@ -134,6 +142,23 @@ class AppController : public QObject {
     QVariantList telemetryWaveformLeft() const;
     QVariantList telemetryWaveformRight() const;
     QString telemetryPerformance() const;
+    bool uploadActive() const {
+        return uploadActive_;
+    }
+    QString uploadName() const {
+        return uploadName_;
+    }
+    QString uploadSlot() const {
+        return uploadSlot_;
+    }
+    int uploadProgress() const {
+        return uploadProgress_;
+    }
+    QString uploadResult() const {
+        return uploadResult_;
+    }
+    void setUploadState(
+        bool active, const QString& name, const QString& slot, int progress, const QString& result = {});
     QJsonObject runtimeJson() const;
     QJsonArray gamesJson() const;
     QJsonObject performanceJson() const;
@@ -169,6 +194,18 @@ class AppController : public QObject {
     Q_INVOKABLE void runPerformanceTest();
     /** Point multiplayer rooms at the configured Cartridge Store relay. */
     void setMultiplayerStoreUrl(const QUrl& url);
+    /** Multiplayer server address; empty uses the Cartridge Store's relay. */
+    QString multiplayerServerUrl() const;
+    /** Persist the multiplayer server address, as the firmware's `prg32 multiplayer set-url` sets it. */
+    void setMultiplayerServerUrl(const QString& url);
+    /** Press device-protocol keys for holdMs; they release by themselves. */
+    void pressRemoteKeys(quint32 mask, int holdMs);
+    /** End a device-protocol press early. */
+    void releaseRemoteKeys(quint32 mask);
+    /** Device-protocol keys still down. */
+    quint32 remoteKeys() const;
+    /** Stored cartridge slots, cart0 to cart7, matching the firmware's partition table. */
+    static constexpr int CartridgeSlotCount = 8;
     /** Select the player layout independently from the physical window orientation. */
     void setPreferredOrientation(const QString& orientation);
     /** Persist whether the desktop player should occupy the full screen. */
@@ -178,6 +215,9 @@ class AppController : public QObject {
     /** Persist whether the firmware-style top and bottom status bars are shown. */
     void setStatusBarsEnabled(bool enabled);
   signals:
+    void multiplayerServerUrlChanged();
+    /** A host started a cartridge over the device protocol: the player page must show it. */
+    void playerRequested();
     void statusChanged();
     void controllerChanged();
     void ledChanged();
@@ -190,6 +230,7 @@ class AppController : public QObject {
     void performanceModeChanged();
     void frameStatsChanged();
     void debugChanged();
+    void uploadChanged();
 
   private:
     void setStatus(QString);
@@ -215,6 +256,11 @@ class AppController : public QObject {
     GamepadBackend* gamepad_ = nullptr;
     std::unique_ptr<QtAudioEngine> audio_;
     std::unique_ptr<QtMultiplayerService> multiplayer_;
+    /** Firmware button bits 0 to 10. */
+    static constexpr int RemoteKeyBits = 11;
+    void releaseExpiredRemoteKeys();
+    QElapsedTimer remoteKeyClock_;
+    std::array<qint64, RemoteKeyBits> remoteKeyDeadlines_{};
     prg32::RGBState led_{};
     bool running_ = false, paused_ = false, performanceAvailable_ = false;
     bool fullScreen_ = false;
@@ -225,6 +271,9 @@ class AppController : public QObject {
     uint32_t debugMemoryAddress_ = 0;
     int debugMemoryLength_ = 128;
     QString debugView_ = "pc";
+    bool uploadActive_ = false;
+    QString uploadName_, uploadSlot_, uploadResult_;
+    int uploadProgress_ = 0;
     uint32_t debugViewAddress_ = 0;
     QSet<uint32_t> debugBreakpoints_;
     bool ignoreBreakpointOnce_ = false;

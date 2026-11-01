@@ -175,6 +175,43 @@ void AppController::setPerformanceMode(const QString& mode) {
 void AppController::setMultiplayerStoreUrl(const QUrl& url) {
     multiplayer_->setStoreUrl(url);
 }
+QString AppController::multiplayerServerUrl() const {
+    return multiplayer_->serverUrl();
+}
+void AppController::setMultiplayerServerUrl(const QString& url) {
+    const QString trimmed = url.trimmed();
+    if (multiplayer_->serverUrl() == trimmed)
+        return;
+    multiplayer_->setServerUrl(trimmed);
+    QSettings().setValue("multiplayer/serverUrl", trimmed);
+    emit multiplayerServerUrlChanged();
+}
+void AppController::pressRemoteKeys(quint32 mask, int holdMs) {
+    input_.set(InputState::Remote, mask, true);
+    // Every press ends by itself, so a host that disappears cannot leave a key stuck. A longer press
+    // of the same key replaces the earlier deadline, as in the firmware's remote key table.
+    const qint64 deadline = remoteKeyClock_.isValid() ? remoteKeyClock_.elapsed() + holdMs : holdMs;
+    if (!remoteKeyClock_.isValid())
+        remoteKeyClock_.start();
+    for (int bit = 0; bit < RemoteKeyBits; ++bit) {
+        if (mask & (1u << bit))
+            remoteKeyDeadlines_[bit] = deadline;
+    }
+    QTimer::singleShot(holdMs, this, &AppController::releaseExpiredRemoteKeys);
+}
+void AppController::releaseRemoteKeys(quint32 mask) {
+    input_.set(InputState::Remote, mask, false);
+}
+quint32 AppController::remoteKeys() const {
+    return input_.value(InputState::Remote);
+}
+void AppController::releaseExpiredRemoteKeys() {
+    const qint64 now = remoteKeyClock_.elapsed();
+    for (int bit = 0; bit < RemoteKeyBits; ++bit) {
+        if (remoteKeyDeadlines_[bit] <= now)
+            input_.set(InputState::Remote, 1u << bit, false);
+    }
+}
 void AppController::setPreferredOrientation(const QString& orientation) {
     if (orientation != "auto" && orientation != "portrait" && orientation != "landscape")
         return;
@@ -711,7 +748,7 @@ QJsonObject AppController::runtimeJson() const {
         {"firmware_version", "qt-" PRG32QT_VERSION},
         {"cart_magic", "PRG2"},
         {"cart_abi_major", 1},
-        {"cart_abi_minor", 6},
+        {"cart_abi_minor", prg32::Runtime::AbiMinorVersion},
         {"cart_abi_hash", double(prg32::Runtime::CurrentAbiHash)},
         {"cart_abi_features", double(prg32::Runtime::ProvidedFeatures)},
         {"cart_load_addr", double(cartridgeLoadAddress)},
@@ -725,7 +762,7 @@ QJsonObject AppController::runtimeJson() const {
 }
 QJsonArray AppController::gamesJson() const {
     QJsonArray out;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < CartridgeSlotCount; ++i) {
         QFile f(slotPath(i));
         QJsonObject g{{"slot", QString("cart%1").arg(i)},
                       {"name", ""},
@@ -758,7 +795,7 @@ QJsonArray AppController::gamesJson() const {
     return out;
 }
 bool AppController::uploadSlot(int slot, const QByteArray& bytes, QString& error) {
-    if (slot < 0 || slot >= 4) {
+    if (slot < 0 || slot >= CartridgeSlotCount) {
         error = "invalid cartridge slot";
         return false;
     }
@@ -778,8 +815,17 @@ bool AppController::uploadSlot(int slot, const QByteArray& bytes, QString& error
     }
     return true;
 }
+void AppController::setUploadState(
+    bool active, const QString& name, const QString& slot, int progress, const QString& result) {
+    uploadActive_ = active;
+    uploadName_ = name;
+    uploadSlot_ = slot;
+    uploadProgress_ = qBound(0, progress, 100);
+    uploadResult_ = result;
+    emit uploadChanged();
+}
 bool AppController::selectSlot(int slot, QString& error) {
-    if (slot < 0 || slot >= 4) {
+    if (slot < 0 || slot >= CartridgeSlotCount) {
         error = "invalid cartridge slot";
         return false;
     }

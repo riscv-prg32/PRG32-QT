@@ -2,6 +2,38 @@
 
 PRG32-QT uses layered validation.
 
+## Firmware ABI 1.8 and multiplayer alignment (2026-11-01)
+
+Against PRG32 firmware `82b8925` on Apple Silicon macOS with Homebrew Qt 6.11.2, Release.
+
+- CTest passed 4 of 4; documentation consistency and `clang-format --dry-run --Werror` passed.
+- Whole Store, 900 frames with media verification and input sweep: `catalog=34 passed=32 skipped_nonportable=2
+  failed=0`; the two are the legacy `space_invaders` and `terraforge`.
+- Device protocol through `socket://127.0.0.1:8081` with the PRG32 SDK: HELLO, `store`, `run`, refusals, corrupt frame,
+  repeated and out-of-order chunks, all 11 keys, chord, `SELECT`, early release, every KEY refusal, reconnection, HTTP
+  endpoints, and a completed performance suite. This agrees with the same checks on the firmware.
+- Multiplayer against a real PRG32 Multiplayer Server, in rooms with QEMU and an ESP32-C6: OutBun, FairWind, Poing
+  Wall, Galleria 2007, Blackjack, and Drumfight, at 20 snapshots per second with no server errors. `room_full`, a
+  server restart, and `leave` were exercised. `wss://`, `rate_limited`, and `device_blocked` were not.
+- The Qt window was not looked at after the desktop locked during the run. Evidence for the player is
+  `/api/screenshot.bmp` and server traffic. The new settings field and the mobile L, C, D, R buttons were not exercised.
+- Not built or run here: Windows, Linux, Raspberry Pi OS, Intel macOS, iOS, Android, Android TV, and Apple TV; no such
+  kits are installed. The Linux and Windows controller mappings were only edited. CI must confirm them.
+- With **Run cartridges in RISC-V debug mode** on, a frame runs in slices, so `/api/screenshot.bmp` can return a partly
+  drawn frame. This misled the first test run and is unchanged.
+## Offline device-protocol validation (2026-10-27)
+
+- The local Qt application build and CTest suite exercise the same runtime and
+  cartridge parser used by the new loopback device listener.
+- A live SDK upload to `socket://127.0.0.1:8081` verifies metadata, ordered
+  transfer, CRC validation, slot persistence, run/debug selection, the upload
+  overlay, and performance JSON retrieval.
+- Verified on Apple Silicon macOS using DeviceDemo in `cart0`; the SDK returned
+  the cartridge name and enabled the debugger after the transfer. All four
+  CTest targets, documentation consistency, and clang-format checks passed.
+- The listener is verified bound only to loopback; network-facing HTTP/mDNS
+  behavior remains unchanged.
+
 ## Store certification recovery validation (2026-10-17)
 
 - The Debug portable target built with Ninja and Apple Clang on Apple Silicon macOS 26.6.2. All four CTest

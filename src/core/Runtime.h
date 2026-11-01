@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 namespace prg32 {
-/** Owns one cartridge execution session and implements all 139 entries of the PRG32 ABI 1.6 table. */
+/** Owns one cartridge execution session and implements all 144 entries of the PRG32 ABI 1.8 table. */
 class Runtime {
   public:
     struct PerfCase {
@@ -35,8 +35,13 @@ class Runtime {
         std::string game, player;
         uint32_t score;
     };
-    static constexpr uint32_t CurrentAbiHash = 0x260f6136u, CompatHash0 = 0x006427c2u,
-                              CompatHash1 = 0x6be6e8d0u, HostBase = 0xf0000000u;
+    static constexpr uint32_t CurrentAbiHash = 0x71b93e23u, CompatHash0 = 0x006427c2u,
+                              CompatHash1 = 0x6be6e8d0u, CompatHash2 = 0x260f6136u, CompatHash3 = 0xb3845925u,
+                              HostBase = 0xf0000000u;
+    /** Entries in the installed ABI table: the count of prg32/abi/prg32_abi.json in firmware ABI 1.8. */
+    static constexpr uint32_t AbiFunctionCount = 144u;
+    /** Minor version of the installed ABI table. */
+    static constexpr uint16_t AbiMinorVersion = 8u;
     static constexpr uint32_t FeatureAudio = 1u << 0, FeatureWifi = 1u << 1, FeatureMultiplayer = 1u << 2,
                               FeatureMetrics = 1u << 3, FeatureAudioPlus = 1u << 4, FeatureKeyboard = 1u << 5,
                               FeatureTilemap = 1u << 6, FeaturePlatformer = 1u << 7, FeatureSprites = 1u << 8;

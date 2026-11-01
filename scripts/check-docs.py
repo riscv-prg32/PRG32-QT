@@ -48,10 +48,12 @@ mdns = "\n".join(
 
 # These values are the serialized ABI-table contract written by Runtime::writeAbiTable.
 for literal, description in (
-    ("139", "host-call count"),
-    ("0x260f6136", "current ABI hash"),
+    ("144", "host-call count"),
+    ("0x71b93e23", "current ABI hash"),
     ("0x006427c2", "compatibility hash 0"),
     ("0x6be6e8d0", "compatibility hash 1"),
+    ("0x260f6136", "compatibility hash 2"),
+    ("0xb3845925", "compatibility hash 3"),
 ):
     if literal not in runtime:
         fail(f"Runtime.cpp no longer contains the documented {description} {literal}")

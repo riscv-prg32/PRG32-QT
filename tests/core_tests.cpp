@@ -31,6 +31,10 @@ static uint32_t rvAddi(unsigned rd, unsigned rs1, int32_t imm) {
 static uint32_t rvLui(unsigned rd, uint32_t imm20) {
     return (imm20 << 12) | (rd << 7) | 0x37u;
 }
+static uint32_t rvSw(unsigned rs2, unsigned rs1, int32_t imm) {
+    return (uint32_t((imm >> 5) & 0x7f) << 25) | (rs2 << 20) | (rs1 << 15) | (2u << 12) |
+           (uint32_t(imm & 0x1f) << 7) | 0x23u;
+}
 static uint32_t rvJalr(unsigned rd, unsigned rs1, int32_t imm) {
     return (uint32_t(imm & 0xfff) << 20) | (rs1 << 15) | (rd << 7) | 0x67u;
 }
@@ -51,6 +55,11 @@ struct TestCode {
             li(reg++, value);
         words.push_back(rvLui(T0, Runtime::HostBase >> 12));
         words.push_back(rvJalr(Ra, T0, int32_t(index * 4)));
+    }
+    // Store the last ABI call's return value at a guest address.
+    void keepResult(uint32_t address) {
+        li(T0, address);
+        words.push_back(rvSw(A0, T0, 0));
     }
     // Start an entry point: keep the return address in s1 across ABI calls.
     uint32_t begin() {
@@ -117,6 +126,95 @@ static bool cellIs(const Runtime& runtime, int cellX, int cellY, uint16_t color)
 static uint32_t guestWord(const Runtime& runtime, uint32_t address) {
     const std::vector<uint8_t> m = runtime.debugMemory(address, 4);
     return uint32_t(m[0]) | uint32_t(m[1]) << 8 | uint32_t(m[2]) << 16 | uint32_t(m[3]) << 24;
+}
+// A scripted transport: the runtime must report the server's ID and nothing else.
+class ScriptedMultiplayer final : public MultiplayerService {
+  public:
+    uint32_t admittedId = 0;
+    void initialize() override {
+    }
+    bool available() const override {
+        return true;
+    }
+    int join(const std::string&, uint32_t) override {
+        return 0;
+    }
+    int leave() override {
+        return 0;
+    }
+    void tick(uint32_t) override {
+    }
+    int setLocalState(int16_t, int16_t, uint16_t, uint16_t) override {
+        return 0;
+    }
+    int setInput(uint32_t) override {
+        return 0;
+    }
+    int peerCount(uint32_t) override {
+        return 0;
+    }
+    int peer(int, uint32_t, MultiplayerPeer&) override {
+        return -1;
+    }
+    uint32_t localPlayerId() const override {
+        return admittedId;
+    }
+};
+// ABI 1.8 appended #139 to #143: pinned to prg32_multiplayer.c and prg32_input.c of firmware 82b8925.
+static void testAbi18Calls() {
+    constexpr uint32_t Results = TestLoadAddress + 0x900u;
+    constexpr uint32_t RawX = Results + 0x20u, RawY = Results + 0x24u;
+    constexpr uint32_t Left = 1u << 0, Right = 1u << 1, Up = 1u << 2, Down = 1u << 3;
+    ScriptedMultiplayer multiplayer;
+    Runtime runtime;
+    runtime.setMultiplayerService(&multiplayer);
+    runTestCartridge(
+        runtime,
+        [](TestCode&) {},
+        [&](TestCode& c) {
+            c.call(139);
+            c.keepResult(Results);
+            c.call(140);
+            c.keepResult(Results + 4);
+            c.call(141);
+            c.keepResult(Results + 8);
+            c.call(143);
+            c.keepResult(Results + 12);
+            c.call(142, {RawX, RawY});
+            c.keepResult(Results + 16);
+        });
+    std::string e;
+    assert(runtime.frame(0, e));
+    assert(guestWord(runtime, Results) == 0);
+    assert(guestWord(runtime, Results + 4) == 0);
+    assert(guestWord(runtime, Results + 8) == 0);
+    assert(guestWord(runtime, Results + 12) == 0);
+    assert(guestWord(runtime, Results + 16) == uint32_t(-1));
+    assert(guestWord(runtime, RawX) == 2048);
+    assert(guestWord(runtime, RawY) == 2048);
+    multiplayer.admittedId = 42;
+    assert(runtime.frame(Left | Down, e));
+    assert(guestWord(runtime, Results) == 42);
+    assert(guestWord(runtime, Results + 4) == uint32_t(-127));
+    assert(guestWord(runtime, Results + 8) == 127);
+    assert(runtime.frame(Right | Up, e));
+    assert(guestWord(runtime, Results + 4) == 127);
+    assert(guestWord(runtime, Results + 8) == uint32_t(-127));
+    // Both directions together cancel, as digital_axis() does.
+    assert(runtime.frame(Left | Right, e));
+    assert(guestWord(runtime, Results + 4) == 0);
+    // The new buttons reach the cartridge unmasked through ABI #1.
+    Runtime buttons;
+    runTestCartridge(
+        buttons,
+        [](TestCode&) {},
+        [&](TestCode& c) {
+            c.call(1);
+            c.keepResult(Results);
+        });
+    constexpr uint32_t ButtonsCDLR = 0x780u;
+    assert(buttons.frame(ButtonsCDLR, e));
+    assert(guestWord(buttons, Results) == ButtonsCDLR);
 }
 // The tile, playfield and platform tests below pin PRG32-QT to the firmware's prg32_tile.c and
 // prg32_platform.c behaviour.
@@ -214,6 +312,7 @@ static void testFirmwareTileCompatibility() {
     }
 }
 int main() {
+    testAbi18Calls();
     VirtualClock virtualClock;
     virtualClock.addCycles(160'000'000);
     assert(virtualClock.nanoseconds() == 1'000'000'000);
@@ -235,6 +334,11 @@ int main() {
     static_assert(prg32qt::input::A == 16);
     static_assert(prg32qt::input::B == 32);
     static_assert(prg32qt::input::Select == 64);
+    static_assert(prg32qt::input::C == 128);
+    static_assert(prg32qt::input::D == 256);
+    static_assert(prg32qt::input::L == 512);
+    static_assert(prg32qt::input::R == 1024);
+    static_assert(Runtime::AbiFunctionCount == 144);
     static_assert((Runtime::ProvidedFeatures & Runtime::FeatureMultiplayer) != 0);
     static_assert(sizeof(MultiplayerPeer) == 24);
     InputState input;

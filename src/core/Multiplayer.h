@@ -16,7 +16,7 @@ struct MultiplayerPeer {
 };
 static_assert(sizeof(MultiplayerPeer) == 24);
 
-/** Host transport used by PRG32 ABI calls #32 through #40. */
+/** Host transport used by PRG32 ABI calls #32 through #40 and #139. */
 class MultiplayerService {
   public:
     virtual ~MultiplayerService() = default;
@@ -29,5 +29,7 @@ class MultiplayerService {
     virtual int setInput(uint32_t input) = 0;
     virtual int peerCount(uint32_t nowMs) = 0;
     virtual int peer(int index, uint32_t nowMs, MultiplayerPeer& output) = 0;
+    /** Player ID from the server's welcome; 0 until admitted and again after the connection is lost. */
+    virtual uint32_t localPlayerId() const = 0;
 };
 } // namespace prg32

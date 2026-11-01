@@ -59,6 +59,11 @@ ApplicationWindow {
         if (key === Qt.Key_X || key === Qt.Key_K) return 32
         if (key === Qt.Key_Return || key === Qt.Key_Enter || key === Qt.Key_Space ||
                 key === Qt.Key_Select) return 64
+        // Firmware buttons C, D, L and R (bits 7 to 10). A and D are already directions.
+        if (key === Qt.Key_C) return 128
+        if (key === Qt.Key_V) return 256
+        if (key === Qt.Key_Q) return 512
+        if (key === Qt.Key_E) return 1024
         return 0
     }
     function gameTitle(g) { return g.title || g.name || g.id || "Cartridge" }
@@ -152,6 +157,9 @@ ApplicationWindow {
         ColumnLayout { anchors.fill:parent; TextField { id:storeField; Layout.fillWidth:true; text:storeClient.baseUrl; placeholderText:"Cartridge Store URL" }
             RowLayout { Button{text:"Test connection";onClicked:{storeClient.baseUrl=storeField.text;storeClient.refresh()}} Button{text:"Restore default";onClicked:{storeClient.resetDefault();storeField.text=storeClient.baseUrl;storeClient.refresh()}} }
             Label { Layout.fillWidth:true; text:storeClient.error.length?storeClient.error:(storeClient.cartridges.length+" cartridges"); wrapMode:Text.Wrap }
+            Label { Layout.fillWidth:true; font.bold:true; text:"Multiplayer" }
+            TextField { Layout.fillWidth:true; text:appController.multiplayerServerUrl; placeholderText:"ws://server:8081 (empty: the Store's relay)"; inputMethodHints:Qt.ImhUrlCharactersOnly
+                onEditingFinished:appController.multiplayerServerUrl=text }
             Label { Layout.fillWidth:true; font.bold:true; text:"Player display" }
             ComboBox { id:orientationBox; Layout.fillWidth:true; model:["Auto","Portrait","Landscape"]
                 Component.onCompleted:currentIndex=Math.max(0,["auto","portrait","landscape"].indexOf(appController.preferredOrientation))
@@ -308,6 +316,24 @@ ApplicationWindow {
         }
     }
 
+    Rectangle {
+        anchors.fill: parent
+        z: 100
+        visible: appController.uploadActive
+        color: "#080b10"
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 560)
+            spacing: 18
+            Label { Layout.alignment: Qt.AlignHCenter; text: "USB CARTRIDGE UPLOAD"; color: "white"; font.family: root.codeFont; font.pixelSize: 22; font.bold: true }
+            Label { Layout.fillWidth: true; text: appController.uploadName; color: "#45c9ff"; font.family: root.codeFont; font.pixelSize: 18; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight }
+            Label { Layout.fillWidth: true; text: "TARGET: " + appController.uploadSlot; color: "#f0d38a"; font.family: root.codeFont; horizontalAlignment: Text.AlignHCenter }
+            ProgressBar { Layout.fillWidth: true; from: 0; to: 100; value: appController.uploadProgress }
+            Label { Layout.fillWidth: true; text: appController.uploadProgress + "%"; color: "white"; font.family: root.codeFont; horizontalAlignment: Text.AlignHCenter }
+            Label { Layout.fillWidth: true; text: appController.uploadResult; color: appController.uploadResult.indexOf("FAILED") >= 0 ? "#ff6b6b" : "#43d17b"; font.family: root.codeFont; font.bold: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
+        }
+    }
+
     Component { id:screenComponent
         Rectangle { color:"black"; radius:10; border.color:Qt.rgba(appController.ledR/255,appController.ledG/255,appController.ledB/255,Math.min(.5,appController.ledIntensity)); border.width:2
             PRG32Frame { anchors.fill:parent; anchors.margins:10; statusBarsEnabled:root.statusBarsVisible; statusText:appController.cartridgeName; framesPerSecond:appController.framesPerSecond; Component.onCompleted:appController.attachFrame(this) }
@@ -328,7 +354,10 @@ ApplicationWindow {
     }
     Component { id:actionsComponent
         Item { RoundButton { width:68;height:68;text:"B";anchors.left:parent.left;anchors.bottom:parent.bottom;onPressed:appController.setButton(32,true);onReleased:appController.setButton(32,false) }
-            RoundButton { width:72;height:72;text:"A";anchors.right:parent.right;anchors.top:parent.top;onPressed:appController.setButton(16,true);onReleased:appController.setButton(16,false) } }
+            RoundButton { width:72;height:72;text:"A";anchors.right:parent.right;anchors.top:parent.top;onPressed:appController.setButton(16,true);onReleased:appController.setButton(16,false) }
+            Row { anchors.horizontalCenter:parent.horizontalCenter;anchors.bottom:parent.top;anchors.bottomMargin:6;spacing:4
+                Repeater { model:[{t:"L",m:512},{t:"C",m:128},{t:"D",m:256},{t:"R",m:1024}]
+                    RoundButton { required property var modelData; width:44;height:44;text:modelData.t;onPressed:appController.setButton(modelData.m,true);onReleased:appController.setButton(modelData.m,false) } } } }
     }
     component WaveformView: Canvas {
         property var samples: []
@@ -394,6 +423,7 @@ ApplicationWindow {
         }
     }
 
+    Connections { target:appController; function onPlayerRequested(){ root.showPlayer() } }
     Connections { target:storeClient; function onCartridgeDownloaded(id,data){ if(appController.loadBytes(data,id)) root.showPlayer() } }
 
     Rectangle { visible:root.splashVisible; anchors.fill:parent; color:"black"; z:100

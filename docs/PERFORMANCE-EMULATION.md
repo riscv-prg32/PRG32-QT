@@ -12,7 +12,7 @@ The profile clock is 160 MHz and the frame period is exactly 33 ms. Those values
 
 Guest instructions receive deterministic effective costs by decoded class: ALU, shift, taken/not-taken branch,
 jump, load, store, multiply, divide/remainder, atomic, CSR, and fence. Compressed instructions use the class of
-the operation they encode. PRG32 ABI #0-#138 calls additionally charge deterministic local processing work;
+the operation they encode. PRG32 ABI #0-#143 calls additionally charge deterministic local processing work;
 graphics and audio-copy calls scale with bounded pixels, tiles, events, or samples. Internet latency is excluded.
 
 In accurate mode:
