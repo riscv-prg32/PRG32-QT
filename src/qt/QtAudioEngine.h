@@ -41,16 +41,24 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
         return 32768 + QIODevice::bytesAvailable();
     }
     /** The PRG32 firmware audio engine's output (22050 Hz interleaved stereo): played as it is,
-     *  resampled to the device. Bounded to half a second so sound never lags the game. */
+     *  resampled to the device. The queue holds at most half a second; the oldest frames beyond
+     *  that are dropped and counted, which is expected only when frames outrun real time. */
     void pushFirmwarePcm(const std::vector<int16_t>& stereo);
-    /** What the output device has taken: its name, sink state, processed time, and the firmware
-     *  frames it pulled (count and 64-bit FNV-1a over their samples, before resampling). */
+    /** Forget queued firmware PCM: a new cartridge, stop, or pause must not play the old sound. */
+    void clearFirmwarePcm();
+    /** What the output device has taken: its name, sink state, processed time, the firmware frames
+     *  it pulled (count and 64-bit FNV-1a over their samples, before resampling), the frames still
+     *  queued, frames dropped because the queue was full, and device frames left silent because
+     *  the queue was empty. */
     struct DeviceStatus {
         QString device;
         int state = -1;
         qint64 processedUs = 0;
         qint64 firmwareFrames = 0;
         quint64 firmwareHash = 0;
+        qint64 queuedFrames = 0;
+        qint64 droppedFrames = 0;
+        qint64 underrunDeviceFrames = 0;
     };
     DeviceStatus deviceStatus() const;
     /** Return a bounded snapshot of recently rendered left-channel samples. */
@@ -75,10 +83,15 @@ class QtAudioEngine final : public QIODevice, public prg32::AudioSink {
     void ensureStarted();
     void render(float* left, float* right, int frames);
     void encode(char* dst, int frames, const std::vector<float>& interleaved);
+    void mixFirmwarePcm(float* left, float* right, int frames);
+    void captureWaveform(const float* left, const float* right, int frames);
     mutable QMutex mutex_;
     std::vector<Voice> voices_;
     std::deque<int16_t> firmwarePcm_;
     double firmwarePosition_ = 0;
+    bool firmwareStreaming_ = false; // a frame has pushed PCM since the last clear
+    qint64 firmwareDroppedFrames_ = 0;
+    qint64 firmwareUnderrunDeviceFrames_ = 0;
     qint64 firmwareFramesPlayed_ = 0;
     quint64 firmwareHash_ = 1469598103934665603ull;
     std::unique_ptr<QAudioSink> sink_;

@@ -18,6 +18,10 @@ PRG32-QT keeps cartridge execution in portable C++20 and confines host-specific 
 CMake 3.21+, a C++20 compiler, Qt 6.5+ with Core, Gui, Quick, QuickControls2, Network, Multimedia and
 WebSockets. CI currently uses Qt 6.8.3 where binary Qt kits are installed.
 
+Every target also compiles the PRG32 firmware audio engine. Configuring fetches its sources from
+`riscv-prg32/PRG32` at the pinned `PRG32_SDK_REVISION`, so Git and network access are needed once. Offline builds
+pass `-DPRG32_SDK_DIR=/path/to/PRG32`, or `-DPRG32QT_FIRMWARE_AUDIO=OFF` for the older mixer.
+
 Every interactive target listens for the PRG32 device HTTP API on TCP port 8080 and advertises
 `_prg32._tcp.local.` on multicast-capable local networks. See
 [Network discovery and PRG32 SDK access](NETWORKING.md) for SDK commands, service metadata, firewall guidance,

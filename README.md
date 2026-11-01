@@ -11,7 +11,7 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - Three persistent performance profiles: Accurate ESP32-C6 timing by default, 30 FPS Optimal, and Unlimited.
 - PRG32 ABI 1.8 (`0x71b93e23`) plus documented compatible hashes.
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
-- AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
+- The PRG32 firmware's audio engine (8 voices, ADSR, synth and filter, AUD0 samples and tracks, stereo), played through Qt Multimedia.
 - Safe-area-aware touch controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
 - `prg32-multiplayer-1.0` multiplayer through a PRG32 Multiplayer Server or the Store's relay, RGB LED emulation, local scores, metrics/performance ABI calls, and
   safe unavailable-service stubs.
@@ -37,6 +37,10 @@ cmake -S . -B build-core -G Ninja -DPRG32QT_BUILD_APP=OFF
 cmake --build build-core
 ctest --test-dir build-core --output-on-failure
 ```
+
+The default configuration fetches the PRG32 audio engine sources from `riscv-prg32/PRG32` at the pinned
+`PRG32_SDK_REVISION`, so it needs network access once. To build offline, pass `-DPRG32_SDK_DIR=/path/to/PRG32`, or
+`-DPRG32QT_FIRMWARE_AUDIO=OFF` for the older mixer, which is not an audio reference.
 
 Host helpers are provided in `scripts/` for Windows, Linux, Raspberry Pi OS, macOS, iOS, Android, Apple TV and Android TV. Platform prerequisites and exact commands are documented in [docs/PLATFORMS.md](docs/PLATFORMS.md).
 

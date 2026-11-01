@@ -2,6 +2,30 @@
 
 PRG32-QT uses layered validation.
 
+## Firmware audio engine merge review (2026-11-01)
+
+PR #1 merged with `main` at `b98a6aa`, on Apple Silicon macOS with Homebrew Qt 6.11.2, Release, and SDK `679dfb5`,
+whose `components/prg32_audio` is identical to firmware `82b8925`.
+
+- CTest passed 5 of 5 with the option on and 4 of 4 with `PRG32QT_FIRMWARE_AUDIO=OFF`. Documentation consistency and
+  `clang-format --dry-run --Werror` passed.
+- Whole Store, 900 frames with media verification and input sweep, accurate and `--unlimited`: `catalog=34 passed=32
+  skipped_nonportable=2 failed=0` in both. Its audio counts come from the `Runtime` sink, so they do not measure the
+  engine's PCM.
+- Malformed `AUD0` with the audio flag clear: before the fix, a bus error in `prg32_audio_tracker_step`; now ignored,
+  covered by `prg32qt_core`. With the flag set, `AudioBlock::parse` rejects it. The running app stayed up with it for 8 s.
+- 1,700 mutated audio blocks (Bach and three Store cartridges with samples), half with the flag clear, 60 frames each,
+  under AddressSanitizer and UBSan: no ASan report and no crash. 383 were rejected by the validator. UBSan reports
+  were not gathered as a separate pass/fail signal.
+- `prg32qt_audio_device_check` on MacBook Pro Speakers, 60 s of Bach with the precise 33 ms timer: 1,818 frames, 0
+  dropped, 1,267 frames queued (57 ms), 1,384 device frames underrun, played frames equal to the engine's, non-zero
+  telemetry waveform. A coarse timer ran at 32 FPS and overflowed the queue, so the check now uses the app's precise
+  timer and fails on any dropped frame.
+- No listening check was performed: these are instrumentation results, not evidence of audible quality.
+- The queue reset on load, stop, and pause was not exercised by an automated test.
+- Not built here: Windows, Linux, Raspberry Pi OS, Intel macOS, iOS, Android, Android TV, and Apple TV; CI must confirm
+  them.
+
 ## Firmware ABI 1.8 and multiplayer alignment (2026-11-01)
 
 Against PRG32 firmware `82b8925` on Apple Silicon macOS with Homebrew Qt 6.11.2, Release.

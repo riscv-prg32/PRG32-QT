@@ -268,8 +268,9 @@ bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName)
 #ifdef PRG32QT_FIRMWARE_AUDIO
     // The firmware audio engine makes the sound; the Runtime's own sink stays silent.
     rt_.setAudioSink(&silentSink_);
+    audio_->clearFirmwarePcm(); // the previous cartridge's queued sound must not play into this one
     if (!firmwareAudio_.attach(
-            rt_, std::span<const uint8_t>((const uint8_t*)d.constData(), size_t(d.size())), e)) {
+            rt_, *c, std::span<const uint8_t>((const uint8_t*)d.constData(), size_t(d.size())), e)) {
         setStatus(QString::fromStdString(e));
         return false;
     }
@@ -338,6 +339,9 @@ void AppController::saveCartridge(const QByteArray& d, const QString& name) {
 void AppController::stop() {
     timer_.stop();
     rt_.stop();
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    audio_->clearFirmwarePcm();
+#endif
     input_ = InputState{};
     paused_ = false;
     emit pausedChanged();
@@ -351,6 +355,9 @@ void AppController::pause() {
         return;
     timer_.stop();
     rt_.pause();
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    audio_->clearFirmwarePcm(); // pausing silences the player at once; the engine keeps its voices
+#endif
     input_ = InputState{};
     paused_ = true;
     emit pausedChanged();

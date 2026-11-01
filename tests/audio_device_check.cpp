@@ -15,6 +15,8 @@
 #include <QCoreApplication>
 #include <QMediaDevices>
 #include <QTimer>
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
@@ -38,13 +40,15 @@ int main(int argc, char** argv) {
     prg32::NullAudioSink silent;
     prg32::FirmwareAudio firmware;
     runtime.setAudioSink(&silent);
-    if (!cartridge || !firmware.attach(runtime, bytes, error) || !runtime.load(*cartridge, error) ||
-        !runtime.init(error)) {
+    if (!cartridge || !firmware.attach(runtime, *cartridge, bytes, error) ||
+        !runtime.load(*cartridge, error) || !runtime.init(error)) {
         std::fprintf(stderr, "%s\n", error.c_str());
         return 3;
     }
     QtAudioEngine output;
     std::vector<int16_t> pushed;
+    float waveformPeak = 0.f;
+    long long framesRun = 0;
     QTimer frames;
     QObject::connect(&frames, &QTimer::timeout, [&] {
         std::string frameError;
@@ -53,11 +57,16 @@ int main(int argc, char** argv) {
             app.exit(4);
             return;
         }
+        ++framesRun;
         firmware.frameDone();
         auto pcm = firmware.take();
         pushed.insert(pushed.end(), pcm.begin(), pcm.end());
         output.pushFirmwarePcm(pcm);
+        // Telemetry reads this copy: it must show the firmware engine's sound, not only tones.
+        for (float sample : output.waveformLeft())
+            waveformPeak = std::max(waveformPeak, std::fabs(sample));
     });
+    frames.setTimerType(Qt::PreciseTimer); // as AppController: a coarse timer runs about 6% fast
     frames.start(33);
     QTimer::singleShot(seconds * 1000, &app, [&] { app.exit(0); });
     if (int code = app.exec())
@@ -72,14 +81,24 @@ int main(int argc, char** argv) {
     const bool timeOk = status.processedUs >= (seconds - 1) * 1000000LL;
     const bool framesOk = status.firmwareFrames >= (seconds - 1) * prg32::FirmwareAudio::SampleRate;
     const bool samplesOk = hash == status.firmwareHash;
-    std::printf(
-        "{\"device\": \"%s\", \"sink_state\": %d, \"processed_us\": %lld, \"firmware_frames_played\": %lld, "
-        "\"frames_pushed\": %zu, \"played_equal_engine\": %s}\n",
-        status.device.toUtf8().constData(),
-        status.state,
-        static_cast<long long>(status.processedUs),
-        static_cast<long long>(status.firmwareFrames),
-        pushed.size() / 2,
-        samplesOk ? "true" : "false");
-    return timeOk && framesOk && samplesOk ? 0 : 1;
+    const bool waveformOk = waveformPeak > 0.f;
+    std::printf("{\"device\": \"%s\", \"sink_state\": %d, \"processed_us\": %lld, \"frames_run\": %lld, "
+                "\"firmware_frames_played\": %lld, "
+                "\"frames_pushed\": %zu, \"played_equal_engine\": %s, \"queued_frames\": %lld, "
+                "\"dropped_frames\": %lld, "
+                "\"underrun_device_frames\": %lld, \"waveform_peak\": %.3f}\n",
+                status.device.toUtf8().constData(),
+                status.state,
+                static_cast<long long>(status.processedUs),
+                framesRun,
+                static_cast<long long>(status.firmwareFrames),
+                pushed.size() / 2,
+                samplesOk ? "true" : "false",
+                static_cast<long long>(status.queuedFrames),
+                static_cast<long long>(status.droppedFrames),
+                static_cast<long long>(status.underrunDeviceFrames),
+                double(waveformPeak));
+    // At the app's real-time pace the queue must never overflow: a dropped frame means lag.
+    const bool pacingOk = status.droppedFrames == 0;
+    return timeOk && framesOk && samplesOk && waveformOk && pacingOk ? 0 : 1;
 }

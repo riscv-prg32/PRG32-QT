@@ -30,7 +30,10 @@ std::vector<uint8_t> audioBlockOf(std::span<const uint8_t> data) {
 }
 } // namespace
 
-bool FirmwareAudio::attach(Runtime& runtime, std::span<const uint8_t> cartridge, std::string& error) {
+bool FirmwareAudio::attach(Runtime& runtime,
+                           const Cartridge& parsed,
+                           std::span<const uint8_t> image,
+                           std::string& error) {
     runtime_ = &runtime;
     frames_ = 0;
     audioNanoseconds_ = 0;
@@ -38,7 +41,9 @@ bool FirmwareAudio::attach(Runtime& runtime, std::span<const uint8_t> cartridge,
         error = "the audio engine did not start";
         return false;
     }
-    block_ = audioBlockOf(cartridge);
+    // Cartridge::parse sets audio() only for a validated block under the PRG2 header's FlagAudioBlock,
+    // as the console's loader requires. Any other trailing AUD0 bytes never reach the engine.
+    block_ = parsed.audio() ? audioBlockOf(image) : std::vector<uint8_t>{};
     if (prg32_kit_audio_load(block_.data(), block_.size()) != 0) {
         error = "failed to load cartridge AUDIO block";
         return false;

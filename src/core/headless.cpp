@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
 #ifdef PRG32QT_FIRMWARE_AUDIO
     // The PRG32 firmware's audio engine makes the sound (AuditAudioSink only counts).
     prg32::FirmwareAudio firmwareAudio;
-    if (!firmwareAudio.attach(r, b, e)) {
+    if (!firmwareAudio.attach(r, *c, b, e)) {
         std::cerr << e << "\n";
         return 4;
     }

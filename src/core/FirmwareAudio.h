@@ -2,7 +2,8 @@
 // The PRG32 firmware's own audio engine (components/prg32_audio of the PRG32 SDK), driven by
 // a Runtime's host calls, so PRG32-QT renders exactly what the console mixes: 8 voices, the
 // SID-like synth and its filter, ADSR envelopes, samples, the tracker and the stereo mix.
-// Built when PRG32QT_FIRMWARE_AUDIO is ON (CMake option, needs PRG32_SDK_DIR).
+// Built when PRG32QT_FIRMWARE_AUDIO is ON (CMake option; CMake fetches the pinned SDK sources
+// unless PRG32_SDK_DIR names a checkout).
 #include "Runtime.h"
 #include <cstddef>
 #include <cstdint>
@@ -16,8 +17,15 @@ class FirmwareAudio {
     static constexpr int SampleRate = 22050;
 
     /** Start the engine as the console does for a cartridge: its AUD0 block (if any) replaces the assets.
-     *  The Runtime's own AudioSink must be a NullAudioSink: the engine makes the sound. */
-    bool attach(Runtime& runtime, std::span<const uint8_t> cartridge, std::string& error);
+     *  The engine trusts the block's layout, so only a block that `parsed` declares through
+     *  Cartridge::FlagAudioBlock and that AudioBlock::parse accepted reaches it; `image` must be the
+     *  bytes `parsed` came from. The Runtime's own AudioSink must not make sound: the engine does. */
+    bool
+    attach(Runtime& runtime, const Cartridge& parsed, std::span<const uint8_t> image, std::string& error);
+    /** Whether attach gave the engine a cartridge AUD0 block. */
+    bool hasAudioBlock() const {
+        return !block_.empty();
+    }
     /** One frame (update + draw) has run: render the audio up to the next frame's start.
      *
      *  The scheduling boundary (the same in the PRG32 firmware under QEMU and in the
