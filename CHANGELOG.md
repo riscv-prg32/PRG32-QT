@@ -4,6 +4,13 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Render cartridge sound with the PRG32 firmware's own audio engine (`components/prg32_audio`): 8 voices, ADSR
+  envelopes, the synth and filter, samples, the tracker, and the stereo mix. On by default through
+  `PRG32QT_FIRMWARE_AUDIO`; `OFF` keeps the older float mixer, which has no ADSR and is not an audio reference.
+- The default build now needs the PRG32 SDK sources: CMake fetches the pinned `PRG32_SDK_REVISION` during configure,
+  so an offline build must set `PRG32_SDK_DIR` or turn the option off.
+- ABI #5, #7, and #8 (the obsolete buzzer calls) stay silent with the firmware engine and are counted, as on the console.
+- Add `prg32qt-headless --audio-wav` and an `AUDIO engine=prg32-firmware pcm_fnv1a=` result line.
 - Align with firmware ABI 1.8: accept hash `0x71b93e23` and its compatible hashes, install the 144-entry table, and
   implement the local player ID (#139) and the analog calls (#140 to #143, with no stick on Qt hosts).
 - Add buttons C, D, L, and R (bits 7 to 10) on keyboard (C, V, Q, E), controllers, and touch.

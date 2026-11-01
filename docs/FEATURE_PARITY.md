@@ -15,9 +15,9 @@ The public PRG32 ABI is the compatibility baseline for this checklist. A feature
 | Sprite frames and animation helpers | `Runtime` |
 | Tile screen, dual playfields, scrolling, parallax, camera | `Runtime` |
 | Platform tile flags, collision, actor move/step, camera follow | `Runtime` |
-| Tone/note/u8 PCM audio | `Runtime`, `QtAudioEngine` |
-| `AUD0` samples/instruments/tracks, including documented procedural synth-ID decoding and delta-0 chords | `Audio`, `Runtime`, `QtAudioEngine` |
-| Volume, channel volume, stereo pan, tempo | `Runtime`, `QtAudioEngine` |
+| Note audio; buzzer calls stay silent and counted with the firmware engine | `FirmwareAudio`, `QtAudioEngine` |
+| `AUD0` samples/instruments/tracks, ADSR, synth and filter, using the firmware's engine | `Audio`, `FirmwareAudio`, `QtAudioEngine` |
+| Volume, channel volume, stereo pan, tempo | `FirmwareAudio`, `QtAudioEngine` |
 | RGB LED emulation driven by audio/runtime activity | `Runtime`, QML player |
 | Touch D-pad with diagonals, A, B, Start/Select and frame-edge latching | `qml/Main.qml`, `InputState` |
 | Adaptive portrait/landscape player | `qml/Main.qml` |

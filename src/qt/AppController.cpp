@@ -48,7 +48,9 @@ AppController::AppController(QObject* p)
     else if (performanceMode_ == "unlimited")
         runtimeMode = prg32::PerformanceMode::Unlimited;
     rt_.setPerformanceMode(runtimeMode);
+#ifndef PRG32QT_FIRMWARE_AUDIO
     rt_.setAudioSink(audio_.get());
+#endif
     rt_.setMultiplayerService(multiplayer_.get());
     rt_.setLEDCallback([this](prg32::RGBState v) {
         led_ = v;
@@ -128,6 +130,10 @@ AppController::AppController(QObject* p)
         }
         if (!frameComplete)
             return;
+#ifdef PRG32QT_FIRMWARE_AUDIO
+        firmwareAudio_.frameDone(); // a frame ran (or was stepped through): its audio
+        audio_->pushFirmwarePcm(firmwareAudio_.take());
+#endif
         ++frameCount_;
         ++frameRateCount_;
         const qint64 elapsedMilliseconds = frameRateTimer_.elapsed();
@@ -259,6 +265,16 @@ bool AppController::loadBytes(const QByteArray& d, const QString& suggestedName)
     }
     timer_.stop();
     rt_.stop();
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    // The firmware audio engine makes the sound; the Runtime's own sink stays silent.
+    rt_.setAudioSink(&silentSink_);
+    audio_->clearFirmwarePcm(); // the previous cartridge's queued sound must not play into this one
+    if (!firmwareAudio_.attach(
+            rt_, *c, std::span<const uint8_t>((const uint8_t*)d.constData(), size_t(d.size())), e)) {
+        setStatus(QString::fromStdString(e));
+        return false;
+    }
+#endif
     if (!rt_.load(*c, e) || !rt_.init(e)) {
         setStatus(QString::fromStdString(e));
         return false;
@@ -323,6 +339,9 @@ void AppController::saveCartridge(const QByteArray& d, const QString& name) {
 void AppController::stop() {
     timer_.stop();
     rt_.stop();
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    audio_->clearFirmwarePcm();
+#endif
     input_ = InputState{};
     paused_ = false;
     emit pausedChanged();
@@ -336,6 +355,9 @@ void AppController::pause() {
         return;
     timer_.stop();
     rt_.pause();
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    audio_->clearFirmwarePcm(); // pausing silences the player at once; the engine keeps its voices
+#endif
     input_ = InputState{};
     paused_ = true;
     emit pausedChanged();

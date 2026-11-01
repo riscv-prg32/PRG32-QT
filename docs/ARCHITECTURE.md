@@ -56,6 +56,12 @@ The runtime implements 8×8 tile definitions, 40×25 direct tile screens, two 64
 
 `AudioBlock` parses packaged `AUD0` samples, instruments, tracks, and events. `Runtime` implements tones, notes, unsigned 8-bit PCM, sample playback, pitch, loop ranges, per-channel volume/pan, master volume, track tempo/event playback, and note/sample-driven RGB LED pulses through the abstract `AudioSink` interface.
 
+With `PRG32QT_FIRMWARE_AUDIO=ON`, the default, `FirmwareAudio` makes the sound and the `Runtime` sink stays silent. It compiles the SDK's `components/prg32_audio` unchanged; `src/core/firmware_audio/` replaces only the audio task and the I2S driver. `Runtime` host-call hooks forward ABI #5 to #25 to the engine. Frame N starts at N x 33 ms, its audio calls take effect at that start, and the engine renders whole 20 ms buffers up to the next frame.
+
+The engine trusts the layout of an `AUD0` block, so `FirmwareAudio::attach` gives it a block only when the PRG2 header sets the audio flag and `AudioBlock::parse` accepted that block. This matches the console's flag check; any other trailing `AUD0` bytes are ignored.
+
+`QtAudioEngine` queues at most half a second of engine PCM and resamples it to the device. Loading a cartridge, stopping, or pausing clears the queue. At the 33 ms precise timer the queue stays small. In Unlimited mode frames outrun real time, so the oldest queued audio is dropped and counted: sound there is not a faithful recording of the run. Use `prg32qt-headless --audio-wav` for that.
+
 ### Scores and metrics
 
 Local scores and the public performance broker are implemented. The host also serves the PRG32 HTTP API on port 8080.
@@ -94,8 +100,8 @@ desktop Escape shortcut routes through the common Setup transition, which pauses
 fullscreen presentation.
 The debugger execution toggle selects between bounded `Runtime::debugStep` slices and the normal `Runtime::frame`
 path while leaving the surrounding inspection UI mounted. Breakpoint checks and single-step are active only on
-the instruction-level path. `QtAudioEngine` retains bounded copies of its latest 64 rendered stereo samples for
-display; the copies are protected by its mixer mutex and do not alter audio output. Player telemetry also reads
+the instruction-level path. `QtAudioEngine` retains bounded copies of its latest 64 stereo samples, taken after
+tones and firmware engine PCM are mixed, for display; the copies are protected by its mixer mutex and do not alter audio output. Player telemetry also reads
 the merged host input mask and runtime instruction/cycle/late-frame counters, plus measured host execution time.
 Debug mode is a default-off desktop setting. The common Run Cartridge action checks that setting and either
 enters the running player with the debugger panel or resumes ordinary cartridge execution; there is no separate

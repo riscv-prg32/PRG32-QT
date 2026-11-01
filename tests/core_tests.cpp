@@ -2,6 +2,11 @@
 // inside them) away. Keep the checks active in every configuration.
 #undef NDEBUG
 #include "Cartridge.h"
+#ifdef PRG32QT_FIRMWARE_AUDIO
+#include "FirmwareAudio.h"
+#include <fstream>
+#include <iterator>
+#endif
 #include "Framebuffer.h"
 #include "InputButtons.h"
 #include "InputState.h"
@@ -311,7 +316,65 @@ static void testFirmwareTileCompatibility() {
         assert(runtime.registerValue(10) == 0);
     }
 }
+#ifdef PRG32QT_FIRMWARE_AUDIO
+// The firmware engine trusts an AUD0 block's layout, and its event capacity is the unsigned
+// difference data_offset - events_offset. Only a declared, validated block may reach it.
+static void testFirmwareAudioTrustBoundary() {
+    // PRG2 header: flags at 10. AUD0 header: tracks_offset at 24, events_offset at 28, data_offset
+    // at 32, block_size at 36. A track descriptor is a u32 event offset and a u32 event count.
+    static constexpr size_t Prg2Flags = 10, Aud0TracksOffset = 24, Aud0EventsOffset = 28, Aud0DataOffset = 32,
+                            Aud0BlockSize = 36, EventCountOffset = 4;
+    static constexpr uint32_t DataBeforeEvents = 0x80, FarOutsideBlock = 0x4000000, EventsReadByTracker = 16;
+    static constexpr int FramesToPlay = 120;
+    std::ifstream file(PRG32QT_TEST_FIXTURES "/Bach.prg32", std::ios::binary);
+    std::vector<uint8_t> image((std::istreambuf_iterator<char>(file)), {});
+    std::string error;
+    {
+        auto valid = Cartridge::parse(image, error);
+        assert(valid && valid->audio());
+        Runtime runtime;
+        NullAudioSink silent;
+        runtime.setAudioSink(&silent);
+        FirmwareAudio firmware;
+        assert(firmware.attach(runtime, *valid, image, error));
+        assert(firmware.hasAudioBlock());
+    }
+    auto read32 = [&](size_t offset) {
+        return uint32_t(image[offset]) | uint32_t(image[offset + 1]) << 8 |
+               uint32_t(image[offset + 2]) << 16 | uint32_t(image[offset + 3]) << 24;
+    };
+    const auto header = Cartridge::parse(image, error)->header();
+    const size_t block = size_t(header.headerSize) + header.codeSize;
+    const uint32_t blockSize = read32(block + Aud0BlockSize);
+    const size_t track = block + read32(block + Aud0TracksOffset);
+    put32(image, block + Aud0EventsOffset, blockSize);
+    put32(image, block + Aud0DataOffset, blockSize - DataBeforeEvents);
+    put32(image, track, FarOutsideBlock);
+    put32(image, track + EventCountOffset, EventsReadByTracker);
+    // Declared by the header: the cartridge validator rejects the block.
+    assert(!Cartridge::parse(image, error));
+    // Not declared: the cartridge is valid, and the malformed bytes must never reach the engine.
+    put16(image, Prg2Flags, uint16_t(header.flags & ~Cartridge::FlagAudioBlock));
+    auto undeclared = Cartridge::parse(image, error);
+    assert(undeclared && !undeclared->audio());
+    Runtime runtime;
+    NullAudioSink silent;
+    runtime.setAudioSink(&silent);
+    FirmwareAudio firmware;
+    assert(firmware.attach(runtime, *undeclared, image, error));
+    assert(!firmware.hasAudioBlock());
+    assert(runtime.load(*undeclared, error) && runtime.init(error));
+    for (int frame = 0; frame < FramesToPlay; ++frame) {
+        assert(runtime.frame(0, error));
+        firmware.frameDone();
+        firmware.take();
+    }
+}
+#endif
 int main() {
+#ifdef PRG32QT_FIRMWARE_AUDIO
+    testFirmwareAudioTrustBoundary();
+#endif
     testAbi18Calls();
     VirtualClock virtualClock;
     virtualClock.addCycles(160'000'000);

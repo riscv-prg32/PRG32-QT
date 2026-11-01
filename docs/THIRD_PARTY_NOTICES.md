@@ -4,7 +4,7 @@
 
 PRG32-QT interoperates with the public PRG32 cartridge format and ABI. Upstream project: `riscv-prg32/PRG32`.
 
-No upstream source file is required at runtime. The regression cartridges under `tests/fixtures/` are retained solely to verify compatible cartridge execution.
+No upstream source file is required at runtime. With `PRG32QT_FIRMWARE_AUDIO=ON`, the default, the build fetches and links `components/prg32_audio` from `riscv-prg32/PRG32` (MIT License) at the pinned `PRG32_SDK_REVISION`. The regression cartridges under `tests/fixtures/` are retained solely to verify compatible cartridge execution.
 
 ## Qt
 

@@ -208,15 +208,18 @@ void QtAudioEngine::render(float* l, float* r, int frames) {
         l[f] = std::tanh(L);
         r[f] = std::tanh(R);
     }
+    std::erase_if(voices_, [](auto& v) { return !v.active; });
+}
+void QtAudioEngine::captureWaveform(const float* left, const float* right, int frames) {
+    QMutexLocker lock(&mutex_);
     const int waveformFrames = std::min(frames, int(waveformLeft_.size()));
     const int waveformStart = frames - waveformFrames;
     waveformLeft_.fill(0.f);
     waveformRight_.fill(0.f);
     for (int index = 0; index < waveformFrames; ++index) {
-        waveformLeft_[size_t(index)] = l[waveformStart + index];
-        waveformRight_[size_t(index)] = r[waveformStart + index];
+        waveformLeft_[size_t(index)] = left[waveformStart + index];
+        waveformRight_[size_t(index)] = right[waveformStart + index];
     }
-    std::erase_if(voices_, [](auto& v) { return !v.active; });
 }
 std::vector<float> QtAudioEngine::waveformLeft() const {
     QMutexLocker lock(&mutex_);
@@ -248,6 +251,65 @@ void QtAudioEngine::encode(char* dst, int frames, const std::vector<float>& x) {
         std::memset(dst, 0, format_.bytesForFrames(frames));
     (void)ch;
 }
+QtAudioEngine::DeviceStatus QtAudioEngine::deviceStatus() const {
+    QMutexLocker lock(&mutex_);
+    DeviceStatus status;
+    status.device = QMediaDevices::defaultAudioOutput().description();
+    if (sink_) {
+        status.state = int(sink_->state());
+        status.processedUs = sink_->processedUSecs();
+    }
+    status.firmwareFrames = firmwareFramesPlayed_;
+    status.firmwareHash = firmwareHash_;
+    status.queuedFrames = qint64(firmwarePcm_.size() / 2);
+    status.droppedFrames = firmwareDroppedFrames_;
+    status.underrunDeviceFrames = firmwareUnderrunDeviceFrames_;
+    return status;
+}
+void QtAudioEngine::clearFirmwarePcm() {
+    QMutexLocker lock(&mutex_);
+    firmwarePcm_.clear();
+    firmwarePosition_ = 0;
+    firmwareStreaming_ = false;
+}
+void QtAudioEngine::pushFirmwarePcm(const std::vector<int16_t>& stereo) {
+    if (stereo.empty())
+        return;
+    ensureStarted();
+    QMutexLocker lock(&mutex_);
+    firmwareStreaming_ = true;
+    firmwarePcm_.insert(firmwarePcm_.end(), stereo.begin(), stereo.end());
+    constexpr size_t limit = 22050; // half a second of stereo frames (two values each)
+    if (firmwarePcm_.size() > limit * 2) {
+        const size_t excess = firmwarePcm_.size() - limit * 2;
+        firmwareDroppedFrames_ += qint64(excess / 2);
+        firmwarePcm_.erase(firmwarePcm_.begin(), firmwarePcm_.begin() + std::ptrdiff_t(excess));
+    }
+}
+void QtAudioEngine::mixFirmwarePcm(float* left, float* right, int frames) {
+    // The firmware engine's frames, stepped through at 22050 Hz (linear between samples). Each
+    // queue frame is two int16 values, so reading a pair of frames needs four queued values.
+    QMutexLocker lock(&mutex_);
+    const double step = 22050.0 / std::max(1, format_.sampleRate());
+    int served = 0;
+    for (; served < frames && firmwarePcm_.size() >= 4; ++served) {
+        const double fraction = firmwarePosition_;
+        left[served] += float((firmwarePcm_[0] * (1 - fraction) + firmwarePcm_[2] * fraction) / 32768.0);
+        right[served] += float((firmwarePcm_[1] * (1 - fraction) + firmwarePcm_[3] * fraction) / 32768.0);
+        firmwarePosition_ += step;
+        while (firmwarePosition_ >= 1 && firmwarePcm_.size() >= 4) {
+            for (int side = 0; side < 2; ++side) {
+                firmwareHash_ ^= quint16(firmwarePcm_.front());
+                firmwareHash_ *= 1099511628211ull;
+                firmwarePcm_.pop_front();
+            }
+            ++firmwareFramesPlayed_;
+            firmwarePosition_ -= 1;
+        }
+    }
+    if (firmwareStreaming_)
+        firmwareUnderrunDeviceFrames_ += frames - served;
+}
 qint64 QtAudioEngine::readData(char* data, qint64 maxlen) {
     if (format_.bytesPerFrame() <= 0)
         return 0;
@@ -256,6 +318,8 @@ qint64 QtAudioEngine::readData(char* data, qint64 maxlen) {
         return 0;
     std::vector<float> L(frames), R(frames);
     render(L.data(), R.data(), frames);
+    mixFirmwarePcm(L.data(), R.data(), frames);
+    captureWaveform(L.data(), R.data(), frames); // after the mix: telemetry shows what is played
     int ch = std::max(1, format_.channelCount());
     std::vector<float> x(size_t(frames) * ch);
     for (int f = 0; f < frames; f++)

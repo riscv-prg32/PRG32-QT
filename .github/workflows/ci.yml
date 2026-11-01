@@ -46,7 +46,7 @@ jobs:
       - name: Install quality tools
         run: sudo apt-get update && sudo apt-get install -y clang-format
       - name: Check C++ formatting
-        run: clang-format --dry-run --Werror src/core/*.cpp src/core/*.h src/qt/*.cpp src/qt/*.h src/qt/*.mm tests/core_tests.cpp
+        run: clang-format --dry-run --Werror src/core/*.cpp src/core/*.h src/core/firmware_audio/*.h src/core/firmware_audio/shim/*.h src/core/firmware_audio/shim/freertos/*.h src/qt/*.cpp src/qt/*.h src/qt/*.mm tests/core_tests.cpp tests/audio_device_check.cpp
       - name: Check documentation contracts
         run: python3 scripts/check-docs.py
       - name: Check Store certification parser
