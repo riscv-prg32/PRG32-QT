@@ -14,7 +14,7 @@ PRG32-QT is deliberately split into a Qt-free portable guest runtime and a thin 
 
 `VirtualClock` and the ESP32-C6 timing profile separate guest execution time from host wall time. In the default
 accurate mode, `cycle` is accumulated effective ESP32-C6 work, `time` is virtual nanoseconds derived from that
-clock, and `instret` remains the retired guest instruction count. Instruction classes and ABI #0-#138 local work
+clock, and `instret` remains the retired guest instruction count. Instruction classes and ABI #0-#143 local work
 receive deterministic charges. Network latency and host rendering latency never alter guest virtual time.
 
 Downloaded cartridge bytes are never treated as host-native code.
@@ -26,7 +26,7 @@ returning to normal frame execution.
 
 ### Synthetic ABI
 
-The runtime installs the PRG32 ABI 1.6 table in guest-visible memory and maps 139 ABI entries to synthetic host-call addresses. Current ABI hash `0x260f6136` and documented compatible hashes `0x006427c2` and `0x6be6e8d0` are accepted.
+The runtime installs the PRG32 ABI 1.8 table in guest-visible memory and maps 144 ABI entries to synthetic host-call addresses. Current ABI hash `0x71b93e23` and documented compatible hashes `0x006427c2`, `0x6be6e8d0`, `0x260f6136`, and `0xb3845925` are accepted.
 
 The provided feature mask intentionally includes only implemented public PRG32 services: audio, multiplayer,
 metrics, extended audio, tile maps, platform helpers, and sprites. Wi-Fi and keyboard/text-input services keep
@@ -34,12 +34,15 @@ safe unavailable/stub semantics and are not advertised.
 
 ### Multiplayer
 
-ABI calls #32 through #40 follow the public PRG32 `prg32_multiplayer` contract. `MultiplayerService` keeps the
-portable runtime independent of Qt and preserves the 24-byte guest snapshot layout. `QtMultiplayerService`
-connects every application target to the configured Store's `/api/multiplayer` WebSocket relay, validates
-1-47 character room signatures, publishes at most every 50 ms, masks input to the seven PRG32 buttons, caps
-the peer set at eight, and expires snapshots after three seconds. Headless execution exposes the ABI but
-reports transport availability as false when no service is installed.
+ABI calls #32 through #40 and #139 follow the public PRG32 `prg32_multiplayer` contract. `MultiplayerService` keeps
+the portable runtime independent of Qt and preserves the 24-byte guest snapshot layout. `QtMultiplayerService`
+implements `prg32-multiplayer-1.0` as the firmware's `prg32_multiplayer.c` does: the local ID is 0 until `welcome`,
+a lost socket is a new session with reconnection backoff and jitter, `room_full` repeats `join` every 5 s,
+`device_blocked` ends the session until a new join, snapshots older than the held frame are dropped, and peers are
+ordered by player ID so a cartridge's index does not move. `join` carries platform `prg32-qt` and a random
+installation UUID kept in `QSettings`. Peers age on real time; `last_seen_ms` reaches the cartridge on the runtime's
+clock, because cartridges compare it with `prg32_ticks_ms()`. The server comes from Settings; when empty, the
+configured Store's `/api/multiplayer` relay is used.
 
 ### Graphics
 
@@ -103,7 +106,7 @@ debug launch path. The debugger does not consume keyboard/controller input, so c
 Inputs are maintained independently and OR-combined before every emulated frame. A release from one source cannot cancel a button still held by another.
 
 - UI/touch: QML digital D-pad with diagonals, A, B, SELECT.
-- Keyboard: arrows/WASD, Z/J, X/K, Enter/Return/Space.
+- Keyboard: arrows/WASD, Z/J, X/K, Enter/Return/Space, and C, V, Q, E for the firmware buttons C, D, L, R.
 - Apple: GameController framework with hot-plug support.
 - Windows: WinMM joystick polling.
 - Linux/Raspberry Pi OS: Linux joystick devices under `/dev/input/js*`.

@@ -62,7 +62,7 @@ The discovery document at `GET /api` lists the active endpoints. The current hos
 | `GET` | `/api` or `/api/` | API discovery |
 | `GET` | `/api/runtime` | ABI, capacity, active cartridge, frame and input state |
 | `GET` | `/api/games` | Four persistent cartridge slots |
-| `POST` | `/api/games?slot=cartN` | Upload a cartridge to `cart0` through `cart3` |
+| `POST` | `/api/games?slot=cartN` | Upload a cartridge to `cart0` through `cart7` |
 | `POST` | `/api/games/select?slot=cartN` | Load and run a stored cartridge |
 | `GET` | `/api/screenshot.bmp` | Current framebuffer capture |
 | `GET` | `/api/performance.json` | Performance-contract state and results |

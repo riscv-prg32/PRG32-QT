@@ -5,7 +5,14 @@
 
 class InputState {
   public:
-    enum Source : std::size_t { Ui = 0, Keyboard = 1, Controller0 = 2, Controller1 = 3, SourceCount = 4 };
+    enum Source : std::size_t {
+        Ui = 0,
+        Keyboard = 1,
+        Controller0 = 2,
+        Controller1 = 3,
+        Remote = 4,
+        SourceCount = 5
+    };
     void set(Source source, std::uint32_t mask, bool down) {
         auto& v = masks_[source];
         if (down) {

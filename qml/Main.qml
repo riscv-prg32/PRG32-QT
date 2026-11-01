@@ -59,6 +59,11 @@ ApplicationWindow {
         if (key === Qt.Key_X || key === Qt.Key_K) return 32
         if (key === Qt.Key_Return || key === Qt.Key_Enter || key === Qt.Key_Space ||
                 key === Qt.Key_Select) return 64
+        // Firmware buttons C, D, L and R (bits 7 to 10). A and D are already directions.
+        if (key === Qt.Key_C) return 128
+        if (key === Qt.Key_V) return 256
+        if (key === Qt.Key_Q) return 512
+        if (key === Qt.Key_E) return 1024
         return 0
     }
     function gameTitle(g) { return g.title || g.name || g.id || "Cartridge" }
@@ -152,6 +157,9 @@ ApplicationWindow {
         ColumnLayout { anchors.fill:parent; TextField { id:storeField; Layout.fillWidth:true; text:storeClient.baseUrl; placeholderText:"Cartridge Store URL" }
             RowLayout { Button{text:"Test connection";onClicked:{storeClient.baseUrl=storeField.text;storeClient.refresh()}} Button{text:"Restore default";onClicked:{storeClient.resetDefault();storeField.text=storeClient.baseUrl;storeClient.refresh()}} }
             Label { Layout.fillWidth:true; text:storeClient.error.length?storeClient.error:(storeClient.cartridges.length+" cartridges"); wrapMode:Text.Wrap }
+            Label { Layout.fillWidth:true; font.bold:true; text:"Multiplayer" }
+            TextField { Layout.fillWidth:true; text:appController.multiplayerServerUrl; placeholderText:"ws://server:8081 (empty: the Store's relay)"; inputMethodHints:Qt.ImhUrlCharactersOnly
+                onEditingFinished:appController.multiplayerServerUrl=text }
             Label { Layout.fillWidth:true; font.bold:true; text:"Player display" }
             ComboBox { id:orientationBox; Layout.fillWidth:true; model:["Auto","Portrait","Landscape"]
                 Component.onCompleted:currentIndex=Math.max(0,["auto","portrait","landscape"].indexOf(appController.preferredOrientation))
@@ -346,7 +354,10 @@ ApplicationWindow {
     }
     Component { id:actionsComponent
         Item { RoundButton { width:68;height:68;text:"B";anchors.left:parent.left;anchors.bottom:parent.bottom;onPressed:appController.setButton(32,true);onReleased:appController.setButton(32,false) }
-            RoundButton { width:72;height:72;text:"A";anchors.right:parent.right;anchors.top:parent.top;onPressed:appController.setButton(16,true);onReleased:appController.setButton(16,false) } }
+            RoundButton { width:72;height:72;text:"A";anchors.right:parent.right;anchors.top:parent.top;onPressed:appController.setButton(16,true);onReleased:appController.setButton(16,false) }
+            Row { anchors.horizontalCenter:parent.horizontalCenter;anchors.bottom:parent.top;anchors.bottomMargin:6;spacing:4
+                Repeater { model:[{t:"L",m:512},{t:"C",m:128},{t:"D",m:256},{t:"R",m:1024}]
+                    RoundButton { required property var modelData; width:44;height:44;text:modelData.t;onPressed:appController.setButton(modelData.m,true);onReleased:appController.setButton(modelData.m,false) } } } }
     }
     component WaveformView: Canvas {
         property var samples: []
@@ -412,6 +423,7 @@ ApplicationWindow {
         }
     }
 
+    Connections { target:appController; function onPlayerRequested(){ root.showPlayer() } }
     Connections { target:storeClient; function onCartridgeDownloaded(id,data){ if(appController.loadBytes(data,id)) root.showPlayer() } }
 
     Rectangle { visible:root.splashVisible; anchors.fill:parent; color:"black"; z:100

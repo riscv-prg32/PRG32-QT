@@ -4,6 +4,18 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Align with firmware ABI 1.8: accept hash `0x71b93e23` and its compatible hashes, install the 144-entry table, and
+  implement the local player ID (#139) and the analog calls (#140 to #143, with no stick on Qt hosts).
+- Add buttons C, D, L, and R (bits 7 to 10) on keyboard (C, V, Q, E), controllers, and touch.
+- Fix ABI #2: player 2 reads nothing and any other value reads the local buttons. Player 1 used to read zero, and
+  the new buttons would have appeared as a remote player's input.
+- Implement `prg32-multiplayer-1.0`: identity in `join`, admission through `welcome`, reconnection with backoff and
+  jitter, policy errors, stale-snapshot rejection, and stable peer order. Add a multiplayer server address setting.
+- Fix peer `last_seen_ms`, which used a different clock from `prg32_ticks_ms()`, so OutBun never counted peers as
+  ready. Publish at the protocol's 20 snapshots per second at 30 frames per second, instead of 15.
+- Device protocol: eight slots and 128 KiB cartridges, as the firmware; HELLO `firmware`, `target`, `slots`,
+  `max_chunk`, `max_payload`, and `keys`; the KEY message; repeated-chunk handling; `received`/`total` replies; and
+  `Wi-Fi is not available in this build` for the Wi-Fi messages. A `run` or `debug` request now opens the player.
 - Add the loopback-only `prg32-io-1.0` development listener with automatic
   cartridge upload progress, store/run/debug actions, and performance-result
   retrieval for offline SDK workflows.

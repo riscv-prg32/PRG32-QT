@@ -10,6 +10,7 @@
 #include <QSet>
 #include <QTimer>
 #include <QUrl>
+#include <array>
 #include <memory>
 class FrameItem;
 class GamepadBackend;
@@ -26,6 +27,8 @@ class AppController : public QObject {
     Q_PROPERTY(int ledB READ ledB NOTIFY ledChanged)
     Q_PROPERTY(double ledIntensity READ ledIntensity NOTIFY ledChanged)
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
+    Q_PROPERTY(QString multiplayerServerUrl READ multiplayerServerUrl WRITE setMultiplayerServerUrl NOTIFY
+                   multiplayerServerUrlChanged)
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
     Q_PROPERTY(QString deviceIp READ deviceIp NOTIFY networkChanged)
     Q_PROPERTY(QString webApiUrl READ webApiUrl NOTIFY networkChanged)
@@ -188,6 +191,18 @@ class AppController : public QObject {
     Q_INVOKABLE void runPerformanceTest();
     /** Point multiplayer rooms at the configured Cartridge Store relay. */
     void setMultiplayerStoreUrl(const QUrl& url);
+    /** Multiplayer server address; empty uses the Cartridge Store's relay. */
+    QString multiplayerServerUrl() const;
+    /** Persist the multiplayer server address, as the firmware's `prg32 multiplayer set-url` sets it. */
+    void setMultiplayerServerUrl(const QString& url);
+    /** Press device-protocol keys for holdMs; they release by themselves. */
+    void pressRemoteKeys(quint32 mask, int holdMs);
+    /** End a device-protocol press early. */
+    void releaseRemoteKeys(quint32 mask);
+    /** Device-protocol keys still down. */
+    quint32 remoteKeys() const;
+    /** Stored cartridge slots, cart0 to cart7, matching the firmware's partition table. */
+    static constexpr int CartridgeSlotCount = 8;
     /** Select the player layout independently from the physical window orientation. */
     void setPreferredOrientation(const QString& orientation);
     /** Persist whether the desktop player should occupy the full screen. */
@@ -197,6 +212,9 @@ class AppController : public QObject {
     /** Persist whether the firmware-style top and bottom status bars are shown. */
     void setStatusBarsEnabled(bool enabled);
   signals:
+    void multiplayerServerUrlChanged();
+    /** A host started a cartridge over the device protocol: the player page must show it. */
+    void playerRequested();
     void statusChanged();
     void controllerChanged();
     void ledChanged();
@@ -231,6 +249,11 @@ class AppController : public QObject {
     GamepadBackend* gamepad_ = nullptr;
     std::unique_ptr<QtAudioEngine> audio_;
     std::unique_ptr<QtMultiplayerService> multiplayer_;
+    /** Firmware button bits 0 to 10. */
+    static constexpr int RemoteKeyBits = 11;
+    void releaseExpiredRemoteKeys();
+    QElapsedTimer remoteKeyClock_;
+    std::array<qint64, RemoteKeyBits> remoteKeyDeadlines_{};
     prg32::RGBState led_{};
     bool running_ = false, paused_ = false, performanceAvailable_ = false;
     bool fullScreen_ = false;

@@ -9,11 +9,11 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - PRG2 validation, CRC, ABI/import-model and feature checks.
 - RV32IMAC guest execution including compressed instructions, atomics and counters used by portable cartridges.
 - Three persistent performance profiles: Accurate ESP32-C6 timing by default, 30 FPS Optimal, and Unlimited.
-- PRG32 ABI 1.6 (`0x260f6136`) plus documented compatible hashes.
+- PRG32 ABI 1.8 (`0x71b93e23`) plus documented compatible hashes.
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - AUD0 samples, tones, notes, PCM, tracks, volume and stereo pan through Qt Multimedia.
 - Safe-area-aware touch controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
-- Store-relayed multiplayer snapshots, RGB LED emulation, local scores, metrics/performance ABI calls, and
+- `prg32-multiplayer-1.0` multiplayer through a PRG32 Multiplayer Server or the Store's relay, RGB LED emulation, local scores, metrics/performance ABI calls, and
   safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL, performance and firmware-style status-bar settings,
   architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
@@ -59,7 +59,8 @@ For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 The APK is written to `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`.
 
 Qt application builds require the Qt Multimedia and Qt WebSockets modules. Multiplayer ABI calls #32 through
-#40 use the configured Store's `/api/multiplayer` WebSocket relay and share one implementation on every Qt
+#40 and #139 use the server address from Settings or, when it is empty, the configured Store's
+`/api/multiplayer` WebSocket relay, and share one implementation on every Qt
 target.
 
 ## SDK deployment and discovery

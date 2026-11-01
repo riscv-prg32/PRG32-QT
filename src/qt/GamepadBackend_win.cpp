@@ -60,6 +60,15 @@ class WinGamepadBackend final : public GamepadBackend {
             m |= 16;
         if (j.dwButtons & JOY_BUTTON2)
             m |= 32;
+        // Firmware buttons C, D, L and R (mask bits 7 to 10).
+        if (j.dwButtons & JOY_BUTTON3)
+            m |= 128;
+        if (j.dwButtons & JOY_BUTTON4)
+            m |= 256;
+        if (j.dwButtons & (1u << 4))
+            m |= 512;
+        if (j.dwButtons & (1u << 5))
+            m |= 1024;
         if (j.dwButtons & ((1u << 6) | (1u << 7) | (1u << 8) | (1u << 9)))
             m |= 64;
         publish(m);

@@ -11,5 +11,9 @@ constexpr std::uint32_t Down = 1u << 3;
 constexpr std::uint32_t A = 1u << 4;
 constexpr std::uint32_t B = 1u << 5;
 constexpr std::uint32_t Select = 1u << 6;
+constexpr std::uint32_t C = 1u << 7;
+constexpr std::uint32_t D = 1u << 8;
+constexpr std::uint32_t L = 1u << 9;
+constexpr std::uint32_t R = 1u << 10;
 constexpr std::uint32_t DirectionMask = Left | Right | Up | Down;
 } // namespace prg32qt::input

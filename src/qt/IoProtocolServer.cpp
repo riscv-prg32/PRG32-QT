@@ -1,5 +1,6 @@
 #include "IoProtocolServer.h"
 #include "AppController.h"
+#include "InputButtons.h"
 #include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -13,7 +14,12 @@ namespace {
 constexpr char Magic[] = {'P', 'R', 'G', '3', '2', 'I', 'O', '\0'};
 constexpr int HeaderSize = 24;
 constexpr quint8 Version = 1;
-constexpr quint32 MaximumPayload = 16 * 1024;
+constexpr int MaximumPayload = 16 * 1024;
+constexpr int MaximumChunk = 4 * 1024;
+/** One firmware cartridge slot and execution window. */
+constexpr int MaximumCartridgeBytes = 128 * 1024;
+constexpr int DefaultKeyHoldMs = 200;
+constexpr int MaximumKeyHoldMs = 60000;
 enum : quint8 {
     Hello = 1,
     UploadBegin,
@@ -22,6 +28,10 @@ enum : quint8 {
     Run,
     Debug,
     PerformanceGet,
+    WifiScan,
+    WifiSet,
+    WifiForget,
+    Key,
     Status = 0x80,
     ResultData = 0x81
 };
@@ -36,6 +46,43 @@ quint32 crc32(const QByteArray& bytes) {
 }
 QByteArray compact(const QJsonObject& value) {
     return QJsonDocument(value).toJson(QJsonDocument::Compact);
+}
+/** The firmware's REMOTE_KEYS table, in the same order as HELLO `keys` on the board. */
+struct KeyName {
+    const char* name;
+    quint32 bit;
+};
+constexpr KeyName KeyNames[] = {{"LEFT", prg32qt::input::Left},
+                                {"RIGHT", prg32qt::input::Right},
+                                {"UP", prg32qt::input::Up},
+                                {"DOWN", prg32qt::input::Down},
+                                {"A", prg32qt::input::A},
+                                {"B", prg32qt::input::B},
+                                {"START", prg32qt::input::Select},
+                                {"C", prg32qt::input::C},
+                                {"D", prg32qt::input::D},
+                                {"L", prg32qt::input::L},
+                                {"R", prg32qt::input::R}};
+QJsonArray keyNames() {
+    QJsonArray names;
+    for (const KeyName& entry : KeyNames)
+        names.append(entry.name);
+    return names;
+}
+/** Bit of a key name, with SELECT as a second name for START; 0 when the name is unknown. */
+quint32 keyBit(const QString& name) {
+    if (name == "SELECT")
+        return prg32qt::input::Select;
+    for (const KeyName& entry : KeyNames) {
+        if (name == QLatin1String(entry.name))
+            return entry.bit;
+    }
+    return 0;
+}
+/** The runtime contract as a protocol host needs it: uploads here have the firmware's slot size. */
+QJsonObject helloRuntime(QJsonObject runtime) {
+    runtime["cart_max_size"] = MaximumCartridgeBytes;
+    return runtime;
 }
 } // namespace
 
@@ -71,7 +118,7 @@ void IoProtocolServer::process(QTcpSocket* socket, QByteArray& buffer) {
         const quint32 requestId = qFromLittleEndian<quint32>(header + 12);
         const quint32 size = qFromLittleEndian<quint32>(header + 16);
         const quint32 checksum = qFromLittleEndian<quint32>(header + 20);
-        if (version != Version || size > MaximumPayload) {
+        if (version != Version || size > quint32(MaximumPayload)) {
             buffer.remove(0, 1);
             continue;
         }
@@ -95,9 +142,15 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
              requestId,
              compact({{"ok", true},
                       {"protocol", "prg32-io-1.0"},
-                      {"capabilities", QJsonArray{"upload", "run", "debug", "performance"}},
+                      {"capabilities", QJsonArray{"upload", "run", "debug", "performance", "keys"}},
+                      {"keys", keyNames()},
                       {"debug_supported", true},
-                      {"runtime", controller_->runtimeJson()}}));
+                      {"firmware", QStringLiteral("qt-" PRG32QT_VERSION)},
+                      {"target", "qt"},
+                      {"slots", AppController::CartridgeSlotCount},
+                      {"max_chunk", MaximumChunk},
+                      {"max_payload", MaximumPayload},
+                      {"runtime", helloRuntime(controller_->runtimeJson())}}));
         return;
     }
     if (type == UploadBegin) {
@@ -106,7 +159,8 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         bool slotOk = false;
         const int slotNumber = slot.startsWith("cart") ? slot.mid(4).toInt(&slotOk) : -1;
         const int size = metadata.value("size").toInt(-1);
-        if (!slotOk || slotNumber < 0 || slotNumber >= 4 || size <= 0 || size > 65536) {
+        if (!slotOk || slotNumber < 0 || slotNumber >= AppController::CartridgeSlotCount || size <= 0 ||
+            size > MaximumCartridgeBytes) {
             status(socket, requestId, false, QStringLiteral("invalid upload metadata"));
             return;
         }
@@ -117,6 +171,9 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         uploadSlot_ = slotNumber;
         uploadSize_ = quint32(size);
         uploadCrc_ = quint32(metadata.value("crc32").toDouble());
+        lastChunk_.clear();
+        lastChunkOffset_ = 0;
+        controller_->releaseRemoteKeys(controller_->remoteKeys());
         controller_->stop();
         controller_->setUploadState(true, uploadName_, slot, 0, QStringLiteral("UPLOADING..."));
         status(socket, requestId, true, QStringLiteral("upload accepted"));
@@ -130,17 +187,27 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         const quint32 offset =
             qFromLittleEndian<quint32>(reinterpret_cast<const uchar*>(payload.constData()));
         const QByteArray data = payload.mid(4);
-        if (offset != quint32(upload_.size()) || upload_.size() + data.size() > int(uploadSize_)) {
-            status(socket, requestId, false, QStringLiteral("out-of-order upload chunk"));
-            return;
+        // A chunk repeating the previous one is a resend after a lost reply: acknowledge it, write nothing.
+        const bool repeated = !lastChunk_.isEmpty() && offset == lastChunkOffset_ && data == lastChunk_;
+        if (!repeated) {
+            if (offset != quint32(upload_.size()) || upload_.size() + data.size() > int(uploadSize_)) {
+                status(socket, requestId, false, QStringLiteral("out-of-order upload chunk"));
+                return;
+            }
+            upload_.append(data);
+            lastChunk_ = data;
+            lastChunkOffset_ = offset;
         }
-        upload_.append(data);
         controller_->setUploadState(true,
                                     uploadName_,
                                     QString("cart%1").arg(uploadSlot_),
                                     int((quint64(upload_.size()) * 100u) / uploadSize_),
                                     QStringLiteral("UPLOADING..."));
-        status(socket, requestId, true, QStringLiteral("chunk accepted"));
+        send(socket,
+             Status,
+             1,
+             requestId,
+             compact({{"ok", true}, {"received", upload_.size()}, {"total", double(uploadSize_)}}));
         return;
     }
     if (type == UploadEnd) {
@@ -154,6 +221,8 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
             ok = controller_->selectSlot(uploadSlot_, error);
         if (ok && uploadCommand_ == "debug")
             controller_->setDebugEnabled(true);
+        if (ok && uploadCommand_ != "store")
+            emit controller_->playerRequested();
         controller_->setUploadState(true,
                                     uploadName_,
                                     QString("cart%1").arg(uploadSlot_),
@@ -169,6 +238,7 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
                           {"message", "upload complete"},
                           {"name", uploadName_},
                           {"slot", QString("cart%1").arg(uploadSlot_)},
+                          {"size", double(uploadSize_)},
                           {"running", uploadCommand_ != "store"}}));
         } else {
             status(socket, requestId, false, error);
@@ -184,9 +254,12 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         bool slotOk = false;
         const int slotNumber = slot.startsWith("cart") ? slot.mid(4).toInt(&slotOk) : -1;
         QString error;
+        controller_->releaseRemoteKeys(controller_->remoteKeys());
         const bool ok = slotOk && controller_->selectSlot(slotNumber, error);
         if (ok && type == Debug)
             controller_->setDebugEnabled(true);
+        if (ok)
+            emit controller_->playerRequested();
         status(socket, requestId, ok, ok ? QStringLiteral("cartridge running") : error);
         return;
     }
@@ -194,7 +267,72 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         send(socket, ResultData, 1, requestId, compact(controller_->performanceJson()));
         return;
     }
-    status(socket, requestId, false, QStringLiteral("unsupported message type"));
+    if (type == Key) {
+        handleKey(socket, requestId, payload);
+        return;
+    }
+    if (type == WifiScan || type == WifiSet || type == WifiForget) {
+        status(socket, requestId, false, QStringLiteral("Wi-Fi is not available in this build"));
+        return;
+    }
+    status(socket, requestId, false, QStringLiteral("unsupported protocol message"));
+}
+
+void IoProtocolServer::handleKey(QTcpSocket* socket, quint32 requestId, const QByteArray& payload) {
+    if (uploadSlot_ >= 0) {
+        status(socket, requestId, false, QStringLiteral("upload in progress"));
+        return;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        status(socket, requestId, false, QStringLiteral("invalid key request"));
+        return;
+    }
+    const QJsonObject request = document.object();
+    const QString action = request.value("action").toString(QStringLiteral("press"));
+    if (action != "press" && action != "release") {
+        status(socket, requestId, false, QStringLiteral("invalid key action"));
+        return;
+    }
+    const QJsonValue keysValue = request.value("keys");
+    if (!keysValue.isUndefined() && !keysValue.isArray()) {
+        status(socket, requestId, false, QStringLiteral("keys must be an array"));
+        return;
+    }
+    quint32 mask = 0;
+    const QJsonArray keys = keysValue.toArray();
+    for (const QJsonValue& key : keys) {
+        const quint32 bit = keyBit(key.toString());
+        if (bit == 0) {
+            // One unknown name refuses the whole request, with no key changed.
+            status(socket, requestId, false, QStringLiteral("unknown key %1").arg(key.toString()));
+            return;
+        }
+        mask |= bit;
+    }
+    if (action == "release") {
+        controller_->releaseRemoteKeys(keys.isEmpty() ? controller_->remoteKeys() : mask);
+    } else {
+        if (mask == 0) {
+            status(socket, requestId, false, QStringLiteral("missing keys"));
+            return;
+        }
+        const int holdMs =
+            request.contains("hold_ms") ? request.value("hold_ms").toInt(-1) : DefaultKeyHoldMs;
+        if (holdMs < 1 || holdMs > MaximumKeyHoldMs) {
+            status(socket, requestId, false, QStringLiteral("invalid hold_ms"));
+            return;
+        }
+        controller_->pressRemoteKeys(mask, holdMs);
+    }
+    QJsonArray active;
+    const quint32 down = controller_->remoteKeys();
+    for (const KeyName& entry : KeyNames) {
+        if (down & entry.bit)
+            active.append(entry.name);
+    }
+    send(socket, Status, 1, requestId, compact({{"ok", true}, {"active", active}}));
 }
 
 void IoProtocolServer::send(

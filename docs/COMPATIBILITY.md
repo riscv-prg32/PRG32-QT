@@ -6,9 +6,10 @@ PRG32-QT targets portable ABI-table PRG32 cartridges and follows the public PRG3
 
 - PRG2 package ABI major 1.
 - RISC-V RV32IMAC guest code, including RV32A word atomics and compressed instructions.
-- PRG32 ABI 1.6, current hash `0x260f6136`.
-- Compatible hashes `0x006427c2` and `0x6be6e8d0`.
-- 139-entry ABI table.
+- PRG32 ABI 1.8, current hash `0x71b93e23`.
+- Compatible hashes `0x006427c2`, `0x6be6e8d0`, `0x260f6136`, and `0xb3845925`.
+- 144-entry ABI table. Calls #140 to #143 report no analog stick and derive the axes from the directions, as on a
+  board without one. Buttons C, D, L, and R are bits 7 to 10.
 - Provided features exactly matching the implemented public PRG32 ABI: audio, multiplayer, metrics,
   audio-plus, tilemap, platformer, and sprites.
 - 320×200 indexed framebuffer with a 256-entry RGB565 palette.
@@ -17,7 +18,7 @@ PRG32-QT targets portable ABI-table PRG32 cartridges and follows the public PRG3
   and scores.
 - DNS-SD device advertisement `_prg32._tcp.local.` with API contract `prg32-http-1`; this is distinct from the
   Cartridge Store's `_prg32store._tcp.local.` discovery ABI.
-- Multiplayer ABI calls #32-#40 and the Store `/api/multiplayer` WebSocket snapshot protocol.
+- Multiplayer ABI calls #32-#40 and #139 and the `prg32-multiplayer-1.0` protocol, against a PRG32 Multiplayer Server or the Store's `/api/multiplayer` relay.
 
 Hardware-specific cartridges that bypass the portable ABI and depend directly on ESP32 peripherals are outside this host's compatibility target.
 

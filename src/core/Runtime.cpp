@@ -16,13 +16,26 @@ constexpr uint32_t ActorHeightOffset = 18;
 constexpr uint32_t ActorStatusOffset = 20;
 constexpr uint32_t ActorLayerOffset = 22;
 constexpr uint32_t ActorReservedOffset = 23;
+// Full scale of an axis, and the mid-scale reading of ABI #142 without an analog stick.
+constexpr int32_t AxisFullScale = 127;
+constexpr uint32_t AnalogRawCenter = 2048;
 // PRG32_TILE_FLAG_* and PRG32_PLATFORM_* bits from the firmware's prg32.h.
 constexpr uint8_t TileFlagSolid = 1u << 0, TileFlagPlatform = 1u << 1, TileFlagHazard = 1u << 2,
                   TileFlagCollect = 1u << 3;
 constexpr uint16_t PlatformOnGround = 1u << 0, PlatformHitLeft = 1u << 1, PlatformHitRight = 1u << 2,
                    PlatformHitHead = 1u << 3, PlatformHazard = 1u << 4, PlatformCollect = 1u << 5;
 // PRG32_BTN_* input bits used by actor_step.
-constexpr uint32_t ButtonLeft = 1u << 0, ButtonRight = 1u << 1, ButtonUp = 1u << 2, ButtonA = 1u << 4;
+constexpr uint32_t ButtonLeft = 1u << 0, ButtonRight = 1u << 1, ButtonUp = 1u << 2, ButtonDown = 1u << 3,
+                   ButtonA = 1u << 4;
+/** The firmware's digital axis: both directions together cancel, and neither is 0. */
+int32_t digitalAxis(uint32_t input, uint32_t negativeButton, uint32_t positiveButton) {
+    int32_t axis = 0;
+    if (input & negativeButton)
+        axis -= AxisFullScale;
+    if (input & positiveButton)
+        axis += AxisFullScale;
+    return axis;
+}
 } // namespace
 
 static void wr16(std::vector<uint8_t>& m, size_t o, uint16_t v) {
@@ -86,7 +99,7 @@ bool Runtime::load(const Cartridge& c, std::string& e) {
         return false;
     }
     if (c.abiHash() && c.abiHash() != CurrentAbiHash && c.abiHash() != CompatHash0 &&
-        c.abiHash() != CompatHash1) {
+        c.abiHash() != CompatHash1 && c.abiHash() != CompatHash2 && c.abiHash() != CompatHash3) {
         e = "incompatible PRG32 ABI hash";
         return false;
     }
@@ -115,7 +128,7 @@ bool Runtime::load(const Cartridge& c, std::string& e) {
     std::copy(c.payload().begin(), c.payload().end(), mem_.begin());
     cpu_.reset(base_, &mem_);
     cpu_.setPerformanceMode(performanceMode_);
-    cpu_.setHostRange(HostBase, 139);
+    cpu_.setHostRange(HostBase, AbiFunctionCount);
     cpu_.setHostCall([this](uint32_t i) { hostCall(i); });
     writeAbiTable();
     loaded_ = true;
@@ -131,12 +144,12 @@ void Runtime::writeAbiTable() {
     size_t o = abiOffset_;
     wr32(mem_, o, 0x49424150u);
     wr16(mem_, o + 4, 1);
-    wr16(mem_, o + 6, 6);
-    wr16(mem_, o + 8, uint16_t(20 + 139 * 4));
-    wr16(mem_, o + 10, 139);
+    wr16(mem_, o + 6, AbiMinorVersion);
+    wr16(mem_, o + 8, uint16_t(20 + AbiFunctionCount * 4));
+    wr16(mem_, o + 10, uint16_t(AbiFunctionCount));
     wr32(mem_, o + 12, CurrentAbiHash);
     wr32(mem_, o + 16, ProvidedFeatures);
-    for (uint32_t i = 0; i < 139; i++)
+    for (uint32_t i = 0; i < AbiFunctionCount; i++)
         wr32(mem_, o + 20 + i * 4, HostBase + i * 4);
 }
 bool Runtime::init(std::string& e) {
@@ -792,7 +805,9 @@ void Runtime::hostCall(uint32_t i) {
         ret(input_);
         break;
     case 2:
-        ret(a(0) == 0 ? input_ & 0x7f : (input_ >> 8) & 0x7f);
+        // ABI #2 input_read_player(player): player 2 reads nothing, as in prg32_input.c; remote players use
+        // the multiplayer API. Every other value reads the local buttons, C, D, L and R included.
+        ret(a(0) == 2 ? 0 : input_ & 0x7ffu);
         break;
     case 5: {
         // ABI #5 tone(frequency_hz, duration_ms, amplitude_10bit).
@@ -1367,11 +1382,36 @@ void Runtime::hostCall(uint32_t i) {
         ret(lo + rng_ % ((hi - lo) + 1));
         break;
     }
+    case 139:
+        // ABI #139 multiplayer_local_player_id(): the server-confirmed ID, or 0 before welcome.
+        ret(multiplayer_ ? multiplayer_->localPlayerId() : 0);
+        break;
+    case 140:
+        // ABI #140 input_axis_x(): no host has an analog stick, so LEFT/RIGHT give -127/127 as on
+        // breadboard1.
+        ret(uint32_t(digitalAxis(input_, ButtonLeft, ButtonRight)));
+        break;
+    case 141:
+        // ABI #141 input_axis_y(): UP is -127 and DOWN is 127, matching the firmware's screen-down axis.
+        ret(uint32_t(digitalAxis(input_, ButtonUp, ButtonDown)));
+        break;
+    case 142:
+        // ABI #142 input_axes_raw(int* x, int* y): without a stick write mid-scale 2048 and return -1.
+        if (a(0))
+            cpu_.store32(a(0), AnalogRawCenter, ok);
+        if (a(1))
+            cpu_.store32(a(1), AnalogRawCenter, ok);
+        ret(uint32_t(-1));
+        break;
+    case 143:
+        // ABI #143 input_has_analog(): axis values come from digital directions on every Qt host.
+        ret(0);
+        break;
     default:
         ret(uint32_t(-1));
         break;
     }
-    // All synthetic ABI #0-#138 operations consume deterministic local ESP32-C6 profile time.
+    // All synthetic ABI #0-#143 operations consume deterministic local ESP32-C6 profile time.
     cpu_.chargeAbi(i, timingArguments);
 }
 } // namespace prg32
