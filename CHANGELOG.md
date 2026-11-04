@@ -4,6 +4,21 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Align with PRG32 SDK `main` (`1fa8474`, ABI 1.8): a controller's left stick now drives the analog calls
+  (#140 to #143) on macOS, through Apple GameController pads and generic USB HID joysticks, with the firmware's
+  deadzone of 12 and its rule that a resting stick lets the directions steer. Without a stick the calls behave as
+  before.
+- ABI #3 `input_read_menu` keeps only `PRG32_INPUT_BUTTONS_MASK` (`0x7ff`), as `prg32_input.c` does.
+- Refuse a portable cartridge whose ABI hash is 0, as `prg32_cart.c` does; only the current and compatible hashes load.
+- Device protocol, as `prg32_usb_protocol.c`: `UPLOAD_BEGIN` needs `name`, `crc32`, a known `command`, and exactly
+  `cart0` to `cart7`; `UPLOAD_DATA` refuses empty chunks and chunks over 4096 bytes, and acknowledges a resent chunk
+  that ends where the data ends; `UPLOAD_END` without an upload, and `RUN` during an upload or without a slot, are
+  refused with the firmware's messages; `RUN` answers `cartridge selected`. An upload is abandoned when its host
+  disconnects or sends nothing for 10 s; before, a vanished host left KEY and RUN refused until restart.
+- Add `prg32qt_multiplayer_check` (CTest `prg32qt_multiplayer`, skipped unless `PRG32QT_MULTIPLAYER_URL` names a
+  server): several runtimes play the Poing Wall through a real PRG32 Multiplayer Server. Add
+  `tests/io_protocol_check.py` for the device protocol of a running app.
+
 - Render cartridge sound with the PRG32 firmware's own audio engine (`components/prg32_audio`): 8 voices, ADSR
   envelopes, the synth and filter, samples, the tracker, and the stereo mix. On by default through
   `PRG32QT_FIRMWARE_AUDIO`; `OFF` keeps the older float mixer, which has no ADSR and is not an audio reference.

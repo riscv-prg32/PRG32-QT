@@ -60,6 +60,9 @@ AppController::AppController(QObject* p)
     connect(gamepad_, &GamepadBackend::inputChanged, this, [this](quint32 mask) {
         input_.replace(InputState::Controller0, mask);
     });
+    connect(gamepad_, &GamepadBackend::analogChanged, this, [this](bool available, int tiltX, int tiltY) {
+        rt_.setAnalogStick(available, tiltX, tiltY);
+    });
     connect(gamepad_, &GamepadBackend::connectedChanged, this, &AppController::controllerChanged);
     timer_.setTimerType(Qt::PreciseTimer);
     updateTimerInterval();
