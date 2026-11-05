@@ -67,3 +67,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# macOS and IDE metadata
+.DS_Store
+.idea/
