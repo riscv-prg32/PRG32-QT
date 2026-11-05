@@ -18,6 +18,8 @@ constexpr int MaximumPayload = 16 * 1024;
 constexpr int MaximumChunk = 4 * 1024;
 /** One firmware cartridge slot and execution window. */
 constexpr int MaximumCartridgeBytes = 128 * 1024;
+/** PROTOCOL_UPLOAD_IDLE_MS in prg32_usb_protocol.c: an upload silent this long is cancelled. */
+constexpr int UploadIdleMs = 10000;
 constexpr int DefaultKeyHoldMs = 200;
 constexpr int MaximumKeyHoldMs = 60000;
 enum : quint8 {
@@ -79,6 +81,19 @@ quint32 keyBit(const QString& name) {
     }
     return 0;
 }
+/** slot_from_name() in prg32_usb_protocol.c: exactly "cart0" to "cart7", otherwise -1. */
+int slotFromName(const QJsonValue& value) {
+    const QString name = value.toString();
+    if (!value.isString() || name.size() != 5 || !name.startsWith(QLatin1String("cart")))
+        return -1;
+    const int slot = name.at(4).unicode() - '0';
+    return slot >= 0 && slot < AppController::CartridgeSlotCount ? slot : -1;
+}
+/** command_is_known() in prg32_usb_protocol.c. */
+bool commandIsKnown(const QString& command) {
+    return command == QLatin1String("store") || command == QLatin1String("run") ||
+           command == QLatin1String("debug") || command == QLatin1String("performance");
+}
 /** The runtime contract as a protocol host needs it: uploads here have the firmware's slot size. */
 QJsonObject helloRuntime(QJsonObject runtime) {
     runtime["cart_max_size"] = MaximumCartridgeBytes;
@@ -96,7 +111,19 @@ IoProtocolServer::IoProtocolServer(AppController* controller, QObject* parent)
                 process(socket, *buffer);
             });
             connect(socket, &QObject::destroyed, this, [buffer] { delete buffer; });
+            // A host that goes away mid-upload must not leave KEY and RUN refused for good.
+            connect(socket, &QTcpSocket::disconnected, this, [this, socket] {
+                if (uploadSlot_ >= 0 && uploadSocket_ == socket)
+                    abandonUpload(QStringLiteral("UPLOAD FAILED: host disconnected"));
+                socket->deleteLater();
+            });
         }
+    });
+    uploadIdle_.setSingleShot(true);
+    uploadIdle_.setInterval(UploadIdleMs);
+    connect(&uploadIdle_, &QTimer::timeout, this, [this] {
+        if (uploadSlot_ >= 0)
+            abandonUpload(QStringLiteral("UPLOAD TIMED OUT"));
     });
     server_.listen(QHostAddress::LocalHost, 8081);
 }
@@ -126,6 +153,8 @@ void IoProtocolServer::process(QTcpSocket* socket, QByteArray& buffer) {
             return;
         const QByteArray payload = buffer.mid(HeaderSize, int(size));
         buffer.remove(0, HeaderSize + int(size));
+        if (uploadSlot_ >= 0)
+            uploadIdle_.start();
         if (crc32(payload) != checksum) {
             status(socket, requestId, false, QStringLiteral("payload checksum mismatch"));
             continue;
@@ -154,25 +183,30 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         return;
     }
     if (type == UploadBegin) {
+        // handle_upload_begin(): name, size, crc32 and a cartN slot are required; command defaults to store.
         const auto metadata = QJsonDocument::fromJson(payload).object();
+        const QJsonValue command = metadata.value("command");
+        const int slotNumber = slotFromName(metadata.value("slot"));
         const QString slot = metadata.value("slot").toString();
-        bool slotOk = false;
-        const int slotNumber = slot.startsWith("cart") ? slot.mid(4).toInt(&slotOk) : -1;
-        const int size = metadata.value("size").toInt(-1);
-        if (!slotOk || slotNumber < 0 || slotNumber >= AppController::CartridgeSlotCount || size <= 0 ||
-            size > MaximumCartridgeBytes) {
+        const double size = metadata.value("size").toDouble(-1);
+        const double crc = metadata.value("crc32").toDouble(-1);
+        const bool commandOk =
+            command.isUndefined() || (command.isString() && commandIsKnown(command.toString()));
+        if (!metadata.value("name").isString() || slotNumber < 0 || size <= 0 ||
+            size > MaximumCartridgeBytes || size != double(qint64(size)) || crc < 0 || crc > 4294967295.0 ||
+            crc != double(qint64(crc)) || !commandOk) {
             status(socket, requestId, false, QStringLiteral("invalid upload metadata"));
             return;
         }
         upload_.clear();
-        upload_.reserve(size);
-        uploadName_ = metadata.value("name").toString(QStringLiteral("cartridge"));
-        uploadCommand_ = metadata.value("command").toString(QStringLiteral("store"));
+        upload_.reserve(int(size));
+        uploadName_ = metadata.value("name").toString().left(32);
+        uploadCommand_ = command.toString(QStringLiteral("store"));
         uploadSlot_ = slotNumber;
         uploadSize_ = quint32(size);
-        uploadCrc_ = quint32(metadata.value("crc32").toDouble());
-        lastChunk_.clear();
-        lastChunkOffset_ = 0;
+        uploadCrc_ = quint32(crc);
+        uploadSocket_ = socket;
+        uploadIdle_.start();
         controller_->releaseRemoteKeys(controller_->remoteKeys());
         controller_->stop();
         controller_->setUploadState(true, uploadName_, slot, 0, QStringLiteral("UPLOADING..."));
@@ -180,23 +214,27 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         return;
     }
     if (type == UploadData) {
-        if (uploadSlot_ < 0 || payload.size() < 4) {
-            status(socket, requestId, false, QStringLiteral("no upload is active"));
+        // handle_upload_data(): a 4-byte offset and 1 to 4096 bytes of data.
+        if (uploadSlot_ < 0) {
+            status(socket, requestId, false, QStringLiteral("no upload in progress"));
+            return;
+        }
+        if (payload.size() <= 4 || payload.size() - 4 > MaximumChunk) {
+            status(socket, requestId, false, QStringLiteral("invalid upload chunk"));
             return;
         }
         const quint32 offset =
             qFromLittleEndian<quint32>(reinterpret_cast<const uchar*>(payload.constData()));
         const QByteArray data = payload.mid(4);
-        // A chunk repeating the previous one is a resend after a lost reply: acknowledge it, write nothing.
-        const bool repeated = !lastChunk_.isEmpty() && offset == lastChunkOffset_ && data == lastChunk_;
+        // A chunk that ends where the received data ends is a resend after a lost reply: acknowledge it and
+        // write nothing, as the firmware does (the final CRC still covers what was kept).
+        const bool repeated = quint64(offset) + quint64(data.size()) == quint64(upload_.size());
         if (!repeated) {
             if (offset != quint32(upload_.size()) || upload_.size() + data.size() > int(uploadSize_)) {
                 status(socket, requestId, false, QStringLiteral("out-of-order upload chunk"));
                 return;
             }
             upload_.append(data);
-            lastChunk_ = data;
-            lastChunkOffset_ = offset;
         }
         controller_->setUploadState(true,
                                     uploadName_,
@@ -211,8 +249,14 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         return;
     }
     if (type == UploadEnd) {
+        if (uploadSlot_ < 0) {
+            status(socket, requestId, false, QStringLiteral("no upload in progress"));
+            return;
+        }
+        uploadIdle_.stop();
+        uploadSocket_.clear();
         QString error;
-        bool ok = uploadSlot_ >= 0 && quint32(upload_.size()) == uploadSize_ && crc32(upload_) == uploadCrc_;
+        bool ok = quint32(upload_.size()) == uploadSize_ && crc32(upload_) == uploadCrc_;
         if (!ok)
             error = QStringLiteral("upload length or checksum mismatch");
         if (ok)
@@ -250,17 +294,24 @@ void IoProtocolServer::handle(QTcpSocket* socket, quint8 type, quint32 requestId
         return;
     }
     if (type == Run || type == Debug) {
-        const QString slot = QJsonDocument::fromJson(payload).object().value("slot").toString("cart0");
-        bool slotOk = false;
-        const int slotNumber = slot.startsWith("cart") ? slot.mid(4).toInt(&slotOk) : -1;
+        // handle_run(): refused during an upload, and the slot must be named exactly.
+        if (uploadSlot_ >= 0) {
+            status(socket, requestId, false, QStringLiteral("upload in progress"));
+            return;
+        }
+        const int slotNumber = slotFromName(QJsonDocument::fromJson(payload).object().value("slot"));
         QString error;
         controller_->releaseRemoteKeys(controller_->remoteKeys());
-        const bool ok = slotOk && controller_->selectSlot(slotNumber, error);
+        if (slotNumber < 0) {
+            status(socket, requestId, false, QStringLiteral("invalid cartridge slot"));
+            return;
+        }
+        const bool ok = controller_->selectSlot(slotNumber, error);
         if (ok && type == Debug)
             controller_->setDebugEnabled(true);
         if (ok)
             emit controller_->playerRequested();
-        status(socket, requestId, ok, ok ? QStringLiteral("cartridge running") : error);
+        status(socket, requestId, ok, ok ? QStringLiteral("cartridge selected") : error);
         return;
     }
     if (type == PerformanceGet) {
@@ -333,6 +384,17 @@ void IoProtocolServer::handleKey(QTcpSocket* socket, quint32 requestId, const QB
             active.append(entry.name);
     }
     send(socket, Status, 1, requestId, compact({{"ok", true}, {"active", active}}));
+}
+
+void IoProtocolServer::abandonUpload(const QString& reason) {
+    uploadIdle_.stop();
+    uploadSocket_.clear();
+    upload_.clear();
+    const QString slot = QString("cart%1").arg(uploadSlot_);
+    uploadSlot_ = -1;
+    controller_->setUploadState(true, uploadName_, slot, 0, reason);
+    QTimer::singleShot(
+        1800, controller_, [controller = controller_] { controller->setUploadState(false, {}, {}, 0, {}); });
 }
 
 void IoProtocolServer::send(

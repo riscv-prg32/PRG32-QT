@@ -122,6 +122,18 @@ if(PRG32QT_BUILD_APP)
     set_tests_properties(prg32qt_audio_device PROPERTIES SKIP_RETURN_CODE 77)
   endif()
 
+  if(PRG32QT_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
+    # Several runtimes play the Poing Wall through a real PRG32 Multiplayer Server, each with its own
+    # prg32-multiplayer-1.0 connection. Skipped (77) unless PRG32QT_MULTIPLAYER_URL names a server.
+    qt_add_executable(prg32qt_multiplayer_check tests/multiplayer_check.cpp src/qt/QtMultiplayerService.cpp
+                      src/qt/QtMultiplayerService.h)
+    target_include_directories(prg32qt_multiplayer_check PRIVATE src/core src/qt)
+    target_link_libraries(prg32qt_multiplayer_check PRIVATE prg32qt_core Qt6::Core Qt6::Network Qt6::WebSockets)
+    add_test(NAME prg32qt_multiplayer COMMAND prg32qt_multiplayer_check
+             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/PoingWall.prg32)
+    set_tests_properties(prg32qt_multiplayer PROPERTIES SKIP_RETURN_CODE 77)
+  endif()
+
   qt_add_executable(PRG32_QT ${PRG32QT_APP_SOURCES})
   qt_add_qml_module(PRG32_QT URI PRG32Qt VERSION 1.0 QML_FILES qml/Main.qml)
   qt_add_resources(PRG32_QT prg32qt_assets PREFIX "/prg32qt" FILES assets/prg32_logo.png assets/prg32_title.png assets/prg32_appicon_1024.png)

@@ -150,6 +150,21 @@ class Runtime {
     void setMultiplayerService(MultiplayerService* service) {
         multiplayer_ = service;
     }
+    /**
+     * Report the host's analog stick for ABI calls #140-#143.
+     *
+     * @param available true while a controller with a stick is attached; false returns the axes to the
+     *        digital directions, as on a board without a stick.
+     * @param tiltX horizontal tilt, -127 (left) to 127 (right), before the firmware's deadzone.
+     * @param tiltY vertical tilt, -127 (up) to 127 (down), before the firmware's deadzone.
+     */
+    void setAnalogStick(bool available, int tiltX, int tiltY);
+    /** True while setAnalogStick() reports an attached stick. */
+    bool analogAvailable() const {
+        return analogAvailable_;
+    }
+    /** The firmware's axis mapping: cut the deadzone out of a -127..127 tilt and rescale the rest. */
+    static int32_t stickAxis(int tilt);
     /** Select the cartridge-visible performance profile. Accurate ESP32-C6 timing is the default. */
     void setPerformanceMode(PerformanceMode mode) {
         performanceMode_ = mode;
@@ -231,6 +246,8 @@ class Runtime {
     Cartridge cart_;
     bool loaded_ = false, fullscreen_ = false;
     uint32_t base_ = 0, input_ = 0, abiOffset_ = 0, scratchOffset_ = 0;
+    bool analogAvailable_ = false;
+    int analogTiltX_ = 0, analogTiltY_ = 0;
     std::vector<uint8_t> mem_;
     Rv32Cpu cpu_;
     Framebuffer fb_;

@@ -57,6 +57,7 @@ class MacGamepadBackend final : public GamepadBackend {
     void update(GCExtendedGamepad* p) {
         if (!p) {
             publish(0);
+            publishAnalog(false, 0.0, 0.0);
             return;
         }
         quint32 m = 0;
@@ -87,8 +88,12 @@ class MacGamepadBackend final : public GamepadBackend {
                 m |= prg32qt::input::Select;
         }
         publish(m);
+        // GameController reports up as +1; the PRG32 axis is screen-down, so the vertical axis is negated.
+        publishAnalog(true, x, -y);
     }
     void updateMicro(GCMicroGamepad* gamepad) {
+        // A micro gamepad (Siri Remote) has a touch surface, not a stick.
+        publishAnalog(false, 0.0, 0.0);
         if (!gamepad) {
             publish(0);
             return;
@@ -121,6 +126,7 @@ class MacGamepadBackend final : public GamepadBackend {
 #else
             setState(false, {});
             publish(0);
+            publishAnalog(false, 0.0, 0.0);
 #endif
             return;
         }
@@ -131,6 +137,7 @@ class MacGamepadBackend final : public GamepadBackend {
             GCMicroGamepad* microGamepad = controller_.microGamepad;
             if (!microGamepad) {
                 publish(0);
+                publishAnalog(false, 0.0, 0.0);
                 return;
             }
             microGamepad.valueChangedHandler = ^(GCMicroGamepad* gamepad, GCControllerElement*) {
@@ -158,6 +165,7 @@ class MacGamepadBackend final : public GamepadBackend {
         if (backend->hidDevice_ != device)
             return;
         backend->hidDevice_ = nullptr;
+        backend->hidHasStick_ = false;
         backend->hidAxes_.fill(0);
         backend->hidButtons_.fill(false);
         backend->publishHidState();
@@ -178,11 +186,13 @@ class MacGamepadBackend final : public GamepadBackend {
             logicalMaximum == logicalMinimum
                 ? 0.0
                 : (double(raw - logicalMinimum) / double(logicalMaximum - logicalMinimum)) * 2.0 - 1.0;
-        if (page == kHIDPage_GenericDesktop && usage == kHIDUsage_GD_X)
+        if (page == kHIDPage_GenericDesktop && usage == kHIDUsage_GD_X) {
             backend->hidAxes_[0] = normalized;
-        else if (page == kHIDPage_GenericDesktop && usage == kHIDUsage_GD_Y)
+            backend->hidHasStick_ = true;
+        } else if (page == kHIDPage_GenericDesktop && usage == kHIDUsage_GD_Y) {
             backend->hidAxes_[1] = normalized;
-        else if (page == kHIDPage_GenericDesktop && usage == kHIDUsage_GD_Hatswitch)
+            backend->hidHasStick_ = true;
+        } else if (page == kHIDPage_GenericDesktop && usage == kHIDUsage_GD_Hatswitch)
             backend->hidHat_ = int(raw);
         else if (page == kHIDPage_Button && usage > 0 && usage <= backend->hidButtons_.size())
             backend->hidButtons_[usage - 1] = raw != 0;
@@ -194,6 +204,7 @@ class MacGamepadBackend final : public GamepadBackend {
         if (!hidDevice_) {
             setState(false, {});
             publish(0);
+            publishAnalog(false, 0.0, 0.0);
             return;
         }
         QString name = "USB game controller";
@@ -228,6 +239,8 @@ class MacGamepadBackend final : public GamepadBackend {
         if (hidButtons_[6] || hidButtons_[7] || hidButtons_[8] || hidButtons_[9])
             mask |= prg32qt::input::Select;
         publish(mask);
+        // HID Y grows downward, which is already the PRG32 screen-down axis.
+        publishAnalog(hidHasStick_, hidAxes_[0], hidAxes_[1]);
     }
 #endif
     NSNotificationCenter* center_ = nil;
@@ -240,6 +253,8 @@ class MacGamepadBackend final : public GamepadBackend {
     std::array<double, 2> hidAxes_{};
     std::array<bool, 32> hidButtons_{};
     int hidHat_ = -1;
+    /** True once the HID device reported an X or Y axis: it has a stick, not only a hat switch. */
+    bool hidHasStick_ = false;
 #endif
 };
 } // namespace

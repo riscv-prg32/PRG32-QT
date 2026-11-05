@@ -221,6 +221,84 @@ static void testAbi18Calls() {
     assert(buttons.frame(ButtonsCDLR, e));
     assert(guestWord(buttons, Results) == ButtonsCDLR);
 }
+// A host stick reaches ABI #140-#143 as prg32_input.c and prg32_joystick_analog.c of SDK 1fa8474 report it.
+static void testAnalogStick() {
+    constexpr uint32_t Results = TestLoadAddress + 0x900u;
+    constexpr uint32_t RawX = Results + 0x20u, RawY = Results + 0x24u;
+    constexpr uint32_t Left = 1u << 0, Down = 1u << 3;
+    Runtime runtime;
+    runTestCartridge(
+        runtime,
+        [](TestCode&) {},
+        [&](TestCode& c) {
+            c.call(140);
+            c.keepResult(Results);
+            c.call(141);
+            c.keepResult(Results + 4);
+            c.call(143);
+            c.keepResult(Results + 8);
+            c.call(142, {RawX, RawY});
+            c.keepResult(Results + 12);
+            c.call(3);
+            c.keepResult(Results + 16);
+        });
+    std::string e;
+    // The deadzone (12) is cut out and the rest rescaled, so full tilt still reads 127.
+    assert(Runtime::stickAxis(12) == 0);
+    assert(Runtime::stickAxis(-12) == 0);
+    assert(Runtime::stickAxis(127) == 127);
+    assert(Runtime::stickAxis(-127) == -127);
+    assert(Runtime::stickAxis(70) == (70 - 12) * 127 / (127 - 12));
+    runtime.setAnalogStick(true, 127, -127);
+    assert(runtime.frame(0, e));
+    assert(guestWord(runtime, Results) == 127);
+    assert(guestWord(runtime, Results + 4) == uint32_t(-127));
+    assert(guestWord(runtime, Results + 8) == 1);
+    assert(guestWord(runtime, Results + 12) == 0);
+    assert(guestWord(runtime, RawX) == 4095);
+    assert(guestWord(runtime, RawY) == 1);
+    // A resting stick still lets the digital directions steer.
+    runtime.setAnalogStick(true, 5, 0);
+    assert(runtime.frame(Left | Down, e));
+    assert(guestWord(runtime, Results) == uint32_t(-127));
+    assert(guestWord(runtime, Results + 4) == 127);
+    assert(guestWord(runtime, RawX) == 2048 + 5 * 2047 / 127);
+    // Unplugging returns to the no-stick answers.
+    runtime.setAnalogStick(false, 90, 90);
+    assert(runtime.frame(0, e));
+    assert(guestWord(runtime, Results) == 0);
+    assert(guestWord(runtime, Results + 8) == 0);
+    assert(guestWord(runtime, Results + 12) == uint32_t(-1));
+    assert(guestWord(runtime, RawX) == 2048);
+    // ABI #3 input_read_menu() keeps only PRG32_INPUT_BUTTONS_MASK.
+    assert(runtime.frame(0xfffu, e));
+    assert(guestWord(runtime, Results + 16) == 0x7ffu);
+}
+// prg32_cart.c refuses a v2 header whose ABI hash is not one of the compatible hashes, 0 included.
+static void testAbiHashZeroRefused() {
+    TestCode code;
+    code.words.push_back(rvJalr(0, TestCode::Ra, 0));
+    auto cart = testCartridge(code, 0, 0);
+    assert(cart);
+    std::vector<uint8_t> image(sizeof(CartHeaderV2) + 4);
+    memcpy(image.data(), "PRG2", 4);
+    put16(image, 4, 1);
+    put16(image, 6, 6);
+    put16(image, 8, sizeof(CartHeaderV2));
+    put16(image, 10, Cartridge::FlagAbiTable);
+    put32(image, 12, TestLoadAddress);
+    put32(image, 16, 4);
+    put32(image, 20, 4096);
+    put32(image, offsetof(CartHeaderV2, abiHash), 0);
+    put32(image, offsetof(CartHeaderV2, importModel), Cartridge::ImportModelAbiTable);
+    memcpy(image.data() + sizeof(CartHeaderV2), code.words.data(), 4);
+    std::string e;
+    auto zero = Cartridge::parse(image, e);
+    assert(zero && zero->isPortable());
+    Runtime runtime;
+    assert(!runtime.load(*zero, e));
+    assert(e == "incompatible PRG32 ABI hash");
+}
 // The tile, playfield and platform tests below pin PRG32-QT to the firmware's prg32_tile.c and
 // prg32_platform.c behaviour.
 static void testFirmwareTileCompatibility() {
@@ -376,6 +454,8 @@ int main() {
     testFirmwareAudioTrustBoundary();
 #endif
     testAbi18Calls();
+    testAnalogStick();
+    testAbiHashZeroRefused();
     VirtualClock virtualClock;
     virtualClock.addCycles(160'000'000);
     assert(virtualClock.nanoseconds() == 1'000'000'000);

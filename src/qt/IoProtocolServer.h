@@ -2,7 +2,9 @@
 
 #include <QByteArray>
 #include <QObject>
+#include <QPointer>
 #include <QTcpServer>
+#include <QTimer>
 
 class AppController;
 class QTcpSocket;
@@ -22,13 +24,17 @@ class IoProtocolServer : public QObject {
     void handleKey(QTcpSocket* socket, quint32 requestId, const QByteArray& payload);
     void send(QTcpSocket* socket, quint8 type, quint16 flags, quint32 requestId, const QByteArray& payload);
     void status(QTcpSocket* socket, quint32 requestId, bool ok, const QString& message);
+    /** End the active upload unfinished, as the firmware's upload_fail() does, and show why. */
+    void abandonUpload(const QString& reason);
+
+    /** Cancels an upload that receives no frame for the firmware's PROTOCOL_UPLOAD_IDLE_MS. */
+    QTimer uploadIdle_;
+    /** The connection that began the active upload; its disconnection abandons the upload. */
+    QPointer<QTcpSocket> uploadSocket_;
 
     QTcpServer server_;
     AppController* controller_;
     QByteArray upload_;
-    /** The previous chunk, to recognize a resend after a lost reply. */
-    QByteArray lastChunk_;
-    quint32 lastChunkOffset_ = 0;
     QString uploadName_;
     QString uploadCommand_;
     int uploadSlot_ = -1;

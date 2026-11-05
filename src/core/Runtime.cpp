@@ -19,6 +19,12 @@ constexpr uint32_t ActorReservedOffset = 23;
 // Full scale of an axis, and the mid-scale reading of ABI #142 without an analog stick.
 constexpr int32_t AxisFullScale = 127;
 constexpr uint32_t AnalogRawCenter = 2048;
+// Largest 12-bit ADC reading of ABI #142.
+constexpr int32_t AnalogRawMaximum = 4095;
+// PRG32_JOYSTICK_AXIS_DEADZONE in the firmware's prg32_config.h: tilts this small read 0.
+constexpr int32_t AxisDeadzone = 12;
+// PRG32_INPUT_BUTTONS_MASK: every button of the firmware's input register (ABI #2 and #3 read only these).
+constexpr uint32_t InputButtonsMask = 0x7ffu;
 // PRG32_TILE_FLAG_* and PRG32_PLATFORM_* bits from the firmware's prg32.h.
 constexpr uint8_t TileFlagSolid = 1u << 0, TileFlagPlatform = 1u << 1, TileFlagHazard = 1u << 2,
                   TileFlagCollect = 1u << 3;
@@ -36,7 +42,28 @@ int32_t digitalAxis(uint32_t input, uint32_t negativeButton, uint32_t positiveBu
         axis += AxisFullScale;
     return axis;
 }
+/** A -127..127 tilt as the 12-bit ADC reading a centred stick would give (ABI #142). */
+uint32_t rawFromTilt(int tilt) {
+    const int32_t span = AnalogRawMaximum - int32_t(AnalogRawCenter);
+    return uint32_t(int32_t(AnalogRawCenter) +
+                    std::clamp(tilt, -AxisFullScale, AxisFullScale) * span / AxisFullScale);
+}
 } // namespace
+
+// Port of map_axis() in the firmware's prg32_joystick_analog.c, after the ADC reading became a tilt.
+int32_t Runtime::stickAxis(int tilt) {
+    const int32_t clamped = std::clamp(tilt, -AxisFullScale, AxisFullScale);
+    int32_t magnitude = clamped < 0 ? -clamped : clamped;
+    if (magnitude <= AxisDeadzone)
+        return 0;
+    magnitude = (magnitude - AxisDeadzone) * AxisFullScale / (AxisFullScale - AxisDeadzone);
+    return clamped < 0 ? -magnitude : magnitude;
+}
+void Runtime::setAnalogStick(bool available, int tiltX, int tiltY) {
+    analogAvailable_ = available;
+    analogTiltX_ = available ? std::clamp(tiltX, -AxisFullScale, AxisFullScale) : 0;
+    analogTiltY_ = available ? std::clamp(tiltY, -AxisFullScale, AxisFullScale) : 0;
+}
 
 static void wr16(std::vector<uint8_t>& m, size_t o, uint16_t v) {
     m[o] = v;
@@ -98,8 +125,9 @@ bool Runtime::load(const Cartridge& c, std::string& e) {
         e = "PRG32-QT accepts portable ABI-table PRG32 cartridges only";
         return false;
     }
-    if (c.abiHash() && c.abiHash() != CurrentAbiHash && c.abiHash() != CompatHash0 &&
-        c.abiHash() != CompatHash1 && c.abiHash() != CompatHash2 && c.abiHash() != CompatHash3) {
+    // Like prg32_cart.c, a portable (v2-header) cartridge must name a compatible hash; 0 is not one.
+    if (c.abiHash() != CurrentAbiHash && c.abiHash() != CompatHash0 && c.abiHash() != CompatHash1 &&
+        c.abiHash() != CompatHash2 && c.abiHash() != CompatHash3) {
         e = "incompatible PRG32 ABI hash";
         return false;
     }
@@ -807,14 +835,18 @@ void Runtime::hostCallCore(uint32_t i) {
         ret(uint32_t(nowUs() / 1000));
         break;
     case 1:
-    case 3:
     case 4:
+        // ABI #1 input_read() and #4 controller_read(): the merged controller mask.
         ret(input_);
+        break;
+    case 3:
+        // ABI #3 input_read_menu(): like prg32_input.c, only the PRG32_INPUT_BUTTONS_MASK bits.
+        ret(input_ & InputButtonsMask);
         break;
     case 2:
         // ABI #2 input_read_player(player): player 2 reads nothing, as in prg32_input.c; remote players use
         // the multiplayer API. Every other value reads the local buttons, C, D, L and R included.
-        ret(a(0) == 2 ? 0 : input_ & 0x7ffu);
+        ret(a(0) == 2 ? 0 : input_ & InputButtonsMask);
         break;
     case 5: {
         // ABI #5 tone(frequency_hz, duration_ms, amplitude_10bit).
@@ -1393,26 +1425,33 @@ void Runtime::hostCallCore(uint32_t i) {
         // ABI #139 multiplayer_local_player_id(): the server-confirmed ID, or 0 before welcome.
         ret(multiplayer_ ? multiplayer_->localPlayerId() : 0);
         break;
-    case 140:
-        // ABI #140 input_axis_x(): no host has an analog stick, so LEFT/RIGHT give -127/127 as on
-        // breadboard1.
-        ret(uint32_t(digitalAxis(input_, ButtonLeft, ButtonRight)));
+    case 140: {
+        // ABI #140 input_axis_x(): the stick, or LEFT/RIGHT as -127/127 while it rests (prg32_input.c).
+        const int32_t x = analogAvailable_ ? stickAxis(analogTiltX_) : 0;
+        ret(uint32_t(x ? x : digitalAxis(input_, ButtonLeft, ButtonRight)));
         break;
-    case 141:
+    }
+    case 141: {
         // ABI #141 input_axis_y(): UP is -127 and DOWN is 127, matching the firmware's screen-down axis.
-        ret(uint32_t(digitalAxis(input_, ButtonUp, ButtonDown)));
+        const int32_t y = analogAvailable_ ? stickAxis(analogTiltY_) : 0;
+        ret(uint32_t(y ? y : digitalAxis(input_, ButtonUp, ButtonDown)));
         break;
-    case 142:
-        // ABI #142 input_axes_raw(int* x, int* y): without a stick write mid-scale 2048 and return -1.
+    }
+    case 142: {
+        // ABI #142 input_axes_raw(int* x, int* y): 12-bit readings and 0, or mid-scale 2048 and -1 without
+        // a stick.
+        const uint32_t rawX = analogAvailable_ ? rawFromTilt(analogTiltX_) : AnalogRawCenter;
+        const uint32_t rawY = analogAvailable_ ? rawFromTilt(analogTiltY_) : AnalogRawCenter;
         if (a(0))
-            cpu_.store32(a(0), AnalogRawCenter, ok);
+            cpu_.store32(a(0), rawX, ok);
         if (a(1))
-            cpu_.store32(a(1), AnalogRawCenter, ok);
-        ret(uint32_t(-1));
+            cpu_.store32(a(1), rawY, ok);
+        ret(analogAvailable_ ? 0 : uint32_t(-1));
         break;
+    }
     case 143:
-        // ABI #143 input_has_analog(): axis values come from digital directions on every Qt host.
-        ret(0);
+        // ABI #143 input_has_analog(): 1 while the host reports a controller stick.
+        ret(analogAvailable_ ? 1 : 0);
         break;
     default:
         ret(uint32_t(-1));

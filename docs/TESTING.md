@@ -38,6 +38,20 @@ whose `components/prg32_audio` is identical to firmware `82b8925`.
 - Not built here: Windows, Linux, Raspberry Pi OS, Intel macOS, iOS, Android, Android TV, and Apple TV; CI must confirm
   them.
 
+## SDK main alignment (2026-11-05)
+
+Against PRG32 SDK `main` `1fa8474` (`-DPRG32_SDK_DIR`), Apple Silicon macOS, Homebrew Qt 6.11.2, default options.
+
+- Core build and desktop app build with no warnings; CTest 5 of 5 with `PRG32QT_MULTIPLAYER_URL` set (the
+  speaker test `prg32qt_audio_device` was excluded on purpose, so nothing was played aloud).
+- `prg32qt_multiplayer_check` against a local PRG32 Multiplayer Server (`36de74b`, port 18081): 2 and 4 consoles,
+  every one admitted with its own player ID and seeing every other as a peer.
+- `tests/io_protocol_check.py` against the running app: 20 of 20 device-protocol cases answer as the firmware does.
+- Whole Store, 300 frames with media verification and input sweep: `catalog=34 passed=32 skipped_nonportable=2
+  failed=0`, with per-cartridge pixel and frame-hash counts identical to the same run before these changes.
+- Not run: the analog stick with a physical controller (none attached), and every non-macOS platform. No Qt for iOS
+  kit is installed, so PRG32-QT was not built for the connected iPhone.
+
 ## Firmware ABI 1.8 and multiplayer alignment (2026-11-01)
 
 Against PRG32 firmware `82b8925` on Apple Silicon macOS with Homebrew Qt 6.11.2, Release.

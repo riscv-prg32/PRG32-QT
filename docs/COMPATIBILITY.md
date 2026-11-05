@@ -8,8 +8,9 @@ PRG32-QT targets portable ABI-table PRG32 cartridges and follows the public PRG3
 - RISC-V RV32IMAC guest code, including RV32A word atomics and compressed instructions.
 - PRG32 ABI 1.8, current hash `0x71b93e23`.
 - Compatible hashes `0x006427c2`, `0x6be6e8d0`, `0x260f6136`, and `0xb3845925`.
-- 144-entry ABI table. Calls #140 to #143 report no analog stick and derive the axes from the directions, as on a
-  board without one. Buttons C, D, L, and R are bits 7 to 10.
+- 144-entry ABI table. Calls #140 to #143 read the left stick of a macOS game controller (GameController or USB
+  HID) with the firmware's deadzone of 12; a resting stick, or no stick, derives the axes from the directions, as
+  on a board without one. The other platform backends report no stick. Buttons C, D, L, and R are bits 7 to 10.
 - Provided features exactly matching the implemented public PRG32 ABI: audio, multiplayer, metrics,
   audio-plus, tilemap, platformer, and sprites.
 - 320×200 indexed framebuffer with a 256-entry RGB565 palette.
