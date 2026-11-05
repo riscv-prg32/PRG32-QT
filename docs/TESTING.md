@@ -2,6 +2,18 @@
 
 PRG32-QT uses layered validation.
 
+## SDK `main` (`1fa8474`) for the firmware audio engine (2026-11-04)
+
+The SDK's `audio.c` now includes `esp_log.h` and creates a binary semaphore, so the port's shim gains `esp_log.h` (the log
+macros do nothing) and `xSemaphoreCreateBinary`, and `PRG32_SDK_REVISION` moves to `1fa8474`. On Apple Silicon macOS,
+Release, `-DPRG32QT_BUILD_APP=OFF`, `PRG32_SDK_DIR` at `1fa8474`:
+
+- Without the change the build stops (`'esp_log.h' file not found`); with it, CTest passed 4 of 4.
+- `prg32qt-headless` on the PRG32-Construction-Kit's audio conformance cartridge, 170 frames: `pcm_fnv1a=2e6c5af207d3d5f2`,
+  the same as the kit's browser core built from the same SDK.
+- `clang-format --dry-run --Werror` on the changed headers passed (clang-format 23).
+- The desktop app and `prg32qt_audio_device_check` were not run.
+
 ## Firmware audio engine merge review (2026-11-01)
 
 PR #1 merged with `main` at `b98a6aa`, on Apple Silicon macOS with Homebrew Qt 6.11.2, Release, and SDK `679dfb5`,

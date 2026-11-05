@@ -11,7 +11,7 @@ option(PRG32QT_TV_MODE "Build a controller-first fullscreen TV application" OFF)
 # mix. On by default; OFF keeps the older float mixer (no ADSR), which is not an audio reference.
 option(PRG32QT_FIRMWARE_AUDIO "Render sound with the PRG32 firmware audio engine" ON)
 set(PRG32_SDK_DIR "" CACHE PATH "PRG32 SDK checkout (default: the pinned PRG32_SDK_REVISION, fetched)")
-set(PRG32_SDK_REVISION "679dfb58783bd007125de9ca0b75eaa077908739" CACHE STRING "PRG32 SDK commit fetched when PRG32_SDK_DIR is empty")
+set(PRG32_SDK_REVISION "1fa8474427bb3998a79d2b350550efdb2578b3be" CACHE STRING "PRG32 SDK commit fetched when PRG32_SDK_DIR is empty")
 
 file(WRITE "${CMAKE_BINARY_DIR}/prg32qt-version.txt" "${PRG32QT_VERSION}\n")
 
