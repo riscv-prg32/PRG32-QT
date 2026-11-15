@@ -41,8 +41,20 @@ a lost socket is a new session with reconnection backoff and jitter, `room_full`
 `device_blocked` ends the session until a new join, snapshots older than the held frame are dropped, and peers are
 ordered by player ID so a cartridge's index does not move. `join` carries platform `prg32-qt` and a random
 installation UUID kept in `QSettings`. Peers age on real time; `last_seen_ms` reaches the cartridge on the runtime's
-clock, because cartridges compare it with `prg32_ticks_ms()`. The server comes from Settings; when empty, the
-configured Store's `/api/multiplayer` relay is used.
+clock, because cartridges compare it with `prg32_ticks_ms()`.
+
+The server is chosen as in the firmware's `prg32_multiplayer.h` (PRG32 SDK `5d2e650`). With the local server
+setting on (`multiplayer/localServer`, default on), a server found on the local network comes first: the service
+broadcasts `{"type":"discover","protocol":"prg32-multiplayer-1.0"}` to UDP port 8082 every 2 s, on
+`255.255.255.255` and each IPv4 network's broadcast address, and the first `server` answer or beacon whose URL
+passes `validServerUrl()` (printable `ws://` or `wss://`, a host, at most 127 characters) is used and shown as
+`LOCAL`. Next is the address typed in Settings (`multiplayer/serverUrl`), normalized as
+`prg32_mp_normalize_server_url()` does: a bare host gets port 8081. Last is the public server
+`wss://multi.prg32.uniparthenope.it`. A join with no address known stands while the search runs and moves to the
+fallback after 10 s; a known address gets 3 s before a lost connection starts a search, and a local server that
+stays silent for 10 s gives way to the fallback. The application searches once when it starts, as the firmware
+does when Wi-Fi connects. The firmware's mDNS lookup of `_prg32mp._tcp` is not implemented: the PRG32 Multiplayer
+Server answers LAN discovery by default, and a server reached only through mDNS must be typed in.
 
 ### Graphics
 

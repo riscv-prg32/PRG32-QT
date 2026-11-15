@@ -27,6 +27,12 @@ Every interactive target listens for the PRG32 device HTTP API on TCP port 8080 
 [Network discovery and PRG32 SDK access](NETWORKING.md) for SDK commands, service metadata, firewall guidance,
 and the distinction between device and Cartridge Store discovery.
 
+Multiplayer looks for a PRG32 Multiplayer Server on the local network with a UDP broadcast to port 8082, then uses
+the address typed in Settings, then `wss://multi.prg32.uniparthenope.it`. A network or platform that blocks the
+broadcast only skips the first step. That fallback is verified on macOS only. iOS and tvOS may need the multicast
+networking entitlement to send broadcasts, and Android may filter the server's beacons (answers to the console's
+own query are unicast); neither has been checked on a device.
+
 ## Windows
 
 Install Qt 6 desktop and Ninja, then from PowerShell:

@@ -11,7 +11,7 @@ option(PRG32QT_TV_MODE "Build a controller-first fullscreen TV application" OFF)
 # mix. On by default; OFF keeps the older float mixer (no ADSR), which is not an audio reference.
 option(PRG32QT_FIRMWARE_AUDIO "Render sound with the PRG32 firmware audio engine" ON)
 set(PRG32_SDK_DIR "" CACHE PATH "PRG32 SDK checkout (default: the pinned PRG32_SDK_REVISION, fetched)")
-set(PRG32_SDK_REVISION "1fa8474427bb3998a79d2b350550efdb2578b3be" CACHE STRING "PRG32 SDK commit fetched when PRG32_SDK_DIR is empty")
+set(PRG32_SDK_REVISION "5d2e6501b2bd4f08bafe7773ef1d54fb71de8134" CACHE STRING "PRG32 SDK commit fetched when PRG32_SDK_DIR is empty")
 
 file(WRITE "${CMAKE_BINARY_DIR}/prg32qt-version.txt" "${PRG32QT_VERSION}\n")
 
@@ -132,6 +132,8 @@ if(PRG32QT_BUILD_APP)
     add_test(NAME prg32qt_multiplayer COMMAND prg32qt_multiplayer_check
              ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/PoingWall.prg32)
     set_tests_properties(prg32qt_multiplayer PROPERTIES SKIP_RETURN_CODE 77)
+    # Server address normalization and LAN discovery parsing, as the firmware's multiplayer wire test.
+    add_test(NAME prg32qt_multiplayer_wire COMMAND prg32qt_multiplayer_check --wire)
   endif()
 
   qt_add_executable(PRG32_QT ${PRG32QT_APP_SOURCES})

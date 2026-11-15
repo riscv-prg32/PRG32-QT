@@ -205,7 +205,11 @@ void StoreClient::downloadGame(const QJsonObject& g) {
     QUrl u = join("api/games/" + QString::fromUtf8(QUrl::toPercentEncoding(id)) + "/download");
     QUrlQuery q;
     q.addQueryItem("architecture", arch);
-    QString version = g.value("version").toString();
+    // The Store sends `latest_version`, not `version`: read it first, as the firmware's store setup does,
+    // and pass the id and version back whole.
+    QString version = g.value("latest_version").toString();
+    if (version.isEmpty())
+        version = g.value("version").toString();
     if (!version.isEmpty())
         q.addQueryItem("version", version);
     u.setQuery(q);
