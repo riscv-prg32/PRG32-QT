@@ -13,7 +13,8 @@ Supported host targets are **Windows, Linux, Raspberry Pi OS/Raspbian, macOS, iO
 - 320x200 indexed/RGB565 rendering, primitives, text, tiles, playfields, parallax, platform helpers, RGB565/indexed/bitplane sprites and animation.
 - The PRG32 firmware's audio engine (8 voices, ADSR, synth and filter, AUD0 samples and tracks, stereo), played through Qt Multimedia.
 - Safe-area-aware touch controls on mobile; keyboard plus hot-plug game controller support on desktop; controller-first, game-only fullscreen presentation on TV.
-- `prg32-multiplayer-1.0` multiplayer through a PRG32 Multiplayer Server or the Store's relay, RGB LED emulation, local scores, metrics/performance ABI calls, and
+- `prg32-multiplayer-1.0` multiplayer through a PRG32 Multiplayer Server, found as the firmware finds it (local
+  network, typed address, public server), RGB LED emulation, local scores, metrics/performance ABI calls, and
   safe unavailable-service stubs.
 - Store browser, search/tag filtering, Store URL, performance and firmware-style status-bar settings,
   architecture-aware downloads, persistent local cartridge import, splash and adaptive portrait/landscape player UI.
@@ -63,9 +64,10 @@ For an Android ARM64 debug APK with the default Qt 6.8.3 installation layout:
 The APK is written to `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`.
 
 Qt application builds require the Qt Multimedia and Qt WebSockets modules. Multiplayer ABI calls #32 through
-#40 and #139 use the server address from Settings or, when it is empty, the configured Store's
-`/api/multiplayer` WebSocket relay, and share one implementation on every Qt
-target.
+#40 and #139 share one implementation on every Qt target and choose the server in the firmware's order: a
+PRG32 Multiplayer Server found on the local network by LAN discovery (UDP port 8082, on unless **Use a local
+server first** is cleared in Settings), then the address typed in Settings, then the public server
+`wss://multi.prg32.uniparthenope.it` after 10 s of finding nothing.
 
 ## SDK deployment and discovery
 

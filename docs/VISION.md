@@ -20,7 +20,7 @@ the same local HTTP API and `_prg32._tcp.local.` discovery contract when network
 
 ## Non-goals
 
-PRG32-QT is not an ESP32 peripheral emulator. Multiplayer uses the public Store relay protocol rather than
+PRG32-QT is not an ESP32 peripheral emulator. Multiplayer uses the public `prg32-multiplayer-1.0` protocol rather than
 emulating ESP32 networking, while unavailable Wi-Fi and keyboard services remain unadvertised instead of
 receiving misleading partial behavior. Host-side HTTP and mDNS access for SDK tooling does not imply that the
 guest cartridge receives an emulated Wi-Fi peripheral.

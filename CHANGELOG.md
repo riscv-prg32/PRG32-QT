@@ -4,6 +4,20 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- Align with PRG32 SDK `main` (`5d2e650`; the cartridge ABI is unchanged at 1.8). Multiplayer now chooses its
+  server as the firmware does: a server found on the local network by LAN discovery (UDP 8082), then the address
+  typed in Settings, then the public `wss://multi.prg32.uniparthenope.it` after 10 s of finding nothing. The old
+  default, the Store's `/api/multiplayer`, is not a WebSocket relay (it answers an upgrade with `200`), so with an
+  empty Settings field no room could be joined. Settings gains **Use a local server first** and shows the server in
+  use; a bare host typed there gets port 8081, and an invalid address is refused.
+- Store downloads request the catalog's `latest_version`, read before `version` as the firmware's store setup
+  reads it; the catalog sends no `version`, so the request had no version at all.
+- `prg32qt_multiplayer_check` gains `discover` (consoles find the server themselves), `--keys` taps to reach a
+  cartridge's online lobby, `--dump`, and `--wire` (CTest `prg32qt_multiplayer_wire`: address normalization and
+  discovery parsing against the firmware's cases). `scripts/store-multiplayer.py` runs every multiplayer
+  cartridge in the Store on several consoles.
+- `PRG32_SDK_REVISION` moves to `5d2e650`.
+
 - Align with PRG32 SDK `main` (`1fa8474`, ABI 1.8): a controller's left stick now drives the analog calls
   (#140 to #143) on macOS, through Apple GameController pads and generic USB HID joysticks, with the firmware's
   deadzone of 12 and its rule that a resting stick lets the directions steer. Without a stick the calls behave as

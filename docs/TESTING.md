@@ -2,6 +2,43 @@
 
 PRG32-QT uses layered validation.
 
+## SDK `main` (`5d2e650`) alignment and Store multiplayer (2026-11-15)
+
+Against PRG32 SDK `main` `5d2e650` (fetched through `PRG32_SDK_REVISION`), Apple Silicon macOS, Homebrew Qt.
+Between `1fa8474` and `5d2e650` the cartridge ABI and `prg32_abi.h` are unchanged; the firmware changed how a console
+finds its multiplayer server and how its store screen keeps ids and versions.
+
+- `scripts/build-macos.sh`: app and tests build; CTest 7 of 7 pass, with `prg32qt_multiplayer` skipped (no
+  `PRG32QT_MULTIPLAYER_URL`) and the new `prg32qt_multiplayer_wire` passing. The speaker test played its tones;
+  nobody listened. `clang-format` 18.1.8 `--dry-run --Werror` and `scripts/check-docs.py` pass.
+- The old default multiplayer endpoint, the Store's `/api/multiplayer`, answers a WebSocket upgrade with
+  `200 OK`, not `101`: it is not a relay. `wss://multi.prg32.uniparthenope.it` answers `101`.
+- Whole Store, 900 frames with media verification and input sweep, Release runner: Accurate and Unlimited both
+  `catalog=38 passed=36 skipped_nonportable=2 failed=0` (`space_invaders`, `terraforge`). Every cartridge's pixel and
+  frame-hash counts agree with the unoptimized runner's run. That run timed out on Pompeii 2.1.0 (120 s): it needs
+  about 26 s per 60 frames unoptimized and 39 s per 900 frames in Release, as CI builds it.
+- `prg32qt_multiplayer_check` with the Poing Wall fixture: 2 consoles on `wss://multi.prg32.uniparthenope.it`; 4
+  consoles that found a local PRG32 Multiplayer Server (`5411482`, `PORT=18081`, discovery on UDP 8082) by LAN
+  discovery and showed it as LOCAL; 4 consoles with the typed address; and, with no server on the network, 2 consoles
+  that moved to the public server after 10 s and saw each other.
+- `scripts/store-multiplayer.py`, every Store cartridge declaring multiplayer (8: Azzurra's Pro Tennis Challenge
+  2.2.0, Drumfight 1.1.0, FairWind 5.0.0, Galleria 2007 0.2.0 and its English edition, OutBun 1.1.0, Sensational Soccer
+  1.1.0, Skipass Madness 2.1.0), each walked to its online lobby by scripted keys: `passed=8 failed=0` with 2 consoles
+  by LAN discovery, with 4 consoles by LAN discovery, and with 2 consoles on `wss://multi.prg32.uniparthenope.it`. Every
+  console was admitted with its own player ID and saw every other console as a peer. Dukes of Duchesca, NapRider,
+  Pompeii and Spiriti mention multiplayer in their entries but declare `multiplayer: false`.
+- One earlier 2-console discovery run, while the computer's load average was near 13, failed Galleria (no peers) and
+  OutBun (one console not admitted): the scripted keys are counted in frames and the run in seconds, so the last keys
+  came too late. The check now also waits 150 frames after the last key, up to three times the requested time. The
+  4-console and public-server runs followed that change; the passing 2-console discovery run, on an idle computer,
+  came just before it.
+- The desktop app searched the local network at start-up and showed `Server: LOCAL (ws://…)` in Settings, and the
+  public server once the local server was stopped; `docs/images/macos-display-settings.png` was refreshed.
+- Not run: a match played to its end, and a room shared with QEMU or an ESP32-C6. The firmware's mDNS lookup of
+  `_prg32mp._tcp` is not implemented here. Windows, Linux, Raspberry Pi OS, iOS, Android, Android TV and Apple TV were
+  not built here: no kits are installed. CI builds them. LAN discovery there is unverified (see
+  [Platforms](PLATFORMS.md)).
+
 ## SDK `main` (`1fa8474`) for the firmware audio engine (2026-11-04)
 
 The SDK's `audio.c` now includes `esp_log.h` and creates a binary semaphore, so the port's shim gains `esp_log.h` (the log

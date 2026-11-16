@@ -52,6 +52,12 @@ AppController::AppController(QObject* p)
     rt_.setAudioSink(audio_.get());
 #endif
     rt_.setMultiplayerService(multiplayer_.get());
+    connect(multiplayer_.get(),
+            &QtMultiplayerService::currentServerChanged,
+            this,
+            &AppController::multiplayerCurrentServerChanged);
+    // As the firmware does when Wi-Fi connects: look for a local server before a game asks for a room.
+    multiplayer_->searchLocalNetwork();
     rt_.setLEDCallback([this](prg32::RGBState v) {
         led_ = v;
         emit ledChanged();
@@ -175,19 +181,31 @@ void AppController::setPerformanceMode(const QString& mode) {
     updateTimerInterval();
     emit performanceModeChanged();
 }
-void AppController::setMultiplayerStoreUrl(const QUrl& url) {
-    multiplayer_->setStoreUrl(url);
-}
 QString AppController::multiplayerServerUrl() const {
     return multiplayer_->serverUrl();
 }
 void AppController::setMultiplayerServerUrl(const QString& url) {
-    const QString trimmed = url.trimmed();
-    if (multiplayer_->serverUrl() == trimmed)
-        return;
-    multiplayer_->setServerUrl(trimmed);
-    QSettings().setValue("multiplayer/serverUrl", trimmed);
+    // Refused text still notifies, so the settings field shows the address actually kept.
+    if (multiplayer_->setServerUrl(url))
+        QSettings().setValue("multiplayer/serverUrl", multiplayer_->serverUrl());
     emit multiplayerServerUrlChanged();
+}
+bool AppController::multiplayerLocalServer() const {
+    return multiplayer_->localServerEnabled();
+}
+void AppController::setMultiplayerLocalServer(bool enabled) {
+    if (multiplayer_->localServerEnabled() == enabled)
+        return;
+    multiplayer_->setLocalServerEnabled(enabled);
+    if (enabled)
+        multiplayer_->searchLocalNetwork();
+    emit multiplayerServerUrlChanged();
+}
+QString AppController::multiplayerCurrentServer() const {
+    const QString url = multiplayer_->currentServerUrl();
+    if (url.isEmpty())
+        return QStringLiteral("Searching the local network");
+    return multiplayer_->currentServerIsLocal() ? QStringLiteral("LOCAL (%1)").arg(url) : url;
 }
 void AppController::pressRemoteKeys(quint32 mask, int holdMs) {
     input_.set(InputState::Remote, mask, true);

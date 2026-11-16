@@ -32,6 +32,10 @@ class AppController : public QObject {
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
     Q_PROPERTY(QString multiplayerServerUrl READ multiplayerServerUrl WRITE setMultiplayerServerUrl NOTIFY
                    multiplayerServerUrlChanged)
+    Q_PROPERTY(bool multiplayerLocalServer READ multiplayerLocalServer WRITE setMultiplayerLocalServer NOTIFY
+                   multiplayerServerUrlChanged)
+    Q_PROPERTY(QString multiplayerCurrentServer READ multiplayerCurrentServer NOTIFY
+                   multiplayerCurrentServerChanged)
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
     Q_PROPERTY(QString deviceIp READ deviceIp NOTIFY networkChanged)
     Q_PROPERTY(QString webApiUrl READ webApiUrl NOTIFY networkChanged)
@@ -192,12 +196,19 @@ class AppController : public QObject {
     Q_INVOKABLE void attachFrame(QObject*);
     Q_INVOKABLE void playStartupTone();
     Q_INVOKABLE void runPerformanceTest();
-    /** Point multiplayer rooms at the configured Cartridge Store relay. */
-    void setMultiplayerStoreUrl(const QUrl& url);
-    /** Multiplayer server address; empty uses the Cartridge Store's relay. */
+    /** Typed multiplayer server address, normalized; empty when none is set. */
     QString multiplayerServerUrl() const;
-    /** Persist the multiplayer server address, as the firmware's `prg32 multiplayer set-url` sets it. */
+    /**
+     * Persist the typed multiplayer server address, as the firmware's SETUP > MULTIPLAYER SETUP > SERVER URL
+     * saves it. A bare host gets port 8081; invalid text is refused and the previous address kept.
+     */
     void setMultiplayerServerUrl(const QString& url);
+    /** Whether a multiplayer server found on the local network comes first (firmware LOCAL SERVER). */
+    bool multiplayerLocalServer() const;
+    /** Persist the LOCAL SERVER setting. */
+    void setMultiplayerLocalServer(bool enabled);
+    /** The multiplayer server in use: "LOCAL (ws://...)", an address, or a search in progress. */
+    QString multiplayerCurrentServer() const;
     /** Press device-protocol keys for holdMs; they release by themselves. */
     void pressRemoteKeys(quint32 mask, int holdMs);
     /** End a device-protocol press early. */
@@ -216,6 +227,7 @@ class AppController : public QObject {
     void setStatusBarsEnabled(bool enabled);
   signals:
     void multiplayerServerUrlChanged();
+    void multiplayerCurrentServerChanged();
     /** A host started a cartridge over the device protocol: the player page must show it. */
     void playerRequested();
     void statusChanged();

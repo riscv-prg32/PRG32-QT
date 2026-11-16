@@ -158,8 +158,11 @@ ApplicationWindow {
             RowLayout { Button{text:"Test connection";onClicked:{storeClient.baseUrl=storeField.text;storeClient.refresh()}} Button{text:"Restore default";onClicked:{storeClient.resetDefault();storeField.text=storeClient.baseUrl;storeClient.refresh()}} }
             Label { Layout.fillWidth:true; text:storeClient.error.length?storeClient.error:(storeClient.cartridges.length+" cartridges"); wrapMode:Text.Wrap }
             Label { Layout.fillWidth:true; font.bold:true; text:"Multiplayer" }
-            TextField { Layout.fillWidth:true; text:appController.multiplayerServerUrl; placeholderText:"ws://server:8081 (empty: the Store's relay)"; inputMethodHints:Qt.ImhUrlCharactersOnly
-                onEditingFinished:appController.multiplayerServerUrl=text }
+            TextField { Layout.fillWidth:true; text:appController.multiplayerServerUrl; placeholderText:"Server address: host, host:port or ws(s)://… (empty: public server)"; inputMethodHints:Qt.ImhUrlCharactersOnly
+                onEditingFinished:{appController.multiplayerServerUrl=text;text=Qt.binding(function(){return appController.multiplayerServerUrl})} }
+            CheckBox { text:"Use a local server first"; checked:appController.multiplayerLocalServer
+                onToggled:appController.multiplayerLocalServer=checked }
+            Label { Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:12; text:"Server: "+appController.multiplayerCurrentServer }
             Label { Layout.fillWidth:true; font.bold:true; text:"Player display" }
             ComboBox { id:orientationBox; Layout.fillWidth:true; model:["Auto","Portrait","Landscape"]
                 Component.onCompleted:currentIndex=Math.max(0,["auto","portrait","landscape"].indexOf(appController.preferredOrientation))

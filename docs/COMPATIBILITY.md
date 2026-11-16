@@ -19,7 +19,7 @@ PRG32-QT targets portable ABI-table PRG32 cartridges and follows the public PRG3
   and scores.
 - DNS-SD device advertisement `_prg32._tcp.local.` with API contract `prg32-http-1`; this is distinct from the
   Cartridge Store's `_prg32store._tcp.local.` discovery ABI.
-- Multiplayer ABI calls #32-#40 and #139 and the `prg32-multiplayer-1.0` protocol, against a PRG32 Multiplayer Server or the Store's `/api/multiplayer` relay.
+- Multiplayer ABI calls #32-#40 and #139 and the `prg32-multiplayer-1.0` protocol, against a PRG32 Multiplayer Server found by LAN discovery, typed in Settings, or the public `wss://multi.prg32.uniparthenope.it`.
 
 Hardware-specific cartridges that bypass the portable ABI and depend directly on ESP32 peripherals are outside this host's compatibility target.
 
