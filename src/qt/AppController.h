@@ -196,6 +196,9 @@ class AppController : public QObject {
     Q_INVOKABLE void attachFrame(QObject*);
     Q_INVOKABLE void playStartupTone();
     Q_INVOKABLE void runPerformanceTest();
+    /** Multiplayer state for `/api/runtime`: server in use, whether it is local, player ID (0 until
+     * `welcome`), and the number of live peers. */
+    QJsonObject multiplayerJson() const;
     /** Typed multiplayer server address, normalized; empty when none is set. */
     QString multiplayerServerUrl() const;
     /**

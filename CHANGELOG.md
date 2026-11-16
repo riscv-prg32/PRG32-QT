@@ -4,6 +4,12 @@ All notable changes to PRG32-QT will be documented here. The project follows Sem
 
 ## [Unreleased]
 
+- `/api/runtime` reports `multiplayer`: the server in use, whether it was found on the local network, the local
+  server setting, the player ID (0 until admitted) and the live peer count.
+- `--cartridge` accepts a path relative to the app's Documents folder, and a cartridge given at launch opens the
+  player after the splash screen. On iOS a cartridge copied there with `devicectl` can be started without touching
+  the device.
+
 - Align with PRG32 SDK `main` (`5d2e650`; the cartridge ABI is unchanged at 1.8). Multiplayer now chooses its
   server as the firmware does: a server found on the local network by LAN discovery (UDP 8082), then the address
   typed in Settings, then the public `wss://multi.prg32.uniparthenope.it` after 10 s of finding nothing. The old

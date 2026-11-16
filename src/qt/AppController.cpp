@@ -786,7 +786,17 @@ QJsonObject AppController::runtimeJson() const {
         {"qemu", false},
         {"cart", cart},
         {"diag", QJsonObject{{"frame_count", double(frameCount_)}, {"input_state", double(input_.merged())}}},
+        {"multiplayer", multiplayerJson()},
         {"host", "qt"}};
+}
+QJsonObject AppController::multiplayerJson() const {
+    // The peer count is read on the service's own real-time clock, so the runtime time passed here is unused.
+    const int peers = multiplayer_->peerCount(0);
+    return {{"server", multiplayer_->currentServerUrl()},
+            {"local", multiplayer_->currentServerIsLocal()},
+            {"local_server_enabled", multiplayer_->localServerEnabled()},
+            {"player_id", double(multiplayer_->localPlayerId())},
+            {"peers", peers}};
 }
 QJsonArray AppController::gamesJson() const {
     QJsonArray out;

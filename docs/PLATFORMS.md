@@ -128,6 +128,20 @@ xcrun devicectl device process launch --device <device-udid> \
   org.riscv-prg32.prg32qt
 ```
 
+An installed app keeps its data only when it is re-signed by the same team; a build from another team is refused
+with `MismatchedApplicationIdentifierEntitlement`. To start a cartridge without touching the device, copy it into
+the app's Documents folder and pass its name with `--cartridge`; a relative path resolves against Documents, and the
+player opens after the splash screen:
+
+```sh
+xcrun devicectl device copy to --device <device-udid> --source game.prg32 \
+  --destination Documents/game.prg32 --domain-type appDataContainer \
+  --domain-identifier org.riscv-prg32.prg32qt
+xcrun devicectl device process launch --device <device-udid> --terminate-existing \
+  org.riscv-prg32.prg32qt --cartridge game.prg32
+xcrun devicectl device capture screenshot --device <device-udid> --destination screen.png
+```
+
 The default Store uses HTTPS. The existing App Transport Security allowance remains only for user-configured
 development Stores that still use plain HTTP.
 The bundle declares `_prg32._tcp` in `NSBonjourServices` and provides a local-network usage description. iOS

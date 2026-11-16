@@ -2,6 +2,27 @@
 
 PRG32-QT uses layered validation.
 
+## iPhone multiplayer (2026-11-15)
+
+iPhone 12 Pro Max (arm64), PRG32-QT 0.4.1 built with Qt 6.8.3 for iOS (aqtinstall), Release, development-signed by
+the team that signed the installed 0.4.0, installed over it with `devicectl` and launched with
+`--cartridge <name>.prg32` from its Documents folder.
+
+- The iPhone and the Mac were on one Wi-Fi subnet that isolates clients: ping and HTTP from the Mac to the phone
+  timed out, so `/api/runtime` and LAN discovery could not be used. The phone found no local server and used the
+  public server after the 10 s fallback, as designed.
+- Sensational Soccer 1.1.0 and Skipass Madness 2.1.0, which join their rooms at boot, ran on the iPhone while two
+  Mac consoles of the same game ran `prg32qt_multiplayer_check ... wss://multi.prg32.uniparthenope.it 2 30`. Both Mac
+  consoles were admitted and saw three consoles in the room (`peers=2 other_hosts=1`), twice for each game. With the
+  app stopped on the phone, the same Sensational Soccer check saw `other_hosts=0`, so the third console was the
+  iPhone, admitted and sending snapshots.
+- Screenshots (`devicectl device capture screenshot`) showed Setup and the player in portrait at 30 FPS with the touch
+  controls, and both games running. Opening the player at once at launch laid it out before the window had its
+  safe-area insets, under the status bar; the player now opens after the splash screen, and its header sits below
+  the status bar.
+- Not verified on the phone: what it receives from its peers (no API access on this network, and the games show no
+  peer count in their demos), LAN discovery, typed addresses, and any touch input; nothing was tapped.
+
 ## SDK `main` (`5d2e650`) alignment and Store multiplayer (2026-11-15)
 
 Against PRG32 SDK `main` `5d2e650` (fetched through `PRG32_SDK_REVISION`), Apple Silicon macOS, Homebrew Qt.

@@ -6,13 +6,21 @@
 #include "RasterImageItem.h"
 #include "StoreClient.h"
 #include "WebApiServer.h"
+#include <QDir>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QResource>
+#include <QStandardPaths>
 #include <QTimer>
+namespace {
+/** Delay before a cartridge given at launch opens the player: after the 900 ms splash screen. */
+constexpr int LaunchPlayerDelayMs = 1500;
+} // namespace
+
 int main(int argc, char** argv) {
     Q_INIT_RESOURCE(prg32qt_assets);
     QGuiApplication app(argc, argv);
@@ -36,8 +44,18 @@ int main(int argc, char** argv) {
             screenshotCartridge = QString::fromLocal8Bit(argv[++argument]);
         }
     }
-    if (!screenshotCartridge.isEmpty())
-        controller.loadFile(QUrl::fromLocalFile(screenshotCartridge));
+    bool launchCartridgeLoaded = false;
+    if (!screenshotCartridge.isEmpty()) {
+        // A relative path names a file in the application's Documents folder. On iOS that folder is the one
+        // `xcrun devicectl device copy to --domain-type appDataContainer ... --destination Documents/`
+        // writes, so a cartridge can be started on a device without the Files app.
+        QString cartridgePath = screenshotCartridge;
+        if (QFileInfo(cartridgePath).isRelative()) {
+            const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+            cartridgePath = QDir(documents).filePath(cartridgePath);
+        }
+        launchCartridgeLoaded = controller.loadFile(QUrl::fromLocalFile(cartridgePath));
+    }
     WebApiServer web(&controller);
     IoProtocolServer ioProtocol(&controller);
     MdnsAdvertiser discovery(web.port());
@@ -54,6 +72,12 @@ int main(int argc, char** argv) {
     e.loadFromModule("PRG32Qt", "Main");
     if (e.rootObjects().isEmpty())
         return 1;
+    // A cartridge given at launch opens the player, unless a documentation screenshot chooses the page.
+    // It waits for the splash screen, so that the mobile window has its safe-area insets before the player
+    // page is laid out.
+    if (launchCartridgeLoaded && screenshotPage.isEmpty())
+        QTimer::singleShot(
+            LaunchPlayerDelayMs, &controller, [&controller] { emit controller.playerRequested(); });
     if (!screenshotPath.isEmpty()) {
         QTimer::singleShot(2500, &app, [&app, &e, screenshotPath] {
             auto* window = qobject_cast<QQuickWindow*>(e.rootObjects().constFirst());
